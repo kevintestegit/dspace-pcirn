@@ -1,0 +1,37 @@
+<style>
+  .mock-stage{position:relative;height:760px;background:#eef1f3;border-radius:14px;overflow:hidden;box-shadow:0 16px 45px rgba(0,0,0,.22)}
+  .mock-live{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+  .mock-body{position:absolute;left:0;right:0;top:88px;bottom:108px;overflow:auto;background:#f4f6f7;color:#152633;font-family:Arial,sans-serif}
+  .mock-body-inner{max-width:1120px;margin:0 auto;padding:52px 58px 64px}
+  .mock-kicker{font-size:11px;font-weight:800;letter-spacing:.18em;color:#0b4f8a;text-transform:uppercase}
+  .mock-body h1{font:400 clamp(36px,5vw,68px)/.98 Georgia,serif;max-width:780px;margin:13px 0 17px;color:#152633}
+  .mock-intro{font:19px/1.48 Georgia,serif;color:#536571;max-width:650px;margin:0}
+  .mock-search{display:flex;max-width:650px;margin:28px 0 43px}.mock-search input{flex:1;border:1px solid #b8c5cc;background:#fff;padding:16px;font-size:14px}.mock-search button{border:0;background:#0b4f8a;color:white;padding:0 25px;font-size:11px;font-weight:800;letter-spacing:.1em}
+  .mock-rule{height:1px;background:#ccd5da;margin-bottom:24px}.mock-heading{display:flex;justify-content:space-between;align-items:center}.mock-heading h2{font:400 28px Georgia,serif;margin:0}.mock-heading a{font-size:11px;font-weight:800;letter-spacing:.08em;color:#0b4f8a;text-transform:uppercase}
+  .mock-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}.mock-card{background:#fff;padding:22px 20px;min-height:150px;border-top:3px solid #0b4f8a;box-shadow:0 3px 12px rgba(21,38,51,.06)}.mock-card:nth-child(2){border-color:#7abf3a}.mock-card:nth-child(3){border-color:#536571}.mock-card small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#0b4f8a}.mock-card h3{font:400 22px/1.08 Georgia,serif;margin:25px 0 10px}.mock-card p{font:14px/1.4 Georgia,serif;color:#61717b;margin:0}.mock-lower{display:grid;grid-template-columns:1.2fr 1fr;gap:38px;margin-top:38px}.mock-lower h2{font:400 24px Georgia,serif;margin:0 0 14px}.mock-list{border-top:1px solid #ccd5da}.mock-list div{display:flex;justify-content:space-between;border-bottom:1px solid #dce3e7;padding:12px 0;font:14px Georgia,serif}.mock-list small{font:800 10px Arial,sans-serif;color:#0b4f8a}.mock-about{font:16px/1.55 Georgia,serif;color:#536571;margin:0}
+  .mock-note{position:absolute;left:14px;top:14px;background:#a6d82e;color:#071926;padding:7px 10px;font:800 10px Arial,sans-serif;letter-spacing:.08em;z-index:3;border-radius:3px}.mock-footer-note{position:absolute;right:14px;bottom:14px;background:rgba(3,20,34,.9);color:#dce6f0;padding:7px 10px;font:10px Arial,sans-serif;z-index:3;border-radius:3px}
+  @media(max-width:700px){.mock-body{top:78px;bottom:135px}.mock-body-inner{padding:32px 22px}.mock-cards,.mock-lower{grid-template-columns:1fr}.mock-intro{font-size:17px}.mock-heading{display:block}.mock-heading a{display:block;margin-top:9px}}
+</style>
+
+<h2>Mock visual — somente o conteúdo central</h2>
+<p class="subtitle">A página ao fundo é a home atual. O painel sobreposto substitui apenas o miolo; header e footer continuam sendo os reais.</p>
+
+<div class="mock-stage">
+  <iframe class="mock-live" src="http://localhost:4000/home" title="Home atual da PCIRN"></iframe>
+  <div class="mock-note">HEADER E FOOTER REAIS · INALTERADOS</div>
+  <section class="mock-body" aria-label="Proposta de conteúdo central">
+    <div class="mock-body-inner">
+      <div class="mock-kicker">Repositório digital institucional</div>
+      <h1>Conhecimento que sustenta a investigação.</h1>
+      <p class="mock-intro">Produção científica, memória institucional e informação pública da Polícia Científica do Rio Grande do Norte.</p>
+      <div class="mock-search"><input placeholder="Busque por título, autor ou assunto"><button>BUSCAR</button></div>
+      <div class="mock-rule"></div>
+      <div class="mock-heading"><h2>Explore o acervo</h2><a href="#">Ver todas as coleções →</a></div>
+      <div class="mock-cards"><article class="mock-card"><small>01 / PESQUISA</small><h3>Produção científica</h3><p>Artigos, relatórios e pesquisas produzidos pela instituição.</p></article><article class="mock-card"><small>02 / ACERVO</small><h3>Comunidades e coleções</h3><p>Navegue por áreas, unidades e conjuntos documentais.</p></article><article class="mock-card"><small>03 / MEMÓRIA</small><h3>Documentos institucionais</h3><p>Conheça a trajetória, os métodos e o conhecimento preservado.</p></article></div>
+      <div class="mock-lower"><section><h2>Em destaque</h2><div class="mock-list"><div><span>Identificação humana e ciência forense</span><small>ARTIGO</small></div><div><span>Boletim técnico da PCIRN</span><small>RELATÓRIO</small></div><div><span>Procedimentos e boas práticas</span><small>DOCUMENTO</small></div></div></section><section><h2>Sobre o repositório</h2><p class="mock-about">Um espaço para preservar, organizar e ampliar o acesso ao conhecimento produzido pela Polícia Científica do RN.</p></section></div>
+    </div>
+  </section>
+  <div class="mock-footer-note">FOOTER REAL · INALTERADO</div>
+</div>
+
+<div class="section" style="margin-top:24px"><span class="label">Aprovação</span><p class="subtitle">Este mock não altera o frontend. Ele serve apenas para validar a área central antes de qualquer implementação no checkout separado.</p></div>

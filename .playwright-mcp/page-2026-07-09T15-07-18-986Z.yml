@@ -1,0 +1,90 @@
+- generic [active] [ref=f7e1]:
+  - heading "🧪 Teste de Visualizadores DSpace" [level=1] [ref=f7e2]
+  - generic [ref=f7e3]:
+    - heading "teste.pdf" [level=3] [ref=f7e4]
+    - generic [ref=f7e5]: "Tipo: pdf"
+    - generic [ref=f7e6]: PDF nao renderizou
+    - link "📥 Download" [ref=f7e7] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.pdf
+  - generic [ref=f7e8]:
+    - heading "teste.png" [level=3] [ref=f7e9]
+    - generic [ref=f7e10]: "Tipo: png"
+    - img "teste.png" [ref=f7e12]
+    - link "📥 Download" [ref=f7e13] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.png
+  - generic [ref=f7e14]:
+    - heading "teste.jpg" [level=3] [ref=f7e15]
+    - generic [ref=f7e16]: "Tipo: jpg"
+    - img "teste.jpg" [ref=f7e18]
+    - link "📥 Download" [ref=f7e19] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.jpg
+  - generic [ref=f7e20]:
+    - heading "teste.gif" [level=3] [ref=f7e21]
+    - generic [ref=f7e22]: "Tipo: gif"
+    - img "teste.gif" [ref=f7e24]
+    - link "📥 Download" [ref=f7e25] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.gif
+  - generic [ref=f7e26]:
+    - heading "teste.webp" [level=3] [ref=f7e27]
+    - generic [ref=f7e28]: "Tipo: webp"
+    - img "teste.webp" [ref=f7e30]
+    - link "📥 Download" [ref=f7e31] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.webp
+  - generic [ref=f7e32]:
+    - heading "teste.svg" [level=3] [ref=f7e33]
+    - generic [ref=f7e34]: "Tipo: svg"
+    - img "teste.svg" [ref=f7e36]
+    - link "📥 Download" [ref=f7e37] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.svg
+  - generic [ref=f7e38]:
+    - heading "teste.txt" [level=3] [ref=f7e39]
+    - generic [ref=f7e40]: "Tipo: txt"
+    - generic [ref=f7e41]:
+      - iframe [ref=f7e42]:
+        - heading "Teste" [level=1] [ref=f8e2]
+      - link "Visualizar" [ref=f7e43] [cursor=pointer]:
+        - /url: /assets/pcirn/test-files/teste.txt
+    - link "📥 Download" [ref=f7e44] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.txt
+  - generic [ref=f7e45]:
+    - heading "teste.html" [level=3] [ref=f7e46]
+    - generic [ref=f7e47]: "Tipo: html"
+    - generic [ref=f7e48]:
+      - iframe [ref=f7e49]:
+        - heading "Teste" [level=1] [ref=f9e2]
+      - link "Visualizar" [ref=f7e50] [cursor=pointer]:
+        - /url: /assets/pcirn/test-files/teste.html
+    - link "📥 Download" [ref=f7e51] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.html
+  - generic [ref=f7e52]:
+    - heading "teste.mp3" [level=3] [ref=f7e53]
+    - generic [ref=f7e54]: "Tipo: mp3"
+    - generic [ref=f7e56]: Audio nao suportado
+    - link "📥 Download" [ref=f7e57] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.mp3
+  - generic [ref=f7e58]:
+    - heading "teste.mp4" [level=3] [ref=f7e59]
+    - generic [ref=f7e60]: "Tipo: mp4"
+    - generic [ref=f7e62]: Video nao suportado
+    - link "📥 Download" [ref=f7e63] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.mp4
+  - generic [ref=f7e64]:
+    - heading "teste.webm" [level=3] [ref=f7e65]
+    - generic [ref=f7e66]: "Tipo: webm"
+    - generic [ref=f7e68]: Video nao suportado
+    - link "📥 Download" [ref=f7e69] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.webm
+  - generic [ref=f7e70]:
+    - heading "teste.zip" [level=3] [ref=f7e71]
+    - generic [ref=f7e72]: "Tipo: zip"
+    - link "📥 Download (não visualizável)" [ref=f7e74] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.zip
+    - link "📥 Download" [ref=f7e75] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.zip
+  - generic [ref=f7e76]:
+    - heading "teste.docx" [level=3] [ref=f7e77]
+    - generic [ref=f7e78]: "Tipo: docx"
+    - link "📥 Download (não visualizável)" [ref=f7e80] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.docx
+    - link "📥 Download" [ref=f7e81] [cursor=pointer]:
+      - /url: /assets/pcirn/test-files/teste.docx

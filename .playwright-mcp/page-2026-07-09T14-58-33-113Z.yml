@@ -1,0 +1,117 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - paragraph [ref=e5]:
+      - text: "Coletamos e processamos suas informações pessoais para os seguintes fins:"
+      - strong [ref=e6]: Funcional, Estatística
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - button "Aceitar" [ref=e9] [cursor=pointer]
+      - listitem [ref=e10]:
+        - button "Recusar" [ref=e11] [cursor=pointer]
+      - listitem [ref=e12]:
+        - button "Customizar" [ref=e13] [cursor=pointer]
+  - generic [ref=e16]:
+    - button "Pular para o conteúdo principal" [ref=e17] [cursor=pointer]
+    - generic [ref=e19]:
+      - banner [ref=e25]:
+        - generic [ref=e26]:
+          - button "Início" [ref=e27] [cursor=pointer]:
+            - img "Logo do repositório" [ref=e28]
+          - navigation "Barra de navegação principal" [ref=e29]:
+            - menubar [ref=e32]:
+              - menuitem "Comunidades & Coleções" [ref=e36] [cursor=pointer]
+              - menuitem "Tudo no DSpace" [ref=e40] [cursor=pointer]:
+                - button "Tudo no DSpace" [ref=e43]
+                - generic [ref=e44]: 
+              - menuitem "Estatísticas" [ref=e48] [cursor=pointer]
+          - generic [ref=e49]:
+            - generic "Buscar" [ref=e52]:
+              - generic [ref=e54]:
+                - textbox "Buscar" [ref=e55]:
+                  - /placeholder: ""
+                - button "Enviar pesquisa" [ref=e56] [cursor=pointer]:
+                  - emphasis [ref=e57]: 
+            - toolbar [ref=e58]:
+              - button "Selecionar um idioma" [ref=e62] [cursor=pointer]:
+                - generic [ref=e63]: 
+      - navigation "breadcrumb" [ref=e66]:
+        - list [ref=e67]:
+          - listitem [ref=e68]:
+            - link "Início" [ref=e70] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=e71]:
+            - text: •
+            - generic [ref=e73]: Entrar
+      - main [ref=e74]:
+        - generic [ref=e80]:
+          - img "Logo do Repositório" [ref=e81]
+          - heading "Por favor, entre no DSpace" [level=1] [ref=e82]
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - textbox "Endereço de e-mail" [ref=e89]
+              - textbox "Senha" [ref=e90]
+              - button " Entrar" [disabled]:
+                - generic: 
+                - text: Entrar
+            - generic [ref=e91]:
+              - link "Novo usuário? Clique aqui para cadastrar." [ref=e92] [cursor=pointer]:
+                - /url: /register
+              - link "Esqueceu sua senha?" [ref=e93] [cursor=pointer]:
+                - /url: /forgot
+      - contentinfo [ref=e96]:
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - generic [ref=e101]:
+              - generic [ref=e102]: POLÍCIA CIENTÍFICA DO RN
+              - generic [ref=e103]: Ciência que identifica. Informação que transforma.
+            - generic "Redes sociais e contato" [ref=e104]:
+              - link "Instagram" [ref=e105] [cursor=pointer]:
+                - /url: https://www.instagram.com/
+                - img [ref=e106]
+              - link "YouTube" [ref=e108] [cursor=pointer]:
+                - /url: https://www.youtube.com/
+                - img [ref=e109]
+              - link "Facebook" [ref=e111] [cursor=pointer]:
+                - /url: https://www.facebook.com/
+                - img [ref=e112]
+              - link "E-mail" [ref=e114] [cursor=pointer]:
+                - /url: mailto:contato@pcirn.rn.gov.br
+                - img [ref=e115]
+          - generic [ref=e117]:
+            - generic [ref=e118]:
+              - img [ref=e119]
+              - text: NAVEGAÇÃO
+            - list [ref=e121]:
+              - listitem [ref=e122]:
+                - link "Início" [ref=e123] [cursor=pointer]:
+                  - /url: /home
+              - listitem [ref=e124]:
+                - link "Comunidades e Coleções" [ref=e125] [cursor=pointer]:
+                  - /url: /community-list
+              - listitem [ref=e126]:
+                - link "Produção Científica" [ref=e127] [cursor=pointer]:
+                  - /url: /search
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - img [ref=e130]
+              - text: AJUDA
+            - list [ref=e132]:
+              - listitem [ref=e133]:
+                - link "Documentos Institucionais" [ref=e134] [cursor=pointer]:
+                  - /url: /info/end-user-agreement
+              - listitem [ref=e135]:
+                - link "Políticas do repositório" [ref=e136] [cursor=pointer]:
+                  - /url: /info/privacy
+              - listitem [ref=e137]:
+                - link "Contato" [ref=e138] [cursor=pointer]:
+                  - /url: /info/feedback
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - img [ref=e141]
+              - text: DSpace 9
+            - generic [ref=e143]: Sistema de Repositório Digital Livre e Aberto
+            - generic [ref=e144]: © 2026 Polícia Científica do RN. Todos os direitos reservados.
+            - generic [ref=e145]:
+              - text: Desenvolvido por
+              - strong [ref=e146]: NUGECID
+    - log [ref=e147]
