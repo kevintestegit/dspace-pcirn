@@ -4,7 +4,7 @@
 
 **Goal:** Reproduce the approved PCIRN search-page layout at `/search`, including the visual icon system, while leaving the existing header and search behavior untouched.
 
-**Architecture:** Keep DSpace's base search template, state, translations, and nested search components as the source of behavior. Enable one custom page stylesheet and use selectors rooted at the themed search page, with `::ng-deep` only where Angular child encapsulation requires it. Add a small Node contract test for the stylesheet activation and the approved visual/icon hooks.
+**Architecture:** Keep DSpace's base search component, state, translations, and nested search components as the source of behavior. Add a themed wrapper template only to provide a visual root, enable one custom page stylesheet, and use selectors rooted at that wrapper, with `::ng-deep` only where Angular child encapsulation requires it. Add a small Node contract test for the stylesheet activation and the approved visual/icon hooks.
 
 **Tech Stack:** Angular 20 standalone components, SCSS, Bootstrap 5, Font Awesome 6 already bundled by DSpace, Node's built-in test runner.
 
@@ -26,16 +26,21 @@ import test from 'node:test';
 
 const sourceRoot = new URL('../dspace-angular/source/', import.meta.url);
 const componentPath = new URL('src/themes/custom/app/search-page/search-page.component.ts', sourceRoot);
+const templatePath = new URL('src/themes/custom/app/search-page/search-page.component.html', sourceRoot);
 const stylePath = new URL('src/themes/custom/app/search-page/search-page.component.scss', sourceRoot);
 
-const [component, styles] = await Promise.all([
+const [component, template, styles] = await Promise.all([
   readFile(componentPath, 'utf8'),
+  readFile(templatePath, 'utf8'),
   readFile(stylePath, 'utf8'),
 ]);
 
 test('PCIRN search page enables its scoped visual stylesheet', () => {
-  assert.match(component, /styleUrls:\s*\[['"]\.\/search-page\.component\.scss['"]\]/);
+  assert.match(component, /^\s*styleUrls:\s*\[['"]\.\/search-page\.component\.scss['"]\]/m);
+  assert.match(component, /^\s*templateUrl:\s*['"]\.\/search-page\.component\.html['"]/m);
+  assert.match(template, /class="pcirn-search-page"/);
   assert.doesNotMatch(component, /header|navbar/i);
+  assert.doesNotMatch(template, /header|navbar/i);
 });
 
 test('PCIRN search stylesheet exposes the approved visual/icon contract', () => {
@@ -75,16 +80,26 @@ Expected: FAIL because the custom search stylesheet is not enabled and is empty.
 
 **Files:**
 - Modify: `/dados/apps/dspace/dspace-angular/source/src/themes/custom/app/search-page/search-page.component.ts`
+- Modify: `/dados/apps/dspace/dspace-angular/source/src/themes/custom/app/search-page/search-page.component.html`
 
 - [ ] **Step 1: Change only the component stylesheet metadata**
 
-Replace the commented style entry with:
+Replace the commented template and style entries with:
 
 ```ts
+  templateUrl: './search-page.component.html',
   styleUrls: ['./search-page.component.scss'],
 ```
 
-Keep the existing base `templateUrl`, provider, imports, selector, and class body unchanged. Do not modify any header source file.
+In the custom HTML file, keep the base page behavior and add only the visual root:
+
+```html
+<div class="pcirn-search-page">
+  <ds-search [showCsvExport]="true" [trackStatistics]="true"></ds-search>
+</div>
+```
+
+Keep the provider, imports, selector, and class body unchanged. Do not modify any header source file.
 
 - [ ] **Step 2: Run the contract test**
 
@@ -209,4 +224,4 @@ git diff --check
 git diff --stat -- scripts/pcirn-search.test.mjs dspace-angular/source/src/themes/custom/app/search-page/search-page.component.ts dspace-angular/source/src/themes/custom/app/search-page/search-page.component.scss
 ```
 
-Expected: only the search contract test and the two custom search-page files are part of this implementation change; no header file is modified.
+Expected: only the search contract test and the three custom search-page files are part of this implementation change; no header file is modified.
