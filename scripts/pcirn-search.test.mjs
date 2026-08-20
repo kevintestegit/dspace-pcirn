@@ -17,6 +17,7 @@ test('PCIRN search page enables its scoped visual stylesheet', () => {
   assert.match(component, /^\s*styleUrls:\s*\[['"]\.\/search-page\.component\.scss['"]\]/m);
   assert.match(component, /^\s*templateUrl:\s*['"]\.\/search-page\.component\.html['"]/m);
   assert.match(template, /class="pcirn-search-page"/);
+  assert.match(template, /\[showRSS\]="false"/);
   assert.doesNotMatch(component, /header|navbar/i);
   assert.doesNotMatch(template, /header|navbar/i);
 });
