@@ -38,6 +38,11 @@ test('PCIRN search stylesheet exposes the approved visual/icon contract', () => 
     '.fa-file-alt',
     '.row-with-sidebar > :not(#search-page-sidebar-content) > .row > .col-12:has(#search-form)',
     'padding-inline: clamp(1rem, 4vw, 3.75rem)',
+    'ds-object-grid',
+    '.card-element',
+    'height: 33rem',
+    '.card-body',
+    'flex-direction: column',
     '@media (max-width:',
   ]) {
     assert.match(styles, new RegExp(hook.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
