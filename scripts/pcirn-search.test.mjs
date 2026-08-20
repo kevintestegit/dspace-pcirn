@@ -43,6 +43,12 @@ test('PCIRN search stylesheet exposes the approved visual/icon contract', () => 
     'height: 33rem',
     '.card-body',
     'flex-direction: column',
+    '.card-title',
+    '.card-text',
+    '.card-body > ds-truncatable',
+    '-webkit-line-clamp: 2',
+    '-webkit-line-clamp: 3',
+    '.text-center:last-child',
     '@media (max-width:',
   ]) {
     assert.match(styles, new RegExp(hook.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
