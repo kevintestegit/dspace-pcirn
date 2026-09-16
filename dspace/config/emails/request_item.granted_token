@@ -11,6 +11,8 @@
 ##  {6} URL of the requested Item including the secure access token
 ##  {7} expiration date of the granted access (timestamp, formatted in requestitem.cfg)
 
+#set($emailTitle = "Acesso seguro concedido")
+#set($emailPreheader = "Seu acesso seguro aos arquivos solicitados foi concedido.")
 #set($subject = 'Request for Copy of Restricted Document is Granted')
 Dear ${params[0]}:
 

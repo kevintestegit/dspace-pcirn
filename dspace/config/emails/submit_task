@@ -6,6 +6,10 @@
 ## {3}  Description of task
 ## {4}  link to 'my DSpace' page
 ##
+#set($emailTitle = "Você tem uma nova tarefa")
+#set($emailActionLabel = "Acessar minhas tarefas")
+#set($emailActionUrl = $params[4])
+#set($emailPreheader = "Uma nova tarefa de submissão aguarda sua ação.")
 #set($subject = "${config.get('dspace.name')}: You have a new task")
 
 A new item has been submitted:

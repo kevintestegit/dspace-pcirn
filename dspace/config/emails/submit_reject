@@ -6,6 +6,10 @@
 ## {3}  Reason for the rejection
 ## {4}  Link to 'My DSpace' page
 ##
+#set($emailTitle = "Sua submissão precisa de atenção")
+#set($emailActionLabel = "Acessar minhas submissões")
+#set($emailActionUrl = $params[4])
+#set($emailPreheader = "Sua submissão foi rejeitada e precisa de atenção.")
 #set($subject = "${config.get('dspace.name')}: Submission Rejected")
 
 You submitted: ${params[0]}

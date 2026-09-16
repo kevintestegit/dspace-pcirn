@@ -19,6 +19,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import jakarta.mail.BodyPart;
 import jakarta.mail.MessagingException;
@@ -148,13 +153,16 @@ public class EmailTest
         assertThat(alternative.getBodyPart(0).isMimeType("text/plain"), is(true));
         assertThat((String) alternative.getBodyPart(0).getContent(), containsString(token));
         assertThat((String) alternative.getBodyPart(0).getContent(),
-                containsString("If you need assistance"));
+                containsString("Se você não solicitou"));
 
         BodyPart relatedPart = alternative.getBodyPart(1);
         assertThat(relatedPart.isMimeType("multipart/related"), is(true));
         Multipart related = (Multipart) relatedPart.getContent();
         String html = (String) related.getBodyPart(0).getContent();
         assertThat(html, containsString("<!doctype html>"));
+        assertThat(html, containsString("Cadastre sua senha"));
+        assertThat(html, containsString("Cadastrar minha senha"));
+        assertThat(html, containsString(token));
         assertThat(html, containsString("cid:pcirn-footer-bg"));
         assertThat(related.getCount(), is(5));
         assertInlinePart(related.getBodyPart(1), "pcirn-dspace-logo",
@@ -165,6 +173,165 @@ public class EmailTest
                 "brasao-estado-rn.png", "image/png");
         assertInlinePart(related.getBodyPart(4), "pcirn-footer-bg",
                 "footer-bg-pcirn.webp", "image/webp");
+    }
+
+    @Test
+    public void buildRendersEveryConfiguredEmailTemplate()
+            throws Exception {
+        config.setProperty("mail.server.disabled", "true");
+        Path emailDirectory = Paths.get(config.getProperty("dspace.dir"), "config", "emails");
+        Map<String, TemplateFixture> fixtures = templateFixtures();
+
+        Set<String> configuredTemplates;
+        try (var paths = Files.list(emailDirectory)) {
+            configuredTemplates = paths.filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> !name.equals("pcirn-layout.html"))
+                    .collect(Collectors.toCollection(TreeSet::new));
+        }
+        assertThat(fixtures.keySet(), equalTo(configuredTemplates));
+
+        for (Map.Entry<String, TemplateFixture> entry : fixtures.entrySet()) {
+            TemplateFixture fixture = entry.getValue();
+            Email email = Email.getEmail(emailDirectory.resolve(entry.getKey()).toString());
+            for (Object argument : fixture.arguments()) {
+                email.addArgument(argument);
+            }
+            email.addRecipient("recipient@example.org");
+            email.build();
+
+            Multipart alternative = (Multipart) email.message.getContent();
+            String plainText = (String) alternative.getBodyPart(0).getContent();
+            Multipart related = (Multipart) alternative.getBodyPart(1).getContent();
+            String html = (String) related.getBodyPart(0).getContent();
+
+            assertThat(html, containsString("<!doctype html>"));
+            assertThat(html, containsString(fixture.title()));
+            assertThat(plainText, containsString(fixture.bodyMarker()));
+            assertThat(plainText, not(containsString("#set(")));
+            assertThat(plainText, not(containsString("$emailTitle")));
+        }
+    }
+
+    private Map<String, TemplateFixture> templateFixtures() {
+        Map<String, TemplateFixture> fixtures = new LinkedHashMap<>();
+        fixtures.put("batch_import_error", fixture("Falha na importação em lote",
+                "falha no lote", "falha no lote", "https://example.org/feedback"));
+        fixtures.put("batch_import_success", fixture("Importação em lote concluída",
+                "completed successfully", "/tmp/mapfile"));
+        fixtures.put("change_password", fixture("Cadastre sua senha",
+                "Recebemos uma solicitação", "https://example.org/reset?token=pcirn-test"));
+        fixtures.put("coar_notify_accepted", fixture("Revisão aceita pelo serviço",
+                "Item aceito", "Serviço LDN", "Item aceito", "https://example.org/service",
+                "https://example.org/item", "Nome do submetente", "2026-09-16"));
+        fixtures.put("coar_notify_endorsed", fixture("Item endossado pelo serviço",
+                "Item endossado", "Serviço LDN", "Item endossado", "https://example.org/service",
+                "https://example.org/item", "Nome do submetente", "2026-09-16"));
+        fixtures.put("coar_notify_rejected", fixture("Solicitação de revisão recusada",
+                "Item recusado", "Serviço LDN", "Item recusado", "https://example.org/service",
+                "https://example.org/item", "Nome do submetente", "2026-09-16"));
+        fixtures.put("coar_notify_rejected_resubmission", fixture("Revisões necessárias na submissão",
+                "Item com revisão", "Serviço LDN", "Item com revisão", "https://example.org/service",
+                "https://example.org/item", "Nome do submetente", "2026-09-16"));
+        fixtures.put("coar_notify_relationship", fixture("Novo relacionamento de recurso",
+                "Item relacionado", "Serviço LDN", "Item relacionado", "https://example.org/service",
+                "https://example.org/item", "Nome do submetente",
+                new RelationshipNotification("https://example.org/related"), "Item relacionado"));
+        fixtures.put("coar_notify_reviewed", fixture("Item revisado pelo serviço",
+                "Item revisado", "Serviço LDN", "Item revisado", "https://example.org/service",
+                "https://example.org/item", "Nome do submetente", "2026-09-16"));
+        fixtures.put("doi_maintenance_error", fixture("Falha na manutenção do DOI",
+                "atualização", "atualização", "2026-09-16", "item", "123", "10.1234/example",
+                "falha"));
+        fixtures.put("export_error", fixture("Falha na exportação",
+                "falha na exportação", "falha na exportação", "https://example.org/feedback"));
+        fixtures.put("export_success", fixture("Exportação pronta para download",
+                "ready for download", "https://example.org/export", "24"));
+        fixtures.put("feedback", fixture("Feedback recebido", "comentário do usuário",
+                "2026-09-16", "user@example.org", "usuário", "https://example.org/page",
+                "Mozilla", "session", "comentário do usuário"));
+        fixtures.put("flowtask_notify", fixture("Relatório de tarefa de curadoria",
+                "Título da submissão", "Título da submissão", "Coleção", "Nome do submetente",
+                "curadoria", "resultado", "ação"));
+        fixtures.put("harvesting_error", fixture("Falha na coleta", "coleção-1",
+                "coleção-1", "2026-09-16", "FAILED", "mensagem de erro", "pilha de erro"));
+        fixtures.put("healthcheck", fixture("Verificação do repositório concluída",
+                "saída do healthcheck", "saída do healthcheck"));
+        fixtures.put("internal_error", fixture("Erro interno do repositório",
+                "https://example.org/server", "https://example.org/server", "2026-09-16", "sessão",
+                "https://example.org/error", "pilha de erro", "usuário", "127.0.0.1"));
+        fixtures.put("orcid", fixture("Conclua seu cadastro com ORCID",
+                "To complete registration", "https://example.org/orcid"));
+        fixtures.put("qaevent_admin_notification", fixture("Nova solicitação administrativa",
+                "topic", "topic", "123", "motivo"));
+        fixtures.put("register", fixture("Confirme seu cadastro", "To complete registration",
+                "https://example.org/register?token=pcirn-test"));
+        fixtures.put("registration_notify", fixture("Novo cadastro no repositório",
+                "novo usuário", "novo usuário", "https://example.org", "Nome", "user@example.org",
+                "2026-09-16"));
+        fixtures.put("request_item.admin", fixture("Solicitação de acesso aberto",
+                "admin", "admin", "https://example.org/item", "token", "Nome do aprovador",
+                "approver@example.org"));
+        fixtures.put("request_item.author", fixture("Solicitação de cópia de documento",
+                "Dear", "Nome do solicitante", "requester@example.org", "arquivo", "123/abc",
+                "Título do documento", "mensagem", "https://example.org/request", "Autor",
+                "author@example.org", "Repositório", "help@example.org"));
+        fixtures.put("request_item.granted", fixture("Solicitação de cópia aprovada",
+                "Dear", "Solicitante", "https://example.org/item", "Título", "Concedente",
+                "grantor@example.org", "mensagem adicional"));
+        fixtures.put("request_item.granted_token", fixture("Acesso seguro concedido",
+                "Dear", "Solicitante", "https://example.org/item", "Título", "Concedente",
+                "grantor@example.org", "mensagem adicional", "https://example.org/token",
+                "2026-09-30"));
+        fixtures.put("request_item.rejected", fixture("Solicitação de cópia recusada",
+                "Dear", "Solicitante", "https://example.org/item", "Título", "Concedente",
+                "grantor@example.org", "mensagem adicional"));
+        fixtures.put("submit_archive", fixture("Submissão aprovada e arquivada",
+                "You submitted", "Título da submissão", "Coleção", "123/abc"));
+        fixtures.put("submit_reject", fixture("Sua submissão precisa de atenção",
+                "You submitted", "Título da submissão", "Coleção", "Revisor", "motivo",
+                "https://example.org/my-dspace"));
+        fixtures.put("submit_task", fixture("Você tem uma nova tarefa", "A new item has been submitted",
+                "Título da submissão", "Coleção", "Nome do submetente", "descrição",
+                "https://example.org/my-dspace"));
+        fixtures.put("subscriptions_content", fixture("Atualizações das suas inscrições",
+                "escolhidas", "escolhidas", "novos itens", "itens modificados"));
+        fixtures.put("validation_orcid", fixture("Confirme seu e-mail ORCID",
+                "To confirm your email", "https://example.org/validation"));
+        fixtures.put("welcome", fixture("Bem-vindo ao repositório",
+                "Thank you for registering an account."));
+        return fixtures;
+    }
+
+    private TemplateFixture fixture(String title, String bodyMarker, Object... arguments) {
+        return new TemplateFixture(title, bodyMarker, arguments);
+    }
+
+    private record TemplateFixture(String title, String bodyMarker, Object[] arguments) {
+    }
+
+    public static final class RelationshipNotification {
+        private final RelationshipObject object;
+
+        public RelationshipNotification(String subject) {
+            object = new RelationshipObject(subject);
+        }
+
+        public RelationshipObject getObject() {
+            return object;
+        }
+    }
+
+    public static final class RelationshipObject {
+        private final String subject;
+
+        public RelationshipObject(String subject) {
+            this.subject = subject;
+        }
+
+        public String getSubject() {
+            return subject;
+        }
     }
 
     private void assertInlinePart(BodyPart part, String contentId, String fileName,

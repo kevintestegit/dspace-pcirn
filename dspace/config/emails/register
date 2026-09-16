@@ -4,6 +4,10 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailTitle = "Confirme seu cadastro")
+#set($emailActionLabel = "Confirmar meu cadastro")
+#set($emailActionUrl = $params[0])
+#set($emailPreheader = "Confirme seu cadastro no Repositório Institucional da PCIRN.")
 #set($subject = "${config.get('dspace.name')} Account Registration")
 #set($phone = ${config.get('mail.message.helpdesk.telephone')})
 To complete registration for a ${config.get('dspace.name')} account, please click the link below:

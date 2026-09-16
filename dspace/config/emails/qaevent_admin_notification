@@ -4,6 +4,8 @@
 ##             {1} resource id
 ##             {2} reason
 ##
+#set($emailTitle = "Nova solicitação administrativa")
+#set($emailPreheader = "Uma nova solicitação administrativa aguarda análise.")
 #set($subject = "Notification about ${params[0]} Request")
 
 Item Details:

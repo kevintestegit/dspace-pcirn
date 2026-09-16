@@ -9,6 +9,8 @@
 ##             {5} Date of the received LDN notification
 ##
 ##
+#set($emailTitle = "Revisões necessárias na submissão")
+#set($emailPreheader = "Uma submissão precisa de revisões após a análise do serviço.")
 #set($subject = "DSpace: The Service ${params[0]} indicates that revisions are needed following review of the Item ""${params[1]}""")
 
 A tentative rejection notification has been received by the service: ${params[0]}

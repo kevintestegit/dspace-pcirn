@@ -8,6 +8,8 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailTitle = "Novo cadastro no repositório")
+#set($emailPreheader = "Um novo usuário foi cadastrado no repositório.")
 #set($subject = "${config.get('dspace.name')}: Registration Notification")
 
 A new user has registered on ${params[0]} at ${params[1]}:

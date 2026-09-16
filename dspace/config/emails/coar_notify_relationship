@@ -10,6 +10,8 @@
 ##             {7} Item
 ##
 ##
+#set($emailTitle = "Novo relacionamento de recurso")
+#set($emailPreheader = "Um serviço relacionou um novo recurso a um item.")
 #set($subject = "DSpace: The Service ${params[0]} has related a Resource ""${params[6].object.subject}""")
 
 A relationship announce notification has been received relating to the Item: ${params[1]}

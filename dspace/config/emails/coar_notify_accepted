@@ -8,6 +8,8 @@
 ##             {5} Date of the received LDN notification
 ##
 ##
+#set($emailTitle = "Revisão aceita pelo serviço")
+#set($emailPreheader = "Um serviço aceitou revisar um item no Repositório Institucional da PCIRN.")
 #set($subject = "DSpace: The Service ${params[0]} has accepted to review the Item ""${params[1]}""")
 
 An acceptance notification has been received by the service: ${params[0]}
