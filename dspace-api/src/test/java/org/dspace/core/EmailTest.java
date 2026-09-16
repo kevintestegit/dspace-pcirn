@@ -208,8 +208,12 @@ public class EmailTest
             assertThat(html, containsString("<!doctype html>"));
             assertThat(html, containsString(fixture.title()));
             assertThat(plainText, containsString(fixture.bodyMarker()));
-            assertThat(plainText, not(containsString("#set(")));
-            assertThat(plainText, not(containsString("$emailTitle")));
+            for (String literal : new String[] {
+                "$emailTitle", "$emailActionLabel", "$emailActionUrl", "$emailPreheader", "#set("
+            }) {
+                assertThat(plainText, not(containsString(literal)));
+                assertThat(html, not(containsString(literal)));
+            }
         }
     }
 
