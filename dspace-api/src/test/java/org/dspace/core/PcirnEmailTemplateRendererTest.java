@@ -12,10 +12,12 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -128,18 +130,6 @@ public final class PcirnEmailTemplateRendererTest {
     }
 
     @Test
-    public void rejectsEmptyActionUrl()
-            throws IOException {
-        assertRejectsInvalidActionUrl("");
-    }
-
-    @Test
-    public void rejectsNullActionUrl()
-            throws IOException {
-        assertRejectsInvalidActionUrl(null);
-    }
-
-    @Test
     public void omitsActionWhenActionUrlIsNull()
             throws IOException {
         assertActionOmitted("Optional action with null URL", null);
@@ -174,7 +164,7 @@ public final class PcirnEmailTemplateRendererTest {
             renderWithActionUrl(actionUrl);
             fail("Expected invalid action URL to be rejected: " + actionUrl);
         } catch (IOException expected) {
-            assertThat(expected, notNullValue());
+            // Expected: the valid render above rules out asset/template failures.
         }
     }
 
@@ -189,6 +179,7 @@ public final class PcirnEmailTemplateRendererTest {
         if (actionUrl != null && !actionUrl.isBlank()) {
             assertThat(rendered.html(), not(containsString(actionUrl)));
         }
+        assertThat(rendered.html(), not(containsString("href=\"")));
     }
 
     private void assertInlineResource(
@@ -200,7 +191,13 @@ public final class PcirnEmailTemplateRendererTest {
                 .orElseThrow(() -> new AssertionError(
                         "Missing inline resource: " + contentId));
 
-        assertThat(resource.file().getName(), equalTo(fileName));
+        File file = resource.file();
+        assertThat(file, notNullValue());
+        if (file != null) {
+            assertThat(file.isFile(), is(true));
+            assertThat(file.canRead(), is(true));
+            assertThat(file.getName(), equalTo(fileName));
+        }
         assertThat(resource.mimeType(), equalTo(mimeType));
     }
 
