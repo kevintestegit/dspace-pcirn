@@ -13,9 +13,12 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.junit.Test;
@@ -24,12 +27,15 @@ import org.junit.Test;
  * Contract tests for the PCIRN email template renderer.
  */
 public final class PcirnEmailTemplateRendererTest {
+    private static final Path EMAIL_DIRECTORY = Paths.get(
+            System.getProperty("user.dir"), "..", "dspace", "config", "emails")
+            .toAbsolutePath().normalize();
 
     @Test
     public void rendersEscapedBodyAndAction()
             throws IOException {
         PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
-                Paths.get("../dspace/config/emails"));
+                EMAIL_DIRECTORY);
 
         PcirnEmailTemplateRenderer.RenderedEmail rendered = renderer.render(
                 "Primeiro <parágrafo> & linha\ncom quebra.\n\nSegundo parágrafo.",
@@ -64,14 +70,9 @@ public final class PcirnEmailTemplateRendererTest {
                         "pcirn-footer-bg"));
     }
 
-    @Test(expected = IOException.class)
-    public void rejectsNonHttpOrHttpsActionUrl()
-            throws IOException {
-        PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
-                Paths.get("../dspace/config/emails"));
-
-        renderer.render("Corpo", "Título", "Abrir", "javascript:alert(1)",
-                "Prévia");
+    @Test
+    public void rejectsNonHttpOrHttpsActionUrl() {
+        assertRejectsInvalidActionUrl("javascript:alert(1)");
     }
 
     @Test
@@ -94,23 +95,67 @@ public final class PcirnEmailTemplateRendererTest {
                 "href=\"https://example.org/task\""));
     }
 
-    @Test(expected = IOException.class)
-    public void rejectsFtpActionUrl()
-            throws IOException {
-        renderWithActionUrl("ftp://example.org/task");
+    @Test
+    public void rejectsFtpActionUrl() {
+        assertRejectsInvalidActionUrl("ftp://example.org/task");
     }
 
-    @Test(expected = IOException.class)
-    public void rejectsRelativeActionUrl()
-            throws IOException {
-        renderWithActionUrl("/task");
+    @Test
+    public void rejectsRelativeActionUrl() {
+        assertRejectsInvalidActionUrl("/task");
+    }
+
+    @Test
+    public void rejectsNetworkPathActionUrl() {
+        assertRejectsInvalidActionUrl("//host/path");
+    }
+
+    @Test
+    public void rejectsRelativeHttpActionUrl() {
+        assertRejectsInvalidActionUrl("http:relative");
+    }
+
+    @Test
+    public void rejectsMalformedActionUrl() {
+        assertRejectsInvalidActionUrl("http://[malformed");
+    }
+
+    @Test
+    public void rejectsEmptyActionUrl() {
+        assertRejectsInvalidActionUrl("");
+    }
+
+    @Test
+    public void rejectsNullActionUrl() {
+        assertRejectsInvalidActionUrl(null);
+    }
+
+    private void assertRejectsInvalidActionUrl(String actionUrl) {
+        try {
+            renderWithActionUrl(actionUrl);
+            fail("Expected invalid action URL to be rejected: " + actionUrl);
+        } catch (IOException exception) {
+            String exceptionDetails = exceptionMessages(exception);
+            assertThat(exceptionDetails.toLowerCase(Locale.ROOT), containsString("url"));
+            if (actionUrl != null && !actionUrl.isEmpty()) {
+                assertThat(exceptionDetails, containsString(actionUrl));
+            }
+        }
+    }
+
+    private String exceptionMessages(Throwable exception) {
+        StringBuilder messages = new StringBuilder();
+        for (Throwable current = exception; current != null; current = current.getCause()) {
+            messages.append(' ').append(current.getMessage());
+        }
+        return messages.toString();
     }
 
     private PcirnEmailTemplateRenderer.RenderedEmail renderWithActionUrl(
             String actionUrl)
             throws IOException {
         PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
-                Paths.get("../dspace/config/emails"));
+                EMAIL_DIRECTORY);
 
         return renderer.render("Corpo", "Título", "Abrir", actionUrl, "Prévia");
     }
