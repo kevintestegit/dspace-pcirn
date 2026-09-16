@@ -1,0 +1,3 @@
+[submodule "dspace-angular/source"]
+	path = dspace-angular/source
+	url = https://github.com/DSpace/dspace-angular.git
