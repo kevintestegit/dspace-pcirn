@@ -9,12 +9,14 @@ package org.dspace.core;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 
@@ -34,16 +36,38 @@ public final class PcirnEmailTemplateRendererTest {
                 "Título <PCIRN> & público",
                 "Abrir <item> & continuar",
                 "https://pcirn.example/item?id=1&mode=\"full\"",
-                "Prévia do e-mail");
+                "Prévia <ação> & necessária");
 
         assertThat(rendered.html(), allOf(
-                containsString("Primeiro &lt;parágrafo&gt; &amp; linha<br>com quebra."),
+                containsString("<p>Primeiro &lt;parágrafo&gt; &amp; linha<br>com quebra.</p>"),
                 containsString("<p>Segundo parágrafo.</p>"),
                 containsString("Título &lt;PCIRN&gt; &amp; público"),
                 containsString("Abrir &lt;item&gt; &amp; continuar"),
-                containsString("https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;"),
+                containsString("Prévia &lt;ação&gt; &amp; necessária"),
+                containsString(
+                        "href=\"https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;\""),
+                containsString("cid:pcirn-dspace-logo"),
+                containsString("cid:pcirn-policiacientifica"),
+                containsString("cid:pcirn-estado-rn"),
                 containsString("cid:pcirn-footer-bg"),
                 not(containsString("Primeiro <parágrafo> & linha"))));
         assertThat(rendered.inlineResources(), hasSize(4));
+        assertThat(rendered.inlineResources().stream()
+                .map(PcirnEmailTemplateRenderer.InlineResource::contentId)
+                .collect(Collectors.toList()), containsInAnyOrder(
+                        "pcirn-dspace-logo",
+                        "pcirn-policiacientifica",
+                        "pcirn-estado-rn",
+                        "pcirn-footer-bg"));
+    }
+
+    @Test(expected = IOException.class)
+    public void rejectsNonHttpOrHttpsActionUrl()
+            throws IOException {
+        PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
+                Paths.get("../dspace/config/emails"));
+
+        renderer.render("Corpo", "Título", "Abrir", "javascript:alert(1)",
+                "Prévia");
     }
 }
