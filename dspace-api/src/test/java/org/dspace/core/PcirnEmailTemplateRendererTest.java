@@ -55,6 +55,8 @@ public final class PcirnEmailTemplateRendererTest {
                 not(containsString("Título <PCIRN> & público")),
                 not(containsString("Abrir <item> & continuar")),
                 not(containsString("Prévia <ação> & necessária")),
+                not(containsString(
+                        "https://pcirn.example/item?id=1&mode=\"full\"")),
                 containsString(
                         "href=\"https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;\""),
                 containsString("cid:pcirn-dspace-logo"),
@@ -142,6 +144,12 @@ public final class PcirnEmailTemplateRendererTest {
     }
 
     @Test
+    public void omitsActionWhenActionUrlIsWhitespace()
+            throws IOException {
+        assertActionOmitted("Optional action with whitespace URL", "   ");
+    }
+
+    @Test
     public void omitsActionWhenActionLabelIsNull()
             throws IOException {
         assertActionOmitted(null, "https://example.org/optional-null-label");
@@ -151,6 +159,12 @@ public final class PcirnEmailTemplateRendererTest {
     public void omitsActionWhenActionLabelIsEmpty()
             throws IOException {
         assertActionOmitted("", "https://example.org/optional-empty-label");
+    }
+
+    @Test
+    public void omitsActionWhenActionLabelIsWhitespace()
+            throws IOException {
+        assertActionOmitted("   ", "https://example.org/optional-whitespace-label");
     }
 
     private void assertRejectsInvalidActionUrl(String actionUrl)
