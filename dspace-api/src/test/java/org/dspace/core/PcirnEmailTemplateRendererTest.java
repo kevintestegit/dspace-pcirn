@@ -44,6 +44,9 @@ public final class PcirnEmailTemplateRendererTest {
                 containsString("Título &lt;PCIRN&gt; &amp; público"),
                 containsString("Abrir &lt;item&gt; &amp; continuar"),
                 containsString("Prévia &lt;ação&gt; &amp; necessária"),
+                not(containsString("Título <PCIRN> & público")),
+                not(containsString("Abrir <item> & continuar")),
+                not(containsString("Prévia <ação> & necessária")),
                 containsString(
                         "href=\"https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;\""),
                 containsString("cid:pcirn-dspace-logo"),
@@ -69,5 +72,46 @@ public final class PcirnEmailTemplateRendererTest {
 
         renderer.render("Corpo", "Título", "Abrir", "javascript:alert(1)",
                 "Prévia");
+    }
+
+    @Test
+    public void acceptsHttpActionUrl()
+            throws IOException {
+        PcirnEmailTemplateRenderer.RenderedEmail rendered = renderWithActionUrl(
+                "http://example.org/task");
+
+        assertThat(rendered.html(), containsString(
+                "href=\"http://example.org/task\""));
+    }
+
+    @Test
+    public void acceptsHttpsActionUrl()
+            throws IOException {
+        PcirnEmailTemplateRenderer.RenderedEmail rendered = renderWithActionUrl(
+                "https://example.org/task");
+
+        assertThat(rendered.html(), containsString(
+                "href=\"https://example.org/task\""));
+    }
+
+    @Test(expected = IOException.class)
+    public void rejectsFtpActionUrl()
+            throws IOException {
+        renderWithActionUrl("ftp://example.org/task");
+    }
+
+    @Test(expected = IOException.class)
+    public void rejectsRelativeActionUrl()
+            throws IOException {
+        renderWithActionUrl("/task");
+    }
+
+    private PcirnEmailTemplateRenderer.RenderedEmail renderWithActionUrl(
+            String actionUrl)
+            throws IOException {
+        PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
+                Paths.get("../dspace/config/emails"));
+
+        return renderer.render("Corpo", "Título", "Abrir", actionUrl, "Prévia");
     }
 }
