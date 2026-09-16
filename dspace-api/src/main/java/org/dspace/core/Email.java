@@ -465,7 +465,11 @@ public class Email {
         for (PcirnEmailTemplateRenderer.InlineResource resource
                 : rendered.inlineResources()) {
             MimeBodyPart imagePart = new MimeBodyPart();
-            imagePart.attachFile(resource.file());
+            try (InputStream inputStream = new FileInputStream(resource.file())) {
+                imagePart.setDataHandler(new DataHandler(new InputStreamDataSource(
+                        resource.file().getName(), resource.mimeType(), inputStream)));
+            }
+            imagePart.setFileName(resource.file().getName());
             imagePart.setHeader("Content-ID", "<" + resource.contentId() + ">");
             imagePart.setDisposition(MimeBodyPart.INLINE);
             related.addBodyPart(imagePart);

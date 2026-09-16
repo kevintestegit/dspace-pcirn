@@ -8,6 +8,7 @@
 package org.dspace.core;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -156,5 +157,22 @@ public class EmailTest
         assertThat(html, containsString("<!doctype html>"));
         assertThat(html, containsString("cid:pcirn-footer-bg"));
         assertThat(related.getCount(), is(5));
+        assertInlinePart(related.getBodyPart(1), "pcirn-dspace-logo",
+                "dspace-logo-mini.svg", "image/svg+xml");
+        assertInlinePart(related.getBodyPart(2), "pcirn-policiacientifica",
+                "brasao-policia-cientifica-rn.png", "image/png");
+        assertInlinePart(related.getBodyPart(3), "pcirn-estado-rn",
+                "brasao-estado-rn.png", "image/png");
+        assertInlinePart(related.getBodyPart(4), "pcirn-footer-bg",
+                "footer-bg-pcirn.webp", "image/webp");
+    }
+
+    private void assertInlinePart(BodyPart part, String contentId, String fileName,
+                                  String mimeType) throws MessagingException {
+        assertThat(part.getFileName(), equalTo(fileName));
+        assertThat(part.getHeader("Content-ID"),
+                arrayContaining("<" + contentId + ">"));
+        assertThat(part.isMimeType(mimeType), is(true));
+        assertThat(part.getDisposition(), equalTo(BodyPart.INLINE));
     }
 }
