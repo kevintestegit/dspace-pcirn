@@ -40,7 +40,13 @@ Coleção única: 123456789/2 (Portarias DG). Inventário: `inventario.csv` + `b
 9. Lei 4526/1975 origem IMLEC/ITEP.
 10. MVP 123456789/24 prova workflow.
 
-## Próximo
+## Enriquecimento com texto do PDF (iteração 2)
+
+- Assetstore copiado (532 MB); `all-bitstreams.csv` mapeia os 2221.
+- pdftotext nos 2221: 1168 com texto extraível (52,6%), 1053 scans sem camada texto.
+- Fichas regeneradas: campo `Resumo com texto do PDF` + `Fonte texto` com contagem de chars.
+- Lotes: 1154 com PDF extraído, 1047 via catalogação OCR (+ 20 piloto detalhado, 14 com PDF).
+- Scans: resumo via abstract OCR da catalogação (provenance `Fonte texto: ocr`), validado no piloto com tesseract por; OCR integral página a página segue pendente para esses.
 
 - OCR total de scans antigos (2233-like) sob demanda.
 - Enriquecer lotes com texto PDF (pdftotext + tesseract por) em iteração 2.
