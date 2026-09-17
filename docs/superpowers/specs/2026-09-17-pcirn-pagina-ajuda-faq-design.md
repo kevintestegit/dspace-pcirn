@@ -39,7 +39,7 @@ Escopo: Frontend Angular (`dspace-angular`)
    - **Q4: Sou servidor da PCIRN. Como faço para submeter documentos?**  
      Autenticação institucional, envio de PDF/A, fluxo de homologação pelo NUGECID e bloco informativo orientando servidores sem acesso ativo a solicitarem a liberação junto ao NUGECID.
    - **Q5: Não encontrei o documento ou preciso de suporte adicional. O que fazer?**  
-     Contatos diretos do NUGECID/Arquivo Geral (e-mail e telefone) e link para o Fale Conosco.
+     Contatos diretos do NUGECID/Arquivo Geral (e-mail, telefone e envio de processo via SEI-RN para a unidade PCI-NUGECID) e link para o Fale Conosco.
 
 4. **Rodapé e Testes:**
    - Atualizar `src/app/footer/footer.component.html`: substituir `<a routerLink="/info/feedback">Ajuda</a>` por `<a routerLink="/info/ajuda">Ajuda</a>`.
