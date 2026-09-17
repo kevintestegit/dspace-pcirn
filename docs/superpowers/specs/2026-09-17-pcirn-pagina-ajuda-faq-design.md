@@ -37,7 +37,7 @@ Escopo: Frontend Angular (`dspace-angular`)
    - **Q3: Como copiar a citação ou o identificador permanente (Handle)?**  
      Uso das ações rápidas "Copiar citação" e "Copiar URI" na página do item.
    - **Q4: Sou servidor da PCIRN. Como faço para submeter documentos?**  
-     Autenticação institucional, envio de PDF/A e fluxo de homologação pelo NUGECID.
+     Autenticação institucional, envio de PDF/A, fluxo de homologação pelo NUGECID e bloco informativo orientando servidores sem acesso ativo a solicitarem a liberação junto ao NUGECID.
    - **Q5: Não encontrei o documento ou preciso de suporte adicional. O que fazer?**  
      Contatos diretos do NUGECID/Arquivo Geral (e-mail e telefone) e link para o Fale Conosco.
 
