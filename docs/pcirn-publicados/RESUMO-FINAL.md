@@ -48,6 +48,16 @@ Coleção única: 123456789/2 (Portarias DG). Inventário: `inventario.csv` + `b
 - Lotes: 1154 com PDF extraído, 1047 via catalogação OCR (+ 20 piloto detalhado, 14 com PDF).
 - Scans: resumo via abstract OCR da catalogação (provenance `Fonte texto: ocr`), validado no piloto com tesseract por; OCR integral página a página segue pendente para esses.
 
+## Escrita no DSpace (2026-09-17, iteração 3)
+
+- Gerador: `gerador-abstracts.py` (reproduzível: mesma saída byte a byte).
+- 1067 abstracts atualizados no banco (`metadata_field_id=36`) via staging + UPDATE em transação.
+- 1154 mantidos (1053 scans sem texto + 101 rejeitados pelo gate).
+- Backup reversível: tabela `metadatavalue_abstract_backup_20260917` (2222 linhas) + `abstracts-backup-20260917.csv`.
+- Rollback: `UPDATE metadatavalue m SET text_value=b.text_value FROM metadatavalue_abstract_backup_20260917 b WHERE m.metadata_value_id=b.metadata_value_id;` + `index-discovery -b`.
+- Reindex `index-discovery -b` executado; Solr confirma ementa completa (ex: 123456789/2268).
+- Exemplo: LEI 811/2026 saiu de "…requisitos de investidura de" (truncado) para ementa completa + Art. 1º.
+
 - OCR total de scans antigos (2233-like) sob demanda.
 - Enriquecer lotes com texto PDF (pdftotext + tesseract por) em iteração 2.
 - Revisar datas 2026 (629) — issued vs accession.
