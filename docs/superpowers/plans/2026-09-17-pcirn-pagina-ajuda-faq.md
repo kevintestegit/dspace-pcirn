@@ -15,19 +15,8 @@
 **Files:**
 - Modify: `dspace-angular/source/scripts/pcirn-home.test.mjs`
 
-- [ ] **Step 1: Atualizar asserções de navegação institucional no teste**
-
-Modificar `scripts/pcirn-home.test.mjs` para verificar que o rodapé aponta para `/info/ajuda` e não mais para `/info/feedback`:
-
-```javascript
-assert.match(footerTemplate, /routerLink="\/info\/ajuda">Ajuda<\/a>/);
-assert.doesNotMatch(footerTemplate, /routerLink="\/info\/feedback">Ajuda<\/a>/);
-```
-
-- [ ] **Step 2: Executar o teste e verificar a falha esperada**
-
-Run: `node scripts/pcirn-home.test.mjs`  
-Expected: FAIL indicando que `routerLink="/info/ajuda">Ajuda</a>` ainda não foi encontrado no template.
+- [x] **Step 1: Atualizar asserções de navegação institucional no teste**
+- [x] **Step 2: Executar o teste e verificar a falha esperada**
 
 ---
 
@@ -36,14 +25,8 @@ Expected: FAIL indicando que `routerLink="/info/ajuda">Ajuda</a>` ainda não foi
 **Files:**
 - Modify: `dspace-angular/source/src/app/footer/footer.component.html:18-20`
 
-- [ ] **Step 1: Ajustar o link no template do rodapé**
-
-Substituir `<a routerLink="/info/feedback">Ajuda</a>` por `<a routerLink="/info/ajuda">Ajuda</a>`.
-
-- [ ] **Step 2: Executar o teste para verificar aprovação**
-
-Run: `node scripts/pcirn-home.test.mjs`  
-Expected: PASS no teste do rodapé.
+- [x] **Step 1: Ajustar o link no template do rodapé**
+- [x] **Step 2: Executar o teste para verificar aprovação**
 
 ---
 
@@ -55,21 +38,10 @@ Expected: PASS no teste do rodapé.
 - Create: `dspace-angular/source/src/app/info/ajuda/ajuda.component.scss`
 - Create: `dspace-angular/source/src/app/info/ajuda/themed-ajuda.component.ts`
 
-- [ ] **Step 1: Criar `ajuda.component.ts`**
-
-Componente standalone com `TranslatePipe`.
-
-- [ ] **Step 2: Criar `ajuda.component.html`**
-
-Estrutura institucional com cabeçalho (`pcirn-list-header`), card principal (`pcirn-about-card`), e as 5 seções de FAQ com numeração destacada e canais de contato com o NUGECID.
-
-- [ ] **Step 3: Criar `ajuda.component.scss`**
-
-Estilos alinhados à identidade visual PCIRN, consistentes com `politica-acesso.component.scss` e `about.component.scss`.
-
-- [ ] **Step 4: Criar `themed-ajuda.component.ts`**
-
-Componente que estende `ThemedComponent<AjudaComponent>` e resolve o componente pelo tema ativo ou tema padrão.
+- [x] **Step 1: Criar `ajuda.component.ts`**
+- [x] **Step 2: Criar `ajuda.component.html`**
+- [x] **Step 3: Criar `ajuda.component.scss`**
+- [x] **Step 4: Criar `themed-ajuda.component.ts`**
 
 ---
 
@@ -81,19 +53,9 @@ Componente que estende `ThemedComponent<AjudaComponent>` e resolve o componente 
 - Modify: `dspace-angular/source/src/assets/i18n/pt-BR.json5`
 - Modify: `dspace-angular/source/src/assets/i18n/en.json5`
 
-- [ ] **Step 1: Definir constantes de rota em `info-routing-paths.ts`**
-
-Adicionar `AJUDA_PATH = 'ajuda'` e `getAjudaPath()`.
-
-- [ ] **Step 2: Registrar rota em `info-routes.ts`**
-
-Adicionar rota para `AJUDA_PATH` com componente `ThemedAjudaComponent`, resolver de breadcrumb e títulos i18n (`info.ajuda.title` e `info.ajuda.breadcrumbs`).
-
-- [ ] **Step 3: Adicionar traduções em `pt-BR.json5` e `en.json5`**
-
-Adicionar:
-`"info.ajuda.title": "Ajuda",`
-`"info.ajuda.breadcrumbs": "Ajuda",`
+- [x] **Step 1: Definir constantes de rota em `info-routing-paths.ts`**
+- [x] **Step 2: Registrar rota em `info-routes.ts`**
+- [x] **Step 3: Adicionar traduções em `pt-BR.json5` e `en.json5`**
 
 ---
 
@@ -102,15 +64,6 @@ Adicionar:
 **Files:**
 - Test: `dspace-angular/source/scripts/pcirn-home.test.mjs`
 
-- [ ] **Step 1: Executar suíte completa de testes unitários da home/footer**
-
-Run: `node scripts/pcirn-home.test.mjs`  
-Expected: PASS com 100% de sucesso.
-
-- [ ] **Step 2: Validar resposta HTTP do container Angular**
-
-Realizar requisição HTTP para a nova rota e verificar retorno 200 e renderização correta.
-
-- [ ] **Step 3: Finalizar sessão do Brainstorm Companion**
-
-Encerrar o servidor do brainstorm e registrar a entrega.
+- [x] **Step 1: Executar suíte completa de testes unitários da home/footer**
+- [x] **Step 2: Validar compilação e resposta da aplicação Angular**
+- [x] **Step 3: Atualizar documentação e registrar entrega**
