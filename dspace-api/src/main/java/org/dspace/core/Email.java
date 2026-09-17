@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringWriter;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -408,6 +409,11 @@ public class Email {
         }
         body = writer.toString();
 
+        String emailTitle = getContextValue(vctx, "emailTitle");
+        String emailActionLabel = getContextValue(vctx, "emailActionLabel");
+        String emailActionUrl = getContextValue(vctx, "emailActionUrl");
+        String emailPreheader = getContextValue(vctx, "emailPreheader");
+
         // Set some message header fields
         Instant date = Instant.now();
         message.setSentDate(java.util.Date.from(date));
@@ -420,7 +426,11 @@ public class Email {
                     subject = headerValue;
                 }
             } else if ("charset".equalsIgnoreCase(headerName)) {
-                charset = headerValue;
+                // Only a template-provided charset overrides the configured default;
+                // an absent template value must not discard "mail.charset".
+                if (headerValue != null) {
+                    charset = headerValue;
+                }
             } else {
                 message.setHeader(headerName, headerValue);
             }
@@ -433,25 +443,56 @@ public class Email {
             message.setSubject(subject);
         }
 
-        // Attach the body.
-        if (attachments.isEmpty() && moreAttachments.isEmpty()) { // Flat body.
-            if (charset != null) {
-                message.setText(body, charset);
-            } else {
-                message.setText(body);
-            }
-        } else { // Add attachments.
-            Multipart multipart = new MimeMultipart();
+        // Attach the body. An absent charset falls back to UTF-8 so the plain and
+        // HTML alternatives always declare the charset they are actually encoded in.
+        String bodyCharset = charset == null ? "UTF-8" : charset;
+        MimeMultipart alternative = new MimeMultipart("alternative");
 
-            // create the first part of the email
-            BodyPart messageBodyPart = new MimeBodyPart();
-            messageBodyPart.setText(body);
-            multipart.addBodyPart(messageBodyPart);
+        MimeBodyPart plainPart = new MimeBodyPart();
+        plainPart.setText(body, bodyCharset);
+        alternative.addBodyPart(plainPart);
+
+        PcirnEmailTemplateRenderer.RenderedEmail rendered =
+                new PcirnEmailTemplateRenderer(Paths.get(
+                        getConfigurationService().getProperty("dspace.dir"),
+                        "config", "emails")).render(body, emailTitle,
+                        emailActionLabel, emailActionUrl, emailPreheader);
+        MimeMultipart related = new MimeMultipart("related");
+
+        MimeBodyPart htmlPart = new MimeBodyPart();
+        htmlPart.setContent(rendered.html(), "text/html; charset=" + bodyCharset);
+        related.addBodyPart(htmlPart);
+
+        for (PcirnEmailTemplateRenderer.InlineResource resource
+                : rendered.inlineResources()) {
+            MimeBodyPart imagePart = new MimeBodyPart();
+            try (InputStream inputStream = new FileInputStream(resource.file())) {
+                imagePart.setDataHandler(new DataHandler(new InputStreamDataSource(
+                        resource.file().getName(), resource.mimeType(), inputStream)));
+            }
+            imagePart.setFileName(resource.file().getName());
+            imagePart.setHeader("Content-ID", "<" + resource.contentId() + ">");
+            imagePart.setDisposition(MimeBodyPart.INLINE);
+            related.addBodyPart(imagePart);
+        }
+
+        MimeBodyPart relatedPart = new MimeBodyPart();
+        relatedPart.setContent(related);
+        alternative.addBodyPart(relatedPart);
+
+        if (attachments.isEmpty() && moreAttachments.isEmpty()) {
+            message.setContent(alternative);
+        } else { // Add attachments.
+            Multipart multipart = new MimeMultipart("mixed");
+
+            MimeBodyPart alternativePart = new MimeBodyPart();
+            alternativePart.setContent(alternative);
+            multipart.addBodyPart(alternativePart);
 
             // Add file attachments
             for (FileAttachment attachment : attachments) {
                 // add the file
-                messageBodyPart = new MimeBodyPart();
+                BodyPart messageBodyPart = new MimeBodyPart();
                 messageBodyPart.setDataHandler(new DataHandler(
                         new FileDataSource(attachment.file)));
                 messageBodyPart.setFileName(attachment.name);
@@ -461,7 +502,7 @@ public class Email {
             // Add stream attachments
             for (InputStreamAttachment attachment : moreAttachments) {
                 // add the stream
-                messageBodyPart = new MimeBodyPart();
+                BodyPart messageBodyPart = new MimeBodyPart();
                 messageBodyPart.setDataHandler(new DataHandler(
                         new InputStreamDataSource(attachment.name,
                                 attachment.mimetype, attachment.is)));
@@ -477,6 +518,20 @@ public class Email {
             replyToAddr[0] = new InternetAddress(replyTo);
             message.setReplyTo(replyToAddr);
         }
+
+        message.saveChanges();
+    }
+
+    /**
+     * Read an optional presentation value from the merged template context.
+     *
+     * @param context merged Velocity context
+     * @param name context property name
+     * @return the property value, or an empty string when it is absent
+     */
+    private String getContextValue(VelocityContext context, String name) {
+        Object value = context.get(name);
+        return value == null ? "" : value.toString();
     }
 
     /**

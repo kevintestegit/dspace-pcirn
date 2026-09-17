@@ -105,10 +105,31 @@ public class WebSecurityConfiguration {
                 // Ensure /actuator/info endpoint is restricted to admins
                 .requestMatchers(HttpMethod.GET, actuatorBasePath + "/info")
                     .hasAnyAuthority(ADMIN_GRANT)
-                // All other requests should be permitted at this layer because we check permissions on each method
-                // via @PreAuthorize annotations. As this code runs first, we must permitAll() here in order to pass
-                // the request on to those annotations.
-                .anyRequest().permitAll())
+                // Public read endpoints still enforce object access through @PreAuthorize and ResourcePolicy.
+                .requestMatchers(HttpMethod.GET, "/api/core/**", "/api/discover/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/api/core/**", "/api/discover/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/pid/**", "/api/dso/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/authz/features/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/system/systemwidealerts/search/**").permitAll()
+                .requestMatchers(HttpMethod.GET, actuatorBasePath + "/health").permitAll()
+                .requestMatchers(HttpMethod.GET, "/signposting/**", "/iiif/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/statistics/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/tools/feedbacks").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/tools/itemrequests/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/tools/itemrequests/**").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/tools/itemrequests/**").permitAll()
+                .requestMatchers("/api/authn/**", "/api/eperson/registrations/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/security/csrf").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api", "/api/").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/config/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/core/sites").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/authz/authorizations/**").permitAll()
+                // Anonymous account creation (POST ?token=...) and password reset (PATCH ?token=...) on epersons
+                // are validated inside the repository: the permission evaluator only allows them with a valid
+                // registration/forgot token (see EPersonRestPermissionEvaluatorPlugin).
+                .requestMatchers(HttpMethod.POST, "/api/eperson/epersons/**").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/eperson/epersons/**").permitAll()
+                .anyRequest().authenticated())
             // Tell Spring to not create Sessions
             .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // Anonymous requests should have the "ANONYMOUS" security grant
