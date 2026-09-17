@@ -8,6 +8,8 @@
 ##             {5} Date of the received LDN notification
 ##
 ##
+#set($emailTitle = "Solicitação de revisão recusada")
+#set($emailPreheader = "Um serviço recusou a solicitação de revisão de um item.")
 #set($subject = "DSpace: The Service ${params[0]} has refused to review the Item ""${params[1]}""")
 
 A rejection notification has been received by the service: ${params[0]}

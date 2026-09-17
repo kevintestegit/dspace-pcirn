@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<import_structure>
+    <community>
+        <name>Gestão Estratégica e Administrativa (DG)</name>
+        <description>Documentos da Direção Geral e da gestão institucional.</description>
+        <collection><name>Portarias e Atos Normativos Internos</name></collection>
+        <collection><name>Manuais de Gestão e Planejamento Estratégico</name></collection>
+        <collection><name>Relatórios de Produtividade e Prestação de Contas</name></collection>
+        <collection><name>Notas Técnicas</name></collection>
+    </community>
+    <community>
+        <name>Instituto de Criminalística (IC)</name>
+        <description>Procedimentos, guias e relatórios do Instituto de Criminalística.</description>
+        <collection><name>Portarias e Atos Normativos Internos</name></collection>
+        <collection><name>POPs - Perícias Internas</name></collection>
+        <collection><name>POPs - Perícias Externas</name></collection>
+        <collection><name>POPs - Laboratórios Forenses</name></collection>
+        <collection><name>Manuais Técnicos e Guias de Coleta e Cadeia de Custódia</name></collection>
+        <collection><name>Relatórios Setoriais de Produtividade Pericial</name></collection>
+        <collection><name>Notas Técnicas</name></collection>
+    </community>
+    <community>
+        <name>Instituto de Medicina Legal (IML)</name>
+        <description>Procedimentos, protocolos e notas técnicas do Instituto de Medicina Legal.</description>
+        <collection><name>Portarias e Atos Normativos Internos</name></collection>
+        <collection><name>POPs - Tanatologia e Traumatologia Forense</name></collection>
+        <collection><name>POPs - Sexologia Forense e Odontologia Legal</name></collection>
+        <collection><name>POPs - Antropologia, Arqueologia, Psiquiatria e Psicologia Forense</name></collection>
+        <collection><name>Manuais de Protocolos de Exames Médico-Legais</name></collection>
+        <collection><name>Notas Técnicas</name></collection>
+    </community>
+    <community>
+        <name>Instituto de Identificação (II)</name>
+        <description>Procedimentos e diretrizes do Instituto de Identificação.</description>
+        <collection><name>Portarias e Atos Normativos Internos</name></collection>
+        <collection><name>POPs e Guias - Biometria, Papiloscopia e Necropapiloscopia</name></collection>
+        <collection><name>Diretrizes e Instruções de Identificação Civil e Criminal</name></collection>
+        <collection><name>Manuais de Operação do Sistema ABIS/CIN</name></collection>
+        <collection><name>Notas Técnicas</name></collection>
+    </community>
+</import_structure>

@@ -11,6 +11,8 @@
 ##             8 corresponding author email
 ##             9 configuration property "dspace.name"
 ##             10 configuration property "mail.helpdesk"
+#set($emailTitle = "Solicitação de cópia de documento")
+#set($emailPreheader = "Um usuário solicitou uma cópia de documento restrito.")
 #set($subject = "${config.get('dspace.name')}: Request copy of document")
 
 Dear ${params[7]},

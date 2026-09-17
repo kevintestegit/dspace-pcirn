@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<node id="PCIRN_DOCUMENT_TYPES" label="Tipos de documento PCIRN">
+    <isComposedBy>
+        <node id="PORTARIA" label="Portaria e Ato Normativo Interno" />
+        <node id="POP" label="Procedimento Operacional Padrão (POP)" />
+        <node id="MANUAL_GUIA" label="Manual Técnico e Guia" />
+        <node id="MANUAL_GESTAO" label="Manual de Gestão e Planejamento" />
+        <node id="RELATORIO_PRODUTIVIDADE" label="Relatório de Produtividade" />
+        <node id="RELATORIO_CONTAS" label="Relatório de Prestação de Contas" />
+        <node id="NOTA_TECNICA" label="Nota Técnica" />
+        <node id="DIRETRIZ_INSTRUCAO" label="Diretriz e Instrução Normativa/Operacional" />
+    </isComposedBy>
+</node>

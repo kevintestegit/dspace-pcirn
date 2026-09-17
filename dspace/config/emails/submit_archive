@@ -4,6 +4,8 @@
 ## {1}  Name of collection
 ## {2}  handle
 ##
+#set($emailTitle = "Submissão aprovada e arquivada")
+#set($emailPreheader = "Sua submissão foi aprovada e arquivada no repositório.")
 #set($subject = "${config.get('dspace.name')}: Submission Approved and Archived")
 
 You submitted: ${params[0]}

@@ -7,6 +7,8 @@
 ## {4}  Task result
 ## {5}  Workflow action taken
 ##
+#set($emailTitle = "Relatório de tarefa de curadoria")
+#set($emailPreheader = "Uma tarefa de curadoria foi processada no repositório.")
 #set($subject = "${config.get('dspace.name')}: Curation Task Report")
 
 Title:         ${params[0]}

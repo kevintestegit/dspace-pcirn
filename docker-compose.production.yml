@@ -1,0 +1,63 @@
+services:
+  dspace:
+    image: pcirn/dspace:local-production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      dspace__P__server__P__url: ${PUBLIC_REST_URL:?Defina PUBLIC_REST_URL no .env.production}
+      dspace__P__ui__P__url: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL no .env.production}
+      dspace__P__server__P__ssr__P__url: http://dspace:8080/server
+      db__P__url: jdbc:postgresql://dspacedb:5432/dspace
+      db__P__username: dspace
+      db__P__password: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env.production}
+      solr__P__server: http://dspacesolr:8983/solr
+      proxies__P__trusted__P__ipranges: ${TRUSTED_PROXY_NETWORK:-10.250.50}
+      LOGGING_CONFIG: /dspace/config/log4j2-container.xml
+      MANAGEMENT_HEALTH_LDAP_ENABLED: "false"
+      MANAGEMENT_HEALTH_GEOIP_ENABLED: "false"
+      MANAGEMENT_HEALTH_SEO_ENABLED: "false"
+    ports: !override
+      - 127.0.0.1:${REST_BIND_PORT:-8501}:8080
+    entrypoint: ["java", "-jar", "/dspace/webapps/server-boot.jar"]
+    volumes: !override
+      - assetstore:/dspace/assetstore
+      - ./dspace/config:/dspace/config
+    depends_on:
+      dspacedb:
+        condition: service_healthy
+
+  dspacedb:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env.production}
+    ports: !override []
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dspace -d dspace"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dspacesolr:
+    ports: !override []
+
+  dspace-angular:
+    image: pcirn/dspace-angular:local-production
+    build:
+      context: ./dspace-angular/source
+      dockerfile: Dockerfile.dist
+    command: ["--json"]
+    environment:
+      NODE_ENV: production
+      DSPACE_UI_SSL: ${DSPACE_UI_SSL:-false}
+      DSPACE_UI_HOST: 0.0.0.0
+      DSPACE_UI_PORT: 4000
+      DSPACE_UI_NAMESPACE: /
+      DSPACE_UI_BASEURL: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL no .env.production}
+      DSPACE_REST_SSL: ${DSPACE_REST_SSL:-false}
+      DSPACE_REST_HOST: ${DSPACE_REST_HOST:?Defina DSPACE_REST_HOST no .env.production}
+      DSPACE_REST_PORT: ${DSPACE_REST_PORT:-8501}
+      DSPACE_REST_NAMESPACE: /server
+      DSPACE_REST_SSRBASEURL: http://dspace:8080/server
+    ports: !override
+      - 127.0.0.1:${UI_BIND_PORT:-4000}:4000
+    volumes: !override []

@@ -40,6 +40,9 @@ nb-configuration.xml
 /local.cfg
 # Also ignore it under dspace/config
 /dspace/config/local.cfg
+/smtp.env
+.env.production
+backups/
 .worktrees/
 
 ##Mac noise

@@ -8,6 +8,8 @@
 ##             {5} Date of the received LDN notification
 ##
 ##
+#set($emailTitle = "Item endossado pelo serviço")
+#set($emailPreheader = "Um serviço endossou um item no Repositório Institucional da PCIRN.")
 #set($subject = "DSpace: The Service ${params[0]} has endorsed the Item ""${params[1]}""")
 
 An endorsement announce notification has been received by the service: ${params[0]}

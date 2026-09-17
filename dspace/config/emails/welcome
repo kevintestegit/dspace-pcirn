@@ -2,6 +2,8 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailTitle = "Bem-vindo ao repositório")
+#set($emailPreheader = "Sua conta no Repositório Institucional da PCIRN está pronta para uso.")
 #set($subject = "Welcome new registered ${config.get('dspace.name')} user!")
 Thank you for registering an account. Your new account can be used immediately
 to subscribe to notices of new content arriving in collections of your choice.

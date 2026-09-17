@@ -4,6 +4,8 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailTitle = "Conclua seu cadastro com ORCID")
+#set($emailPreheader = "Conclua o cadastro da sua conta usando o ORCID.")
 #set($subject = "${config.get('dspace.name')} Account Registration")
 #set($phone = ${config.get('mail.message.helpdesk.telephone')})
 To complete registration for a DSpace account, please click the link

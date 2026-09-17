@@ -8,6 +8,8 @@
 ##             {5} Date of the received LDN notification
 ##
 ##
+#set($emailTitle = "Item revisado pelo serviço")
+#set($emailPreheader = "Um serviço concluiu a revisão de um item.")
 #set($subject = "DSpace: The Service ${params[0]} has reviewed the Item ""${params[1]}""")
 
 A review announce notification has been received by the service: ${params[0]}

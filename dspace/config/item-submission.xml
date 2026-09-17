@@ -18,7 +18,7 @@
     <!-- for handle "default". -->
     <submission-map>
         <!-- Default submission process -->
-        <name-map collection-handle="default" submission-name="traditional"/>
+        <name-map collection-handle="default" submission-name="pcirn"/>
 
         <!-- Sample Entities Collection configuration based on the demo Entities dataset available at:
              https://github.com/DSpace-Labs/AIP-Files/releases/tag/demo-entities-data
@@ -114,6 +114,16 @@
             <type>submission-form</type>
         </step-definition>
         <step-definition id="traditionalpagetwo" mandatory="true">
+            <heading>submit.progressbar.describe.steptwo</heading>
+            <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
+            <type>submission-form</type>
+        </step-definition>
+        <step-definition id="pcirnpageone" mandatory="true">
+            <heading>submit.progressbar.describe.stepone</heading>
+            <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
+            <type>submission-form</type>
+        </step-definition>
+        <step-definition id="pcirnpagetwo" mandatory="true">
             <heading>submit.progressbar.describe.steptwo</heading>
             <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
             <type>submission-form</type>
@@ -271,6 +281,17 @@
     <!-- -->
     <!-- -->
     <submission-definitions>
+
+        <!-- PCIRN institutional document workflow. Collection selection, metadata,
+             file upload and the DSpace license remain native steps. Published
+             items are always public, so the access condition step is omitted. -->
+        <submission-process name="pcirn">
+            <step id="collection"/>
+            <step id="pcirnpageone"/>
+            <step id="pcirnpagetwo"/>
+            <step id="upload"/>
+            <step id="license"/>
+        </submission-process>
 
         <!--This "traditional" process defines the DEFAULT item submission process -->
         <submission-process name="traditional">

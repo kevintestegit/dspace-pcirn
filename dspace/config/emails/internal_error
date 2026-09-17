@@ -10,6 +10,8 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailTitle = "Erro interno do repositório")
+#set($emailPreheader = "O repositório registrou um erro interno do servidor.")
 #set($subject = "${config.get('dspace.name')}: Internal Server Error")
 An internal server error occurred on ${params[0]}:
 

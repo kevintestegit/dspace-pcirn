@@ -34,6 +34,8 @@ public class AcceptEditRejectAction extends ProcessingAction {
 
     private static final String SUBMITTER_IS_DELETED_PAGE = "submitter_deleted";
 
+    public static final String SUBMIT_DELETE = "submit_delete";
+
     //TODO: rename to AcceptAndEditMetadataAction
 
     @Override
@@ -50,6 +52,8 @@ public class AcceptEditRejectAction extends ProcessingAction {
                     return processAccept(c, wfi);
                 case SUBMIT_REJECT:
                     return super.processRejectPage(c, wfi, request);
+                case SUBMIT_DELETE:
+                    return processDelete(c, wfi);
                 case SUBMITTER_IS_DELETED_PAGE:
                     return processSubmitterIsDeletedPage(c, wfi, request);
                 default:
@@ -65,7 +69,7 @@ public class AcceptEditRejectAction extends ProcessingAction {
         options.add(SUBMIT_APPROVE);
         options.add(SUBMIT_REJECT);
         options.add(ProcessingAction.SUBMIT_EDIT_METADATA);
-        options.add(RETURN_TO_POOL);
+        options.add(SUBMIT_DELETE);
         return options;
     }
 
@@ -75,6 +79,16 @@ public class AcceptEditRejectAction extends ProcessingAction {
         super.addApprovedProvenance(c, wfi);
 
         return new ActionResult(ActionResult.TYPE.TYPE_OUTCOME, ActionResult.OUTCOME_COMPLETE);
+    }
+
+    /**
+     * Permanently deletes the workflow item, the item and its files. Used by the
+     * NUGECID reviewer to discard a submission instead of returning it.
+     */
+    public ActionResult processDelete(Context c, XmlWorkflowItem wfi)
+            throws SQLException, AuthorizeException, IOException {
+        xmlWorkflowService.deleteWorkflowByWorkflowItem(c, wfi, c.getCurrentUser());
+        return new ActionResult(ActionResult.TYPE.TYPE_SUBMISSION_PAGE);
     }
 
     public ActionResult processSubmitterIsDeletedPage(Context c, XmlWorkflowItem wfi, HttpServletRequest request)

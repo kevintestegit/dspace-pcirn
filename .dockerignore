@@ -3,6 +3,11 @@
 .settings/
 */target/
 dspace/modules/*/target/
+dspace-angular/source/node_modules/
+dspace-angular/source/.angular/
+dspace-angular/source/dist/
+.buildx/
+.playwright-mcp/
 Dockerfile.*
 dspace/src/main/docker/dspace-postgres-loadsql
 dspace/src/main/docker/README.md

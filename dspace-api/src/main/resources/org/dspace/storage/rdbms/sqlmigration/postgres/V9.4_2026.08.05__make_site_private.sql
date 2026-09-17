@@ -22,22 +22,49 @@
 -- Idempotent: safe to re-run manually if the group is ever recreated.
 --------------------------------------------------------------------------------
 
--- 1. Ensure the default groups exist (may be missing on fresh installs, since
---    GroupServiceInitializer only runs AFTER all migrations).
-INSERT INTO epersongroup (uuid, name, permanent)
-SELECT gen_random_uuid(), 'Anonymous', true
-WHERE NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'Anonymous');
+-- 1. Ensure the groups exist. epersongroup.uuid references dspaceobject.uuid;
+--    inserting only epersongroup fails on fresh installations.
+DO $$
+DECLARE
+    group_uuid uuid;
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'Anonymous') THEN
+        group_uuid := gen_random_uuid();
+        INSERT INTO dspaceobject (uuid) VALUES (group_uuid);
+        INSERT INTO epersongroup (uuid, name, permanent)
+        VALUES (group_uuid, 'Anonymous', true);
+    END IF;
 
-INSERT INTO epersongroup (uuid, name, permanent)
-SELECT gen_random_uuid(), 'Administrator', true
-WHERE NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'Administrator');
+    IF NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'Administrator') THEN
+        group_uuid := gen_random_uuid();
+        INSERT INTO dspaceobject (uuid) VALUES (group_uuid);
+        INSERT INTO epersongroup (uuid, name, permanent)
+        VALUES (group_uuid, 'Administrator', true);
+    END IF;
 
--- 2. Target group for authenticated users (create if missing).
-INSERT INTO epersongroup (uuid, name, permanent)
-SELECT gen_random_uuid(), 'Usuarios_Logados', false
-WHERE NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'Usuarios_Logados');
+    IF NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'Usuarios_Logados') THEN
+        group_uuid := gen_random_uuid();
+        INSERT INTO dspaceobject (uuid) VALUES (group_uuid);
+        INSERT INTO epersongroup (uuid, name, permanent)
+        VALUES (group_uuid, 'Usuarios_Logados', false);
+    END IF;
 
--- 3. Make every registered EPerson a member of the group (idempotent).
+    IF NOT EXISTS (SELECT 1 FROM epersongroup WHERE name = 'NUGECID') THEN
+        group_uuid := gen_random_uuid();
+        INSERT INTO dspaceobject (uuid) VALUES (group_uuid);
+        INSERT INTO epersongroup (uuid, name, permanent)
+        VALUES (group_uuid, 'NUGECID', false);
+    END IF;
+END $$;
+
+-- Repair a partially-created group if an earlier manual attempt inserted its
+-- row without the required dspaceobject parent.
+INSERT INTO dspaceobject (uuid)
+SELECT g.uuid
+FROM epersongroup g
+WHERE NOT EXISTS (SELECT 1 FROM dspaceobject d WHERE d.uuid = g.uuid);
+
+-- 2. Make every registered EPerson a member of the group (idempotent).
 --    New accounts created later must be added to the group manually (or by
 --    re-running this INSERT).
 INSERT INTO epersongroup2eperson (eperson_group_id, eperson_id)
@@ -50,7 +77,7 @@ WHERE g.name = 'Usuarios_Logados'
       WHERE m.eperson_group_id = g.uuid AND m.eperson_id = e.uuid
   );
 
--- 4. Swap Anonymous -> Usuarios_Logados on every visibility-granting policy.
+-- 3. Swap Anonymous -> Usuarios_Logados on every visibility-granting policy.
 UPDATE resourcepolicy rp
 SET epersongroup_id = g.uuid
 FROM epersongroup anon
