@@ -11,18 +11,18 @@
 #set($emailTitle = "Solicitação de cópia aprovada")
 #set($emailPreheader = "Sua solicitação de cópia de documento foi aprovada.")
 #set($subject = 'Request for Copy of Restricted Document is Granted')
-Dear ${params[0]}:
+Prezado(a) ${params[0]},
 
-Your request for a copy of the file(s) from the below document has been approved by ${params[3]}.  You may find the requested file(s) attached.
+Sua solicitação de cópia do(s) arquivo(s) do documento abaixo foi aprovada por ${params[3]}. O(s) arquivo(s) solicitado(s) está(ão) anexado(s).
 
     ${params[2]}
     ${params[1]} 
 #if( $params[5] )
 
-An additional message from ${params[3]} follows:
+Segue uma mensagem adicional de ${params[3]}:
 
 ${params[5]}
 #end
 
-Best regards,
-The ${config.get('dspace.name')} Team
+Atenciosamente,
+A equipe do ${config.get('dspace.name')}

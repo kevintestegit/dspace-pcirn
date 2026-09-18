@@ -8,8 +8,8 @@
 #set($emailPreheader = "Uma nova solicitação administrativa aguarda análise.")
 #set($subject = "Notification about ${params[0]} Request")
 
-Item Details:
+Detalhes do item:
 
-Type of request: ${params[0]}
-Relatem to item: ${params[1]}
-Reason: ${params[2]}
+Tipo de solicitação: ${params[0]}
+Item relacionado: ${params[1]}
+Motivo: ${params[2]}

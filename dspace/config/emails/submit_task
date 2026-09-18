@@ -12,17 +12,16 @@
 #set($emailPreheader = "Uma nova tarefa de submissão aguarda sua ação.")
 #set($subject = "${config.get('dspace.name')}: You have a new task")
 
-A new item has been submitted:
+Um novo item foi submetido:
 
-Title:        ${params[0]}
-Collection:   ${params[1]}
-Submitted by: ${params[2]}
+Título:        ${params[0]}
+Coleção:       ${params[1]}
+Enviado por:   ${params[2]}
 
 ${params[3]}
 
-To claim this task, please visit your "My${config.get('dspace.shortname')}"
-page:  ${params[4]}
+Para assumir esta tarefa, acesse a página "Meu${config.get('dspace.shortname')}".
 
-Many thanks!
+Muito obrigado!
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

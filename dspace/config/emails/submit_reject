@@ -12,15 +12,15 @@
 #set($emailPreheader = "Sua submissão foi rejeitada e precisa de atenção.")
 #set($subject = "${config.get('dspace.name')}: Submission Rejected")
 
-You submitted: ${params[0]}
+Você submeteu: ${params[0]}
 
-To collection: ${params[1]}
+Para a coleção: ${params[1]}
 
-Your submission has been rejected by ${params[2]}
-with the following explanation:
+Sua submissão foi rejeitada por ${params[2]},
+com a seguinte justificativa:
 
 ${params[3]}
 
-Your submission has not been deleted. You can access it from your "My${config.get('dspace.shortname')}" page: ${params[4]}
+Sua submissão não foi excluída. Você poderá acessá-la na página "Meu${config.get('dspace.shortname')}".
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

@@ -9,13 +9,12 @@
 #set($emailTitle = "Falha na importação em lote")
 #set($emailPreheader = "A importação em lote não foi concluída no Repositório Institucional da PCIRN.")
 #set($subject = 'DSpace - The batch import was not completed.')
-The batch import you initiated from the DSpace UI was not completed, due to the following reason:
+A importação em lote iniciada pela interface do DSpace não foi concluída, pelo seguinte motivo:
  ${params[0]}
 
-For more information you may contact your system administrator:
+Para mais informações, entre em contato com o administrador do sistema:
  ${params[1]}
 
 
 
-The DSpace Team
-
+A equipe do DSpace

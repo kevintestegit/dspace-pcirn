@@ -5,20 +5,19 @@
 ## See org.dspace.core.Email for information on the format of this file.
 ##
 #set($emailTitle = "Confirme seu e-mail ORCID")
+#set($emailActionLabel = "Confirmar e-mail ORCID")
+#set($emailActionUrl = $params[0])
 #set($emailPreheader = "Confirme seu e-mail para criar sua conta com ORCID.")
 #set($subject = "${config.get('dspace.name')} Account Registration")
-#set($phone = ${config.get('mail.message.helpdesk.telephone')})
-To confirm your email and create the needed account, please click the link
-below:
+#set($phone = $config.get('mail.message.helpdesk.telephone'))
+Para confirmar seu e-mail e criar a conta, clique no botão abaixo.
 
-  ${params[0]}
-
-If you need assistance with your account, please email
+Se precisar de ajuda com sua conta, envie um e-mail para
 
   ${config.get("mail.helpdesk")}
 #if( $phone )
 
-or call us at ${phone}.
+ou ligue para ${phone}.
 #end
 
-The ${config.get("dspace.name")} Team
+A equipe do ${config.get("dspace.name")}

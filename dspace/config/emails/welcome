@@ -5,12 +5,12 @@
 #set($emailTitle = "Bem-vindo ao repositório")
 #set($emailPreheader = "Sua conta no Repositório Institucional da PCIRN está pronta para uso.")
 #set($subject = "Welcome new registered ${config.get('dspace.name')} user!")
-Thank you for registering an account. Your new account can be used immediately
-to subscribe to notices of new content arriving in collections of your choice.
+Obrigado por cadastrar uma conta. Sua nova conta já pode ser usada
+para assinar avisos sobre novos conteúdos nas coleções de sua escolha.
 
-Your new account can also be granted privileges to submit new content, or to
-edit and/or approve submissions.
+Sua nova conta também pode receber permissões para submeter novos conteúdos,
+editar e/ou aprovar submissões.
 
-If you need assistance with your account, please email ${config.get("mail.helpdesk")}.
+Se precisar de ajuda com sua conta, envie um e-mail para ${config.get("mail.helpdesk")}.
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

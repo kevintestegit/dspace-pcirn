@@ -6,7 +6,7 @@
 #set($emailTitle = "Atualizações das suas inscrições")
 #set($emailPreheader = "Veja as novidades dos itens e coleções que você acompanha.")
 #set($subject = "${config.get('dspace.name')} Subscriptions")
-This email is sent from ${config.get('dspace.name')} based on the chosen subscription preferences.
+Este e-mail foi enviado pelo ${config.get('dspace.name')} com base nas preferências de inscrição selecionadas.
 
 #if( not( "$params[0]" == "" ))
 ${params[0]}

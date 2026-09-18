@@ -14,16 +14,16 @@
 #set($emailPreheader = "Um feedback foi recebido pelo Repositório Institucional da PCIRN.")
 #set($subject = "${config.get('dspace.name')}: Feedback Form Information")
 
-Comments:
+Comentários:
 
 ${params[6]}
 
 
-Date: ${params[0]}
-Email: ${params[1]}
-Logged In As: ${params[2]}
-Referring Page: ${params[3]}
-User Agent: ${params[4]}
-Session: ${params[5]}
+Data: ${params[0]}
+E-mail: ${params[1]}
+Usuário autenticado como: ${params[2]}
+Página de origem: ${params[3]}
+Agente do usuário: ${params[4]}
+Sessão: ${params[5]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

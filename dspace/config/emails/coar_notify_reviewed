@@ -12,18 +12,17 @@
 #set($emailPreheader = "Um serviço concluiu a revisão de um item.")
 #set($subject = "DSpace: The Service ${params[0]} has reviewed the Item ""${params[1]}""")
 
-A review announce notification has been received by the service: ${params[0]}
-for the Item: ${params[1]}
+O serviço ${params[0]} recebeu uma notificação de revisão para o item: ${params[1]}
 
-Here is a more detailed report:
+Veja o relatório detalhado:
 Item: ${params[1]}
-Item URL: ${params[3]}
-Submitted by: ${params[4]}
+URL do item: ${params[3]}
+Enviado por: ${params[4]}
 
-Has a new status: REVIEWED
+Novo status: REVIEWED
 
-By Service: ${params[0]}
-Service URL: ${params[2]}
-Date: ${params[5]}
+Pelo serviço: ${params[0]}
+URL do serviço: ${params[2]}
+Data: ${params[5]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

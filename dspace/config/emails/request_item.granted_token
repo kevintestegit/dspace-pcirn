@@ -12,13 +12,13 @@
 ##  {7} expiration date of the granted access (timestamp, formatted in requestitem.cfg)
 
 #set($emailTitle = "Acesso seguro concedido")
+#set($emailActionLabel = "Acessar arquivos")
+#set($emailActionUrl = $params[6])
 #set($emailPreheader = "Seu acesso seguro aos arquivos solicitados foi concedido.")
 #set($subject = 'Request for Copy of Restricted Document is Granted')
-Dear ${params[0]}:
+Prezado(a) ${params[0]},
 
-Your request for a copy of the file(s) from the below document has been approved.  The following link will grant access to the files you requested.
-
-Secure link: ${params[6]}
+Sua solicitação de cópia do(s) arquivo(s) do documento abaixo foi aprovada. O botão abaixo dará acesso aos arquivos solicitados.
 
     ${params[2]}
     ${params[1]}
@@ -26,16 +26,16 @@ Secure link: ${params[6]}
 #if( $params[7] )
 
 
-Your access will last until ${params[7]}.
+Seu acesso ficará disponível até ${params[7]}.
 #end
 #if( $params[5] )
 
 
 
-An additional message from the approver follows:
+Segue uma mensagem adicional do responsável pela aprovação:
 
 ${params[5]}
 #end
 
-Best regards,
-The ${config.get('dspace.name')} Team
+Atenciosamente,
+A equipe do ${config.get('dspace.name')}

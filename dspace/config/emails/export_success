@@ -6,13 +6,14 @@
 ## See org.dspace.core.Email for information on the format of this file.
 ##
 #set($emailTitle = "Exportação pronta para download")
+#set($emailActionLabel = "Baixar arquivo")
+#set($emailActionUrl = $params[0])
 #set($emailPreheader = "O arquivo exportado está pronto para download.")
 #set($subject = "${config.get('dspace.name')}: Item export requested is ready for download")
-The item export you requested from the repository is now ready for download.
+A exportação do item solicitada no repositório está pronta para download.
 
-You may download the compressed file using the following link:
-${params[0]}
+O botão abaixo permite baixar o arquivo compactado.
 
-This file will remain available for at least ${params[1]} hours.
+Este arquivo permanecerá disponível por pelo menos ${params[1]} horas.
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

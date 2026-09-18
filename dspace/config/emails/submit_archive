@@ -8,16 +8,16 @@
 #set($emailPreheader = "Sua submissão foi aprovada e arquivada no repositório.")
 #set($subject = "${config.get('dspace.name')}: Submission Approved and Archived")
 
-You submitted: ${params[0]}
+Você submeteu: ${params[0]}
 
-To collection: ${params[1]}
+Para a coleção: ${params[1]}
 
-Your submission has been accepted and archived in ${config.get('dspace.name')},
-and it has been assigned the following identifier:
+Sua submissão foi aceita e arquivada em ${config.get('dspace.name')},
+e recebeu o seguinte identificador:
 ${params[2]}
 
-Please use this identifier when citing your submission.
+Use este identificador ao citar sua submissão.
 
-Many thanks!
+Muito obrigado!
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

@@ -9,10 +9,10 @@
 #set($emailTitle = "Falha na exportação")
 #set($emailPreheader = "A exportação solicitada não foi concluída.")
 #set($subject = "${config.get('dspace.name')}: The item export you requested was not completed.")
-The item export you requested was not completed, due to the following reason:
+A exportação do item solicitada não foi concluída pelo seguinte motivo:
  ${params[0]}
 
-For more information you may contact your system administrator:
+Para mais informações, entre em contato com o administrador do sistema:
  ${params[1]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

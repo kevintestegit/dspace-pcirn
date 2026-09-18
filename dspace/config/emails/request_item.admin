@@ -12,11 +12,11 @@
 #set($emailPreheader = "Um documento foi solicitado para disponibilização em acesso aberto.")
 #set($subject = "${config.get('dspace.name')}: Request for Open Access")
 
-${params[3]}, with address ${params[4]},
-requested the following document/file to be in Open Access:
+${params[3]}, com o endereço ${params[4]},
+solicitou que o seguinte documento/arquivo seja disponibilizado em acesso aberto:
 
-Document Handle: ${params[1]}
-File ID: ${params[0]}
+Handle do documento: ${params[1]}
+ID do arquivo: ${params[0]}
 Token: ${params[2]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

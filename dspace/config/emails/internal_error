@@ -13,14 +13,14 @@
 #set($emailTitle = "Erro interno do repositório")
 #set($emailPreheader = "O repositório registrou um erro interno do servidor.")
 #set($subject = "${config.get('dspace.name')}: Internal Server Error")
-An internal server error occurred on ${params[0]}:
+Ocorreu um erro interno do servidor em ${params[0]}:
 
-Date:       ${params[1]}
-Session ID: ${params[2]}
-User:       ${params[5]}
-IP address: ${params[6]}
+Data:       ${params[1]}
+ID da sessão: ${params[2]}
+Usuário:    ${params[5]}
+Endereço IP: ${params[6]}
 
 ${params[3]}
 
-Exception:
+Exceção:
 ${params[4]}

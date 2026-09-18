@@ -6,6 +6,6 @@
 #set($emailTitle = "Verificação do repositório concluída")
 #set($emailPreheader = "A verificação de saúde do repositório foi concluída.")
 #set($subject = "${config.get('dspace.name')}: Repository healthcheck")
-The healthcheck finished with the following output:
+A verificação de saúde foi concluída com a seguinte saída:
 
 ${params[0]}

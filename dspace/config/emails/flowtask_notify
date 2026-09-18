@@ -11,15 +11,15 @@
 #set($emailPreheader = "Uma tarefa de curadoria foi processada no repositório.")
 #set($subject = "${config.get('dspace.name')}: Curation Task Report")
 
-Title:         ${params[0]}
-Collection:    ${params[1]}
-Submitted by:  ${params[2]}
+Título:        ${params[0]}
+Coleção:       ${params[1]}
+Enviado por:   ${params[2]}
 
-Curation task ${params[3]} has been performed
-with the following result:
+A tarefa de curadoria ${params[3]} foi executada
+com o seguinte resultado:
 
 ${params[4]}
 
-Action taken on the submission: ${params[5]}
+Ação executada na submissão: ${params[5]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

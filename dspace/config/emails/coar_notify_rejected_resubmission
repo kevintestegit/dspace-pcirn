@@ -13,18 +13,17 @@
 #set($emailPreheader = "Uma submissão precisa de revisões após a análise do serviço.")
 #set($subject = "DSpace: The Service ${params[0]} indicates that revisions are needed following review of the Item ""${params[1]}""")
 
-A tentative rejection notification has been received by the service: ${params[0]}
-for the Item: ${params[1]}. Revisions are needed. To further proceed, please submit a revised version when ready.
+O serviço ${params[0]} recebeu uma notificação de recusa provisória para o item: ${params[1]}. São necessárias revisões. Para prosseguir, envie uma versão revisada quando estiver pronta.
 
-Here is a more detailed report:
+Veja o relatório detalhado:
 Item: ${params[1]}
-Item URL: ${params[3]}
-Submitted by: ${params[4]}
+URL do item: ${params[3]}
+Enviado por: ${params[4]}
 
-Has a new update: REVISIONS ARE NEEDED FOLLOWING REVIEW
+Nova atualização: REVISIONS ARE NEEDED FOLLOWING REVIEW
 
-By Service: ${params[0]}
-Service URL: ${params[2]}
-Date: ${params[5]}
+Pelo serviço: ${params[0]}
+URL do serviço: ${params[2]}
+Data: ${params[5]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}

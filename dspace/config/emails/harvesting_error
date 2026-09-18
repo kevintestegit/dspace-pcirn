@@ -11,14 +11,14 @@
 #set($emailTitle = "Falha na coleta")
 #set($emailPreheader = "A coleta de uma coleção encontrou um erro.")
 #set($subject = "${config.get('dspace.name')}: Harvesting Error")
-Collection ${params[0]} failed on harvest:
+Falha na coleta da coleção ${params[0]}:
 
-Date:       	${params[1]}
-Status Flag: 	${params[2]}
+Data:       	${params[1]}
+Indicador de status: 	${params[2]}
 
 ${params[3]}
 
-Exception:
+Exceção:
 ${params[4]}
 
-The ${config.get('dspace.name')} Team
+A equipe do ${config.get('dspace.name')}
