@@ -71,6 +71,9 @@ public class EmailServiceImplTest
 
     private static final String CFG_USERNAME = "mail.server.username";
     private static final String CFG_PASSWORD = "mail.server.password";
+    private static final String CFG_SERVER = "mail.server";
+    private static final String CFG_SERVER_PORT = "mail.server.port";
+    private static final String CFG_EXTRAPROPERTIES = "mail.extraproperties";
 
     /**
      * Test of testGetSession method, of class EmailServiceImpl when an smtp
@@ -99,6 +102,49 @@ public class EmailServiceImplTest
         cfg.setProperty(CFG_USERNAME, oldUsername);
         cfg.setProperty(CFG_PASSWORD, oldPassword);
         instance.reset();
+    }
+
+    /**
+     * Test of an authenticated session configured for Resend SMTP with STARTTLS.
+     */
+    @Test
+    public void testGetAuthenticatedStartTlsSession() {
+        System.out.println("getAuthenticatedStartTlsSession");
+        ConfigurationService cfg = getKernel().getConfigurationService();
+
+        String oldServer = cfg.getProperty(CFG_SERVER);
+        String oldServerPort = cfg.getProperty(CFG_SERVER_PORT);
+        String oldUsername = cfg.getProperty(CFG_USERNAME);
+        String oldPassword = cfg.getProperty(CFG_PASSWORD);
+        String oldExtraProperties = cfg.getProperty(CFG_EXTRAPROPERTIES);
+
+        EmailServiceImpl instance = (EmailServiceImpl) getService(EmailServiceImpl.class);
+        try {
+            cfg.setProperty(CFG_SERVER, "smtp.resend.com");
+            cfg.setProperty(CFG_SERVER_PORT, "587");
+            cfg.setProperty(CFG_USERNAME, "resend");
+            cfg.setProperty(CFG_PASSWORD, "dummy-resend-api-key");
+            cfg.setProperty(CFG_EXTRAPROPERTIES,
+                    "mail.smtp.starttls.enable=true,mail.smtp.starttls.required=true");
+
+            instance.reset();
+            Session session = instance.getSession();
+            assertNotNull(" getSession returned null", session);
+            assertEquals("smtp.resend.com", session.getProperties().getProperty("mail.host"));
+            assertEquals("587", session.getProperties().getProperty("mail.smtp.port"));
+            assertEquals("true", session.getProperties().getProperty("mail.smtp.auth"));
+            assertEquals("true",
+                    session.getProperties().getProperty("mail.smtp.starttls.enable"));
+            assertEquals("true",
+                    session.getProperties().getProperty("mail.smtp.starttls.required"));
+        } finally {
+            cfg.setProperty(CFG_SERVER, oldServer);
+            cfg.setProperty(CFG_SERVER_PORT, oldServerPort);
+            cfg.setProperty(CFG_USERNAME, oldUsername);
+            cfg.setProperty(CFG_PASSWORD, oldPassword);
+            cfg.setProperty(CFG_EXTRAPROPERTIES, oldExtraProperties);
+            instance.reset();
+        }
     }
 
     /**
