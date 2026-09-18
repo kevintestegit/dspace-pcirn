@@ -58,7 +58,7 @@ public final class PcirnEmailTemplateRendererTest {
                         "href=\"https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;\""),
                 containsString(
                         "Se o botão não abrir, acesse: <a href=\"https://pcirn.example/"
-                                + "item?id=1&amp;mode=&quot;full&quot;\">"),
+                                + "item?id=1&amp;mode=&quot;full&quot;\""),
                 containsString(
                         "https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;</a>"),
                 containsString("cid:pcirn-dspace-logo"),

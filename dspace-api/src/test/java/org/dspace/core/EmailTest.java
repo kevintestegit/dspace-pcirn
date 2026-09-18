@@ -265,7 +265,7 @@ public class EmailTest
         fixtures.put("batch_import_error", fixture("Falha na importação em lote",
                 "falha no lote", "falha no lote", "https://example.org/feedback"));
         fixtures.put("batch_import_success", fixture("Importação em lote concluída",
-                "completed successfully", "/tmp/mapfile"));
+                "concluída com sucesso", "/tmp/mapfile"));
         fixtures.put("change_password", fixture("Cadastre sua senha",
                 "Recebemos uma solicitação", "https://example.org/reset?token=pcirn-test"));
         fixtures.put("coar_notify_accepted", fixture("Revisão aceita pelo serviço",
@@ -293,7 +293,7 @@ public class EmailTest
         fixtures.put("export_error", fixture("Falha na exportação",
                 "falha na exportação", "falha na exportação", "https://example.org/feedback"));
         fixtures.put("export_success", fixture("Exportação pronta para download",
-                "ready for download", "https://example.org/export", "24"));
+                "pronta para download", "https://example.org/export", "24"));
         fixtures.put("feedback", fixture("Feedback recebido", "comentário do usuário",
                 "2026-09-16", "user@example.org", "usuário", "https://example.org/page",
                 "Mozilla", "session", "comentário do usuário"));
@@ -308,10 +308,10 @@ public class EmailTest
                 "https://example.org/server", "https://example.org/server", "2026-09-16", "sessão",
                 "https://example.org/error", "pilha de erro", "usuário", "127.0.0.1"));
         fixtures.put("orcid", fixture("Conclua seu cadastro com ORCID",
-                "To complete registration", "https://example.org/orcid"));
+                "concluir o cadastro", "https://example.org/orcid"));
         fixtures.put("qaevent_admin_notification", fixture("Nova solicitação administrativa",
                 "topic", "topic", "123", "motivo"));
-        fixtures.put("register", fixture("Confirme seu cadastro", "To complete registration",
+        fixtures.put("register", fixture("Confirme seu cadastro", "concluir o cadastro",
                 "https://example.org/register?token=pcirn-test"));
         fixtures.put("registration_notify", fixture("Novo cadastro no repositório",
                 "novo usuário", "novo usuário", "https://example.org", "Nome", "user@example.org",
@@ -320,33 +320,33 @@ public class EmailTest
                 "admin", "admin", "https://example.org/item", "token", "Nome do aprovador",
                 "approver@example.org"));
         fixtures.put("request_item.author", fixture("Solicitação de cópia de documento",
-                "Dear", "Nome do solicitante", "requester@example.org", "arquivo", "123/abc",
+                "Um usuário", "Nome do solicitante", "requester@example.org", "arquivo", "123/abc",
                 "Título do documento", "mensagem", "https://example.org/request", "Autor",
                 "author@example.org", "Repositório", "help@example.org"));
         fixtures.put("request_item.granted", fixture("Solicitação de cópia aprovada",
-                "Dear", "Solicitante", "https://example.org/item", "Título", "Concedente",
+                "Prezado(a)", "Solicitante", "https://example.org/item", "Título", "Concedente",
                 "grantor@example.org", "mensagem adicional"));
         fixtures.put("request_item.granted_token", fixture("Acesso seguro concedido",
-                "Dear", "Solicitante", "https://example.org/item", "Título", "Concedente",
+                "Prezado(a)", "Solicitante", "https://example.org/item", "Título", "Concedente",
                 "grantor@example.org", "mensagem adicional", "https://example.org/token",
                 "2026-09-30"));
         fixtures.put("request_item.rejected", fixture("Solicitação de cópia recusada",
-                "Dear", "Solicitante", "https://example.org/item", "Título", "Concedente",
+                "Prezado(a)", "Solicitante", "https://example.org/item", "Título", "Concedente",
                 "grantor@example.org", "mensagem adicional"));
         fixtures.put("submit_archive", fixture("Submissão aprovada e arquivada",
-                "You submitted", "Título da submissão", "Coleção", "123/abc"));
+                "Você submeteu", "Título da submissão", "Coleção", "123/abc"));
         fixtures.put("submit_reject", fixture("Sua submissão precisa de atenção",
-                "You submitted", "Título da submissão", "Coleção", "Revisor", "motivo",
+                "Você submeteu", "Título da submissão", "Coleção", "Revisor", "motivo",
                 "https://example.org/my-dspace"));
-        fixtures.put("submit_task", fixture("Você tem uma nova tarefa", "A new item has been submitted",
+        fixtures.put("submit_task", fixture("Você tem uma nova tarefa", "Um novo item foi submetido",
                 "Título da submissão", "Coleção", "Nome do submetente", "descrição",
                 "https://example.org/my-dspace"));
         fixtures.put("subscriptions_content", fixture("Atualizações das suas inscrições",
                 "escolhidas", "escolhidas", "novos itens", "itens modificados"));
         fixtures.put("validation_orcid", fixture("Confirme seu e-mail ORCID",
-                "To confirm your email", "https://example.org/validation"));
+                "confirmar seu e-mail", "https://example.org/validation"));
         fixtures.put("welcome", fixture("Bem-vindo ao repositório",
-                "Thank you for registering an account."));
+                "Obrigado por cadastrar uma conta"));
         return fixtures;
     }
 

@@ -24,6 +24,7 @@ import java.time.Period;
 
 import jakarta.mail.Address;
 import jakarta.mail.Message;
+import jakarta.mail.Multipart;
 import jakarta.mail.Provider;
 import jakarta.mail.Session;
 import jakarta.mail.internet.InternetAddress;
@@ -186,15 +187,13 @@ public class RequestItemEmailNotifierTest
         // Check the message body.
         Message myMessage = JavaMailTestTransport.getMessage();
 
-        Object content = myMessage.getContent();
-        assertThat("Body should be a single text bodypart",
-                content, instanceOf(String.class));
+        String content = getPlainTextContent(myMessage);
 
         assertThat("Should contain the helpdesk name",
-                (String)content, containsString(HELPDESK_NAME));
+                content, containsString(HELPDESK_NAME));
 
         assertThat("Should contain the test custom message",
-                (String)content, containsString(TEST_MESSAGE));
+                content, containsString(TEST_MESSAGE));
     }
 
     /**
@@ -259,19 +258,17 @@ public class RequestItemEmailNotifierTest
         // Check the message body.
         Message myMessage = JavaMailTestTransport.getMessage();
 
-        Object content = myMessage.getContent();
-        assertThat("Body should be a single text bodypart",
-                content, instanceOf(String.class));
+        String content = getPlainTextContent(myMessage);
 
         assertThat("Should contain the helpdesk name",
-                (String)content, containsString(HELPDESK_NAME));
+                content, containsString(HELPDESK_NAME));
 
         assertThat("Should contain the test custom message",
-                (String)content, containsString(TEST_MESSAGE));
+                content, containsString(TEST_MESSAGE));
 
         // FIXME Note that this depends on the content of the rejection template!
-        assertThat("Should contain the word 'denied'.",
-                (String)content, containsString("denied"));
+        assertThat("Should contain the rejection wording.",
+                content, containsString("recusada"));
     }
 
     @Test
@@ -313,9 +310,19 @@ public class RequestItemEmailNotifierTest
 
         // Check that the email contains the access link and no attachment.
         Message myMessage = JavaMailTestTransport.getMessage();
-        String content = (String)myMessage.getContent();
+        String content = getPlainTextContent(myMessage);
         assertThat("Should contain access link", content, containsString(responseLink));
         assertThat("Should not contain attachment marker", content, not(containsString("Attachment")));
+    }
+
+    private String getPlainTextContent(Message message) throws Exception {
+        Object content = message.getContent();
+        assertThat("Body should be multipart/alternative",
+                content, instanceOf(Multipart.class));
+        Object plainText = ((Multipart) content).getBodyPart(0).getContent();
+        assertThat("First alternative should be plain text",
+                plainText, instanceOf(String.class));
+        return (String) plainText;
     }
 
     @Test
