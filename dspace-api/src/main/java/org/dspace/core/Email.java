@@ -407,7 +407,7 @@ public class Email {
             LOG.error("Template not merged:  {}", ex.getMessage());
             throw new MessagingException("Template not merged", ex);
         }
-        body = writer.toString();
+        String mergedBody = writer.toString();
 
         String emailTitle = getContextValue(vctx, "emailTitle");
         String emailActionLabel = getContextValue(vctx, "emailActionLabel");
@@ -443,6 +443,13 @@ public class Email {
             message.setSubject(subject);
         }
 
+        PcirnEmailTemplateRenderer.RenderedEmail rendered =
+                new PcirnEmailTemplateRenderer(Paths.get(
+                        getConfigurationService().getProperty("dspace.dir"),
+                        "config", "emails")).render(mergedBody, emailTitle,
+                        emailActionLabel, emailActionUrl, emailPreheader);
+        body = appendPlainTextActionFallback(mergedBody, emailActionLabel, emailActionUrl);
+
         // Attach the body. An absent charset falls back to UTF-8 so the plain and
         // HTML alternatives always declare the charset they are actually encoded in.
         String bodyCharset = charset == null ? "UTF-8" : charset;
@@ -452,11 +459,6 @@ public class Email {
         plainPart.setText(body, bodyCharset);
         alternative.addBodyPart(plainPart);
 
-        PcirnEmailTemplateRenderer.RenderedEmail rendered =
-                new PcirnEmailTemplateRenderer(Paths.get(
-                        getConfigurationService().getProperty("dspace.dir"),
-                        "config", "emails")).render(body, emailTitle,
-                        emailActionLabel, emailActionUrl, emailPreheader);
         MimeMultipart related = new MimeMultipart("related");
 
         MimeBodyPart htmlPart = new MimeBodyPart();
@@ -532,6 +534,22 @@ public class Email {
     private String getContextValue(VelocityContext context, String name) {
         Object value = context.get(name);
         return value == null ? "" : value.toString();
+    }
+
+    /**
+     * Append a readable action link to the plain-text email body when available.
+     *
+     * @param body merged template body
+     * @param actionLabel action link label
+     * @param actionUrl action link URL
+     * @return body with a plain-text action fallback, or the unchanged body
+     */
+    private String appendPlainTextActionFallback(String body, String actionLabel, String actionUrl) {
+        if (actionLabel == null || actionLabel.isBlank()
+                || actionUrl == null || actionUrl.isBlank()) {
+            return body;
+        }
+        return body + "\n\n" + actionLabel + ": " + actionUrl + "\n";
     }
 
     /**
