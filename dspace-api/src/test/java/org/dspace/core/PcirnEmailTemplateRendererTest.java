@@ -69,6 +69,8 @@ public final class PcirnEmailTemplateRendererTest {
                 containsString("Repositório Institucional da PCIRN"),
                 containsString("POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE"),
                 containsString("CIÊNCIA QUE IDENTIFICA. INFORMAÇÃO QUE TRANSFORMA."),
+                containsString("max-width:680px"),
+                not(containsString("$email")),
                 not(containsString("Primeiro <parágrafo> & linha"))));
         String escapedActionUrl = "https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;";
         assertThat(countOccurrences(rendered.html(), "href=\"" + escapedActionUrl + "\""), is(2));
