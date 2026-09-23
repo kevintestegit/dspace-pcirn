@@ -194,18 +194,16 @@ public class EmailTest
         assertThat(countOccurrences(html, ">" + token + "</a>"), is(1));
         String htmlWithoutAnchors = html.replaceAll("(?is)<a\\b[^>]*>.*?</a>", "");
         assertThat(htmlWithoutAnchors, not(containsString(token)));
-        assertThat(html, containsString("cid:pcirn-footer-bg"));
+        assertThat(html, containsString("alt=\"Brasão da Polícia Científica do Rio Grande do Norte\""));
         assertThat(html, containsString("cid:pcirn-footer-building"));
-        assertThat(related.getCount(), is(6));
+        assertThat(related.getCount(), is(5));
         assertInlinePart(related.getBodyPart(1), "pcirn-dspace-logo",
                 "dspace-logo-white.svg", "image/svg+xml");
         assertInlinePart(related.getBodyPart(2), "pcirn-policiacientifica",
                 "brasao-policia-cientifica-rn.png", "image/png");
         assertInlinePart(related.getBodyPart(3), "pcirn-estado-rn",
                 "brasao-estado-rn.png", "image/png");
-        assertInlinePart(related.getBodyPart(4), "pcirn-footer-bg",
-                "footer-bg-pcirn.webp", "image/webp");
-        assertInlinePart(related.getBodyPart(5), "pcirn-footer-building",
+        assertInlinePart(related.getBodyPart(4), "pcirn-footer-building",
                 "desenho1.png", "image/png");
 
         ByteArrayOutputStream serialized = new ByteArrayOutputStream();

@@ -25,22 +25,22 @@
 - Modificar: `dspace-angular/source/src/app/search-page/search-page-routes.ts`
 - Teste: `scripts/pcirn-navbar-i18n.test.mjs`
 
-- [ ] **Passo 1: Escrever teste de regressão para validar os rótulos de navegação**
+- [x] **Passo 1: Escrever teste de regressão para validar os rótulos de navegação**
   - Verificar que o link para `/collection-list` não utiliza o rótulo singular `"Coleção"`.
   - Verificar que a chave `search.form.scope.all` não contém `"DSpace"` no catálogo pt-BR.
   - Verificar que o breadcrumb de `/search` corresponde a `"Publicações"`.
 
-- [ ] **Passo 2: Executar o teste e confirmar as falhas**
+- [x] **Passo 2: Executar o teste e confirmar as falhas**
   - Executar: `node --test scripts/pcirn-navbar-i18n.test.mjs`
 
-- [ ] **Passo 3: Corrigir os templates e catálogos de tradução**
+- [x] **Passo 3: Corrigir os templates e catálogos de tradução**
   - Em `navbar.component.html`, trocar `collection.listelement.badge` por `item.page.collections` (`"Coleções"`).
   - Em `footer.component.html`, alinhar o link da coluna de navegação para `item.page.collections`.
   - Em `pt-BR.json5`, alterar `"search.form.scope.all"` de `"Todo o DSpace"` para `"Todo o Acervo"`.
   - Em `en.json5`, manter `"All of Repository"`.
   - Em `search-page-routes.ts`, atualizar `breadcrumbKey` para `publicacoes.search.title` ou garantir exibição consistente de `"Publicações"`.
 
-- [ ] **Passo 4: Executar os testes e validar aprovação**
+- [x] **Passo 4: Executar os testes e validar aprovação**
   - Executar: `node --test scripts/pcirn-navbar-i18n.test.mjs scripts/pcirn-i18n.test.mjs`
 
 ---
@@ -54,20 +54,20 @@
 - Criar/Modificar: `dspace-angular/source/src/themes/custom/app/logout-page/logout-page.component.scss`
 - Teste: `dspace-angular/source/scripts/pcirn-login.test.mjs`
 
-- [ ] **Passo 1: Escrever teste de asserção da identidade visual de login**
+- [x] **Passo 1: Escrever teste de asserção da identidade visual de login**
   - Assegurar que o template de login não referencia `dspace-logo.svg`.
   - Assegurar que referencia `brasao-policia-cientifica-rn.png` ou `brasao-estado-rn.svg`.
   - Assegurar a presença do container/card estilizado `.pcirn-login-card`.
 
-- [ ] **Passo 2: Implementar o template e estilo temático de login**
+- [x] **Passo 2: Implementar o template e estilo temático de login**
   - Substituir a logo padrão pela marca da Polícia Científica do RN.
   - Estruturar o card centralizado com `border-radius: 12px`, elevação sutil e espaçamento adequado.
   - Estilizar os inputs e o botão de acesso com a cor primária PCIRN (`#07345f`).
 
-- [ ] **Passo 3: Implementar o template e estilo de logout**
+- [x] **Passo 3: Implementar o template e estilo de logout**
   - Exibir mensagem de encerramento seguro de sessão com o brasão institucional e botão de retorno à página inicial.
 
-- [ ] **Passo 4: Validar compilação e teste**
+- [x] **Passo 4: Validar compilação e teste**
   - Executar: `node --test dspace-angular/source/scripts/pcirn-login.test.mjs`
 
 ---
@@ -83,18 +83,18 @@
 - Modificar: `dspace-angular/source/src/assets/i18n/en.json5`
 - Teste: `dspace-angular/source/scripts/pcirn-info-legal.test.mjs`
 
-- [ ] **Passo 1: Escrever teste para validação de conteúdo legal e ausência de placeholders em inglês**
+- [x] **Passo 1: Escrever teste para validação de conteúdo legal e ausência de placeholders em inglês**
   - Verificar que o componente de privacidade não contém termos corporativos em inglês como `"Children under the age of 13"`, `"Company" or "We"`.
   - Verificar que o contrato de usuário não contém notas soltas `[a]`.
 
-- [ ] **Passo 2: Implementar a Política de Privacidade em Português (LGPD)**
+- [x] **Passo 2: Implementar a Política de Privacidade em Português (LGPD)**
   - Redigir os tópicos: Controladoria de dados da PCIRN, finalidade institucional, tratamento de logs de acesso de acordo com o Marco Civil da Internet e LGPD, transparência e canal da encarregada/DPO via NUGECID.
   - Estruturar em cards com ícones e títulos limpos, seguindo o padrão já consolidado em `about` e `politica-acesso`.
 
-- [ ] **Passo 3: Implementar os Termos de Uso Institucionais**
+- [x] **Passo 3: Implementar os Termos de Uso Institucionais**
   - Reestruturar as regras de uso do repositório, direitos autorais dos atos e laudos periciais, deveres de integridade da informação e preservação digital.
 
-- [ ] **Passo 4: Validar testes**
+- [x] **Passo 4: Validar testes**
   - Executar: `node --test dspace-angular/source/scripts/pcirn-info-legal.test.mjs`
 
 ---
@@ -105,43 +105,49 @@
 - Modificar: `dspace-angular/source/src/app/app-routes.ts`
 - Teste: `scripts/pcirn-public-read.test.mjs`
 
-- [ ] **Passo 1: Atualizar o teste de acesso público**
+- [x] **Passo 1: Atualizar o teste de acesso público**
   - Adicionar asserção em `scripts/pcirn-public-read.test.mjs` verificando que a rota `browse` não possui `authenticatedGuard`.
 
-- [ ] **Passo 2: Remover `authenticatedGuard` da rota `browse`**
+- [x] **Passo 2: Remover `authenticatedGuard` da rota `browse`**
   - Em `app-routes.ts` (linhas 149–153), remover a restrição para permitir a consulta anônima por título, autor, assunto e data.
 
-- [ ] **Passo 3: Validar teste**
+- [x] **Passo 3: Validar teste**
   - Executar: `node --test scripts/pcirn-public-read.test.mjs`
 
 ---
 
-### Tarefa 5: Telas de Erro Institucionais (404 e 403)
+### Tarefa 5: Telas de Erro Institucionais (404, 403, 500 e Erro Geral)
 
 **Arquivos:**
 - Criar/Modificar: `dspace-angular/source/src/themes/custom/app/pagenotfound/pagenotfound.component.html`
 - Criar/Modificar: `dspace-angular/source/src/themes/custom/app/pagenotfound/pagenotfound.component.scss`
 - Criar/Modificar: `dspace-angular/source/src/themes/custom/app/forbidden/forbidden.component.html`
 - Criar/Modificar: `dspace-angular/source/src/themes/custom/app/forbidden/forbidden.component.scss`
+- Criar/Modificar: `dspace-angular/source/src/themes/custom/app/page-internal-server-error/page-internal-server-error.component.html`
+- Criar/Modificar: `dspace-angular/source/src/themes/custom/app/page-internal-server-error/page-internal-server-error.component.scss`
+- Criar/Modificar: `dspace-angular/source/src/themes/custom/app/page-internal-server-error/page-internal-server-error.component.ts`
+- Criar/Modificar: `dspace-angular/source/src/themes/custom/app/page-error/page-error.component.html`
+- Criar/Modificar: `dspace-angular/source/src/themes/custom/app/page-error/page-error.component.scss`
+- Criar/Modificar: `dspace-angular/source/src/themes/custom/app/page-error/page-error.component.ts`
 - Teste: `dspace-angular/source/scripts/pcirn-errors.test.mjs`
 
-- [ ] **Passo 1: Escrever teste de regressão das páginas de erro**
-  - Validar que as páginas 404 e 403 possuem cards estilizados e links úteis de retorno e busca.
+- [x] **Passo 1: Escrever teste de regressão das páginas de erro**
+  - Validar que as páginas 404, 403, 500 e Erro Geral possuem cards estilizados e links úteis de retorno e busca.
 
-- [ ] **Passo 2: Implementar templates temáticos com card PCIRN**
+- [x] **Passo 2: Implementar templates temáticos com card PCIRN**
   - Inserir badge/ícone institucional, mensagem explicativa acolhedora em português e grupo de botões:
     - *"Ir para o Início"*
     - *"Pesquisar no Acervo"*
     - *"Fale Conosco"*
 
-- [ ] **Passo 3: Executar a suíte de testes de erro**
+- [x] **Passo 3: Executar a suíte de testes de erro**
   - Executar: `node --test dspace-angular/source/scripts/pcirn-errors.test.mjs`
 
 ---
 
 ### Verificação Final e Aceite
 
-- [ ] Executar toda a suíte de testes de interface:
+- [x] Executar toda a suíte de testes de interface:
   `node --test scripts/pcirn-*.test.mjs dspace-angular/source/scripts/pcirn-*.test.mjs`
-- [ ] Validar compilação sem erros no contêiner `dspace-angular`.
-- [ ] Gerar capturas de tela finais das páginas corrigidas via Google Chrome headless para conferência visual.
+- [x] Validar compilação sem erros no contêiner `dspace-angular`.
+- [x] Gerar capturas de tela finais das páginas corrigidas via Google Chrome headless para conferência visual.

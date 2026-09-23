@@ -7,6 +7,7 @@ services:
     environment:
       dspace__P__server__P__url: ${PUBLIC_REST_URL:?Defina PUBLIC_REST_URL no .env.production}
       dspace__P__ui__P__url: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL no .env.production}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       dspace__P__server__P__ssr__P__url: http://dspace:8080/server
       db__P__url: jdbc:postgresql://dspacedb:5432/dspace
       db__P__username: dspace

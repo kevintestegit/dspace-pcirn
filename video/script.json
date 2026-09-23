@@ -1,0 +1,36 @@
+{
+  "voice": "pt-BR-AntonioNeural",
+  "rate": "+0%",
+  "scenes": [
+    {
+      "id": "s1",
+      "kind": "title",
+      "narration": "DSpace é uma plataforma open source de repositório digital, usada por mais de duas mil instituições para preservar e dar acesso durável a conteúdos digitais."
+    },
+    {
+      "id": "s2",
+      "kind": "modules",
+      "narration": "O backend é um projeto Java 17, em Maven, organizado em dez módulos. O dspace-api concentra o domínio, o dspace-services traz serviços compartilhados, e o dspace-server-webapp expõe a API REST."
+    },
+    {
+      "id": "s3",
+      "kind": "flow",
+      "narration": "Toda requisição segue o mesmo caminho: o frontend Angular chama a API REST, que passa pela camada de serviços, chega aos DAOs com Hibernate e persiste no PostgreSQL. A busca é indexada no Solr e os arquivos originais ficam no assetstore."
+    },
+    {
+      "id": "s4",
+      "kind": "integrations",
+      "narration": "Além da API REST, o DSpace expõe interfaces padronizadas: OAI-PMH para coleta de metadados, SWORD para depósito, IIIF para imagens e SAML2 para autenticação institucional."
+    },
+    {
+      "id": "s5",
+      "kind": "deploy",
+      "narration": "Para rodar localmente, o projeto inclui Docker Compose com PostgreSQL, Solr, o servidor DSpace e o frontend Angular, tudo com um único comando."
+    },
+    {
+      "id": "s6",
+      "kind": "outro",
+      "narration": "DSpace é mantido pela comunidade sob licença BSD e está na versão nove. Contribuições são bem-vindas no GitHub."
+    }
+  ]
+}

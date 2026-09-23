@@ -42,6 +42,7 @@ nb-configuration.xml
 /dspace/config/local.cfg
 /smtp.env
 .env.production
+.env.local
 backups/
 .worktrees/
 
@@ -54,3 +55,17 @@ rebel.xml
 
 ## Ignore jenv configuration
 .java-version
+
+# Superpowers brainstorming mockups
+.superpowers/
+
+# Video explainer: dependencies and generated media
+video/node_modules/
+video/out/
+
+# Local agent/browser tooling artifacts
+.playwright-mcp/
+.playwright-cli/
+.buildx/
+.codex/
+output/

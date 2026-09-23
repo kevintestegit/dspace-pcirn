@@ -9,5 +9,6 @@
         <node id="RELATORIO_CONTAS" label="Relatório de Prestação de Contas" />
         <node id="NOTA_TECNICA" label="Nota Técnica" />
         <node id="DIRETRIZ_INSTRUCAO" label="Diretriz e Instrução Normativa/Operacional" />
+        <node id="PRODUCAO_CIENTIFICA" label="Produção Científica" />
     </isComposedBy>
 </node>

@@ -66,6 +66,11 @@
                 <entry key="default-relationships" value-ref="defaultRelationshipsConfiguration" />
                 <!-- PCIRN "Publicações": somente itens, mais recentes primeiro -->
                 <entry key="publicacoes" value-ref="publicacoesConfiguration" />
+                <!-- PCIRN: buscas por categoria usadas pelo acesso rápido e atalhos da home -->
+                <entry key="pcirnNormas" value-ref="pcirnNormasConfiguration" />
+                <entry key="pcirnPops" value-ref="pcirnPopsConfiguration" />
+                <entry key="pcirnProducao" value-ref="pcirnProducaoConfiguration" />
+                <entry key="pcirnRelatorios" value-ref="pcirnRelatoriosConfiguration" />
                 <!--<entry key="123456789/7621" value-ref="defaultConfiguration"/>-->
                 <!-- Used to show filters and results on MyDSpace -->
                 <!-- Do not change the id of special entries or else they won't work -->
@@ -374,6 +379,55 @@
                     </list>
                 </property>
             </bean>
+        </property>
+    </bean>
+
+    <!--PCIRN: category searches used by the home quick access cards and search chips-->
+    <bean id="pcirnNormasConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnNormas"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:(PORTARIA OR DECRETO OR LEI)</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnPopsConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnPops"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:POP</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnProducaoConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnProducao"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:PRODUCAO_CIENTIFICA</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnRelatoriosConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnRelatorios"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:(RELATORIO_PRODUTIVIDADE OR RELATORIO_CONTAS)</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
         </property>
     </bean>
 

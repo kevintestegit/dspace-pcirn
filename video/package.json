@@ -1,0 +1,12 @@
+{
+  "name": "dspace-explainer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bash build.sh"
+  },
+  "dependencies": {
+    "gsap": "^3.13.0",
+    "playwright": "^1.63.0"
+  }
+}

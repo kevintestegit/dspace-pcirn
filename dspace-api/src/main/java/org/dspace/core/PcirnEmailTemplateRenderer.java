@@ -36,8 +36,6 @@ public final class PcirnEmailTemplateRenderer {
 
     private static final String ESTADO_RN = "brasao-estado-rn.png";
 
-    private static final String FOOTER_BACKGROUND = "footer-bg-pcirn.webp";
-
     private static final String FOOTER_BUILDING = "desenho1.png";
 
     private static final Pattern HTML_ENTITY = Pattern.compile(
@@ -110,7 +108,6 @@ public final class PcirnEmailTemplateRenderer {
                 inlineResource("pcirn-dspace-logo", DSPACE_LOGO, "image/svg+xml"),
                 inlineResource("pcirn-policiacientifica", POLICIA_CIENTIFICA, "image/png"),
                 inlineResource("pcirn-estado-rn", ESTADO_RN, "image/png"),
-                inlineResource("pcirn-footer-bg", FOOTER_BACKGROUND, "image/webp"),
                 inlineResource("pcirn-footer-building", FOOTER_BUILDING, "image/png")));
     }
 
@@ -126,13 +123,13 @@ public final class PcirnEmailTemplateRenderer {
                 + "cellspacing=\"0\" border=\"0\" style=\"margin:28px auto 0;\">"
                 + "<tr><td align=\"center\" style=\"padding:0 0 16px;\">"
                 + "<a href=\"" + actionUrl + "\" style=\"display:inline-block; "
-                + "padding:16px 34px; background-color:#1d72f3; color:#ffffff; "
-                + "font-size:17px; line-height:22px; font-weight:bold; text-decoration:none; "
-                + "border-radius:999px;\">"
-                + actionLabel + " &nbsp;&#8599;</a></td></tr>"
-                + "<tr><td align=\"center\" style=\"font-size:12px; line-height:19px; color:#b9d2ed;\">"
+                + "padding:17px 34px; background-color:#0869e8; color:#ffffff; "
+                + "font-size:18px; line-height:22px; font-weight:bold; text-decoration:none; "
+                + "border-radius:7px;\">"
+                + actionLabel + " &nbsp;&#8594;</a></td></tr>"
+                + "<tr><td align=\"center\" style=\"font-size:12px; line-height:19px; color:#5a6d8d;\">"
                 + "Se o botão não abrir, acesse: <a href=\"" + actionUrl
-                + "\" style=\"color:#6db1ff; word-break:break-all;\">"
+                + "\" style=\"color:#0869e8; word-break:break-all;\">"
                 + actionUrl + "</a></td></tr></table>";
     }
 

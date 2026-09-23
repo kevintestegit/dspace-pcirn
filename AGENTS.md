@@ -42,3 +42,7 @@ Do not commit credentials, local `.env` files, database dumps, or generated arti
   complexity or improve reliability. Do not reimplement common functionality without a clear reason.
 - Lean on the dependencies already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
 - Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.    
+
+# JEV
+
+Tool MCP `jev_evaluate` disponível (TypeSafe `jev-latest`): classificação, roteamento, risco/destrutivo, informação faltante, rubrica. Não usar para gerar texto/código ou onde a decisão já é determinística. Detalhes: `~/jev/README.md`.

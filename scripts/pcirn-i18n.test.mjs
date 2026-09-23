@@ -113,6 +113,7 @@ test('document type translations exist for standard PCIRN types in pt-BR and en'
     { key: 'pcirn.document-type.POP', pt: 'Procedimento Operacional Padrão (POP)', en: 'Standard Operating Procedure (SOP)' },
     { key: 'pcirn.document-type.NOTA_TECNICA', pt: 'Nota Técnica', en: 'Technical Note' },
     { key: 'pcirn.document-type.TEXTO', pt: 'Texto', en: 'Text' },
+    { key: 'pcirn.document-type.PRODUCAO_CIENTIFICA', pt: 'Produção Científica', en: 'Scientific Production' },
     { key: 'pcirn.document-type.DOCUMENTO', pt: 'Documento', en: 'Document' },
     { key: 'pcirn.document-type.DEFAULT', pt: 'Documento', en: 'Document' },
   ];
@@ -120,6 +121,17 @@ test('document type translations exist for standard PCIRN types in pt-BR and en'
   for (const tc of testCases) {
     assert.equal(pt[tc.key], tc.pt, `Missing or mismatched pt-BR key: ${tc.key}`);
     assert.equal(en[tc.key], tc.en, `Missing or mismatched en key: ${tc.key}`);
+  }
+});
+
+test('category search result headers are translated in pt-BR and en', () => {
+  const pt = JSON5.parse(readFileSync(ptBrUrl, 'utf8'));
+  const en = JSON5.parse(readFileSync(enUrl, 'utf8'));
+
+  for (const configuration of ['pcirnNormas', 'pcirnPops', 'pcirnProducao', 'pcirnRelatorios']) {
+    const key = `${configuration}.search.results.head`;
+    assert.ok(pt[key], `Missing pt-BR key: ${key}`);
+    assert.ok(en[key], `Missing en key: ${key}`);
   }
 });
 

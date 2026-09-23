@@ -13,6 +13,8 @@ services:
     container_name: dspace
     env_file:
       - ./smtp.env
+      - path: ./.env.local
+        required: false
     environment:
       # Below syntax may look odd, but it is how to override dspace.cfg settings via env variables.
       # See https://github.com/DSpace/DSpace/blob/main/dspace/config/config-definition.xml

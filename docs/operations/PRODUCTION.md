@@ -7,6 +7,7 @@ cp .env.production.example .env.production
 cp smtp.env.example smtp.env
 chmod 600 .env.production smtp.env
 # preencher URLs, senha do PostgreSQL e SMTP antes de iniciar
+# para habilitar o histórico administrativo de e-mails, preencher BREVO_API_KEY
 docker compose --env-file .env.production \
   -f docker-compose.yml \
   -f dspace/src/main/docker-compose/docker-compose-angular.yml \

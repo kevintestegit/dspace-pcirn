@@ -64,26 +64,31 @@ public final class PcirnEmailTemplateRendererTest {
                 containsString("cid:pcirn-dspace-logo"),
                 containsString("cid:pcirn-policiacientifica"),
                 containsString("cid:pcirn-estado-rn"),
-                containsString("cid:pcirn-footer-bg"),
+                containsString("alt=\"Brasão da Polícia Científica do Rio Grande do Norte\""),
                 containsString("cid:pcirn-footer-building"),
                 containsString("Repositório Institucional da PCIRN"),
                 containsString("POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE"),
-                containsString("CIÊNCIA QUE IDENTIFICA. INFORMAÇÃO QUE TRANSFORMA."),
-                containsString("max-width:680px"),
+                containsString("CIÊNCIA QUE IDENTIFICA.<br>INFORMAÇÃO QUE TRANSFORMA."),
+                containsString("NOTIFICAÇÃO DO REPOSITÓRIO"),
+                containsString("background-color:#edf4fb"),
+                containsString("border-radius:12px"),
+                containsString("background-color:#0869e8"),
+                containsString("Se você não reconhece esta mensagem"),
+                containsString("text-align:center;\">!</div>"),
+                containsString("width=\"46\""),
+                not(containsString("background-color:#041c34")),
                 not(containsString("$email")),
                 not(containsString("Primeiro <parágrafo> & linha"))));
         String escapedActionUrl = "https://pcirn.example/item?id=1&amp;mode=&quot;full&quot;";
         assertThat(countOccurrences(rendered.html(), "href=\"" + escapedActionUrl + "\""), is(2));
         assertThat(countOccurrences(rendered.html(), ">" + escapedActionUrl + "</a>"), is(1));
-        assertThat(rendered.inlineResources(), hasSize(5));
+        assertThat(rendered.inlineResources(), hasSize(4));
         assertInlineResource(rendered.inlineResources(), "pcirn-dspace-logo",
                 "dspace-logo-white.svg", "image/svg+xml");
         assertInlineResource(rendered.inlineResources(), "pcirn-policiacientifica",
                 "brasao-policia-cientifica-rn.png", "image/png");
         assertInlineResource(rendered.inlineResources(), "pcirn-estado-rn",
                 "brasao-estado-rn.png", "image/png");
-        assertInlineResource(rendered.inlineResources(), "pcirn-footer-bg",
-                "footer-bg-pcirn.webp", "image/webp");
         assertInlineResource(rendered.inlineResources(), "pcirn-footer-building",
                 "desenho1.png", "image/png");
     }

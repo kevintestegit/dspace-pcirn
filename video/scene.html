@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>DSpace explainer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: #0b1020; color: #e6edf7;
+    font-family: "Segoe UI", system-ui, -apple-system, "Noto Sans", sans-serif;
+  }
+  #stage { position: relative; width: 1280px; height: 720px;
+    background: radial-gradient(1000px 600px at 20% 0%, #16203c 0%, #0b1020 60%); }
+  #brand { position: absolute; top: 28px; left: 44px; font-size: 15px;
+    letter-spacing: .12em; text-transform: uppercase; color: #8ea0bf; }
+  #counter { position: absolute; top: 28px; right: 44px; font-size: 15px;
+    color: #8ea0bf; font-variant-numeric: tabular-nums; }
+  #progress { position: absolute; left: 0; bottom: 0; width: 100%; height: 5px;
+    background: #1a2340; }
+  #progress i { display: block; width: 0; height: 100%;
+    background: linear-gradient(90deg, #4f8cff, #22d3a7); }
+
+  .scene { position: absolute; inset: 0; opacity: 0; padding: 96px 88px 88px;
+    display: flex; flex-direction: column; justify-content: center; gap: 34px; }
+  h2 { font-size: 40px; font-weight: 700; letter-spacing: -.01em; }
+  h2::after { content: ""; display: block; width: 72px; height: 4px; margin-top: 14px;
+    border-radius: 2px; background: linear-gradient(90deg, #4f8cff, #22d3a7); }
+
+  .center { display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 26px; height: 100%; text-align: center; }
+  .logo { font-size: 104px; font-weight: 800; letter-spacing: -.03em;
+    background: linear-gradient(120deg, #7fb0ff, #4f8cff 45%, #22d3a7);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .logo.small { font-size: 72px; }
+  .sub { font-size: 30px; color: #c3d0e6; }
+  .sub2 { font-size: 22px; color: #8ea0bf; }
+  .chips { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .chip { padding: 10px 18px; border-radius: 999px; font-size: 18px;
+    color: #cfe0ff; background: #141d36; border: 1px solid #27324f; }
+
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  .mod { padding: 20px 14px; border-radius: 12px; background: #121a30;
+    border: 1px solid #27324f; text-align: center; font-size: 16px; color: #a9b8d4;
+    display: flex; flex-direction: column; gap: 8px; min-height: 96px;
+    align-items: center; justify-content: center; }
+  .mod b { font-size: 17px; color: #dbe6f8; }
+  .mod span { font-size: 14px; color: #7f92b3; }
+  .mod.core { background: #14203f; border-color: #3b5b9e; }
+  .mod.core b { color: #9cc2ff; }
+
+  .pipe { position: relative; display: flex; align-items: center; gap: 10px; }
+  .node { flex: 1; padding: 22px 10px; border-radius: 12px; background: #121a30;
+    border: 1px solid #27324f; text-align: center; font-size: 19px; font-weight: 600;
+    color: #dbe6f8; display: flex; flex-direction: column; gap: 6px; }
+  .node small { font-size: 14px; font-weight: 400; color: #7f92b3; }
+  .arrow { color: #4f8cff; font-size: 24px; }
+  #flowdot { position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    background: #22d3a7; transform: translate(-50%, -50%); opacity: 0;
+    box-shadow: 0 0 18px rgba(34, 211, 167, .8); }
+  .side { display: flex; gap: 18px; }
+  .side-node { flex: 1; padding: 18px; border-radius: 12px; text-align: center;
+    background: #101a2e; border: 1px dashed #2f4a72; font-size: 18px; font-weight: 600;
+    color: #bcd2f2; display: flex; flex-direction: column; gap: 6px; }
+  .side-node small { font-size: 14px; font-weight: 400; color: #7f92b3; }
+
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .card { padding: 34px 18px; border-radius: 14px; background: #121a30;
+    border: 1px solid #27324f; text-align: center; display: flex;
+    flex-direction: column; gap: 10px; }
+  .card b { font-size: 26px; color: #9cc2ff; }
+  .card span { font-size: 16px; color: #8ea0bf; }
+
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .layer { display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 22px; border-radius: 10px; background: #121a30;
+    border: 1px solid #27324f; font-size: 19px; color: #dbe6f8; }
+  .layer span { font-size: 15px; color: #7f92b3; font-family: ui-monospace, Menlo, monospace; }
+  .term { margin-top: 8px; padding: 16px 22px; border-radius: 10px; background: #0e1526;
+    border: 1px solid #27324f; font-family: ui-monospace, Menlo, monospace;
+    font-size: 19px; color: #22d3a7; }
+  .cursor { margin-left: 6px; color: #4f8cff; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="brand">DSpace · backend 9.4</div>
+  <div id="counter">1 / 6</div>
+
+  <section class="scene" id="s1">
+    <div class="center">
+      <div class="reveal logo">DSpace</div>
+      <div class="reveal sub">Repositório digital open source</div>
+      <div class="chips">
+        <span class="reveal chip">2000+ instituições</span>
+        <span class="reveal chip">Java 17 · Maven</span>
+        <span class="reveal chip">Angular</span>
+        <span class="reveal chip">BSD-3</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="scene" id="s2">
+    <h2 class="reveal">Arquitetura em módulos</h2>
+    <div class="grid">
+      <div class="reveal mod core"><b>dspace-api</b><span>domínio</span></div>
+      <div class="reveal mod core"><b>dspace-services</b><span>serviços</span></div>
+      <div class="reveal mod core"><b>dspace-server-webapp</b><span>REST API</span></div>
+      <div class="reveal mod"><b>dspace</b><span>assembly</span></div>
+      <div class="reveal mod"><b>dspace-oai</b><span>OAI-PMH</span></div>
+      <div class="reveal mod"><b>dspace-sword</b><span>depósito</span></div>
+      <div class="reveal mod"><b>dspace-swordv2</b><span>depósito v2</span></div>
+      <div class="reveal mod"><b>dspace-iiif</b><span>imagens</span></div>
+      <div class="reveal mod"><b>dspace-saml2</b><span>autenticação</span></div>
+      <div class="reveal mod"><b>dspace-rdf</b><span>linked data</span></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s3">
+    <h2 class="reveal">Fluxo de uma requisição</h2>
+    <div class="pipe">
+      <div class="node reveal" id="n1">Angular<small>interface</small></div>
+      <div class="arrow reveal">→</div>
+      <div class="node reveal" id="n2">REST API<small>controllers</small></div>
+      <div class="arrow reveal">→</div>
+      <div class="node reveal" id="n3">Service<small>regras</small></div>
+      <div class="arrow reveal">→</div>
+      <div class="node reveal" id="n4">DAO<small>Hibernate</small></div>
+      <div class="arrow reveal">→</div>
+      <div class="node reveal" id="n5">PostgreSQL<small>dados</small></div>
+      <div id="flowdot"></div>
+    </div>
+    <div class="side">
+      <div class="reveal side-node" id="solr">Solr<small>índice de busca</small></div>
+      <div class="reveal side-node" id="asset">Assetstore<small>bitstreams</small></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s4">
+    <h2 class="reveal">Interfaces padronizadas</h2>
+    <div class="cards">
+      <div class="reveal card"><b>OAI-PMH</b><span>metadados</span></div>
+      <div class="reveal card"><b>SWORD</b><span>depósito</span></div>
+      <div class="reveal card"><b>IIIF</b><span>imagens</span></div>
+      <div class="reveal card"><b>SAML 2</b><span>autenticação</span></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s5">
+    <h2 class="reveal">Rodando localmente</h2>
+    <div class="stack">
+      <div class="reveal layer">dspace-angular <span>:4000</span></div>
+      <div class="reveal layer">dspace-server-webapp <span>:8080</span></div>
+      <div class="reveal layer">PostgreSQL <span>:5432</span></div>
+      <div class="reveal layer">Solr <span>:8983</span></div>
+    </div>
+    <div class="reveal term">$ docker compose up -d<span class="cursor">▌</span></div>
+  </section>
+
+  <section class="scene" id="s6">
+    <div class="center">
+      <div class="reveal logo small">DSpace</div>
+      <div class="reveal sub">github.com/DSpace/DSpace</div>
+      <div class="reveal sub2">Licença BSD-3 · versão 9</div>
+      <div class="reveal chip">Contribua com a comunidade</div>
+    </div>
+  </section>
+
+  <div id="progress"><i></i></div>
+</div>
+
+<script src="node_modules/gsap/dist/gsap.min.js"></script>
+<script>
+  const D = window.__SEGMENT_DURATIONS || [9, 12, 15, 11, 9, 8];
+  const scenes = [...document.querySelectorAll('.scene')];
+  const counter = document.getElementById('counter');
+  const total = D.reduce((a, b) => a + b, 0);
+  const TAIL = 0.4;
+
+  function buildFlow(tl, el, t, d) {
+    const pipe = el.querySelector('.pipe');
+    const nodes = ['n1', 'n2', 'n3', 'n4', 'n5'].map(id => el.querySelector('#' + id));
+    const pr = pipe.getBoundingClientRect();
+    const a = nodes[0].getBoundingClientRect();
+    const b = nodes[4].getBoundingClientRect();
+    const x0 = a.left + a.width / 2 - pr.left;
+    const x1 = b.left + b.width / 2 - pr.left;
+    const y = a.top + a.height / 2 - pr.top;
+    const dot = el.querySelector('#flowdot');
+    gsap.set(dot, { left: x0, top: y });
+    tl.to(dot, { opacity: 1, duration: 0.3 }, t + 1.4);
+    tl.fromTo(dot, { left: x0 }, { left: x1, duration: Math.max(2, d - 5), ease: 'power1.inOut' }, t + 1.7);
+    tl.to(dot, { opacity: 0, duration: 0.3 }, t + d - 1.4);
+    const solr = el.querySelector('#solr');
+    tl.fromTo(solr,
+      { boxShadow: '0 0 0 rgba(34,211,167,0)' },
+      { boxShadow: '0 0 28px rgba(34,211,167,.5)', duration: 0.6, yoyo: true, repeat: 3 },
+      t + d - 4.2);
+  }
+
+  function buildDeploy(tl, el, t, d) {
+    tl.to(el.querySelector('.cursor'), { opacity: 0, duration: 0.45, repeat: Math.floor(d / 0.9), yoyo: true }, t + 0.9);
+  }
+
+  function buildModules(tl, el, t, d) {
+    tl.to(el.querySelectorAll('.mod.core'), {
+      boxShadow: '0 0 26px rgba(79,140,255,.4)', borderColor: '#6fa0ff',
+      duration: 0.45, stagger: 0.3, yoyo: true, repeat: 1
+    }, t + 1.1);
+  }
+
+  const builders = { s2: buildModules, s3: buildFlow, s5: buildDeploy };
+  const tl = gsap.timeline({ paused: true, onComplete: () => { window.__DONE = true; } });
+
+  let t = 0;
+  scenes.forEach((el, i) => {
+    const d = D[i];
+    tl.set(el, { opacity: 1 }, t);
+    tl.fromTo(el.querySelectorAll('.reveal'),
+      { y: 24, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.5, stagger: 0.12, ease: 'power2.out' }, t + 0.15);
+    (builders[el.id] || (() => {}))(tl, el, t, d);
+    tl.to(el, { opacity: 0, duration: 0.45, ease: 'power1.in' }, t + d - 0.45);
+    tl.call(() => { counter.textContent = `${i + 1} / ${scenes.length}`; }, null, t + 0.05);
+    t += d;
+  });
+  tl.to('#progress i', { width: '100%', duration: total, ease: 'none' }, 0);
+  tl.to({}, { duration: TAIL });
+
+  window.start = () => tl.play(0);
+  window.__READY = true;
+</script>
+</body>
+</html>
