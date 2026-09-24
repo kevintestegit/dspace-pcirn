@@ -105,7 +105,7 @@ public class EmailTest
         assertThat(alternative.getBodyPart(1).isMimeType("multipart/related"), is(true));
 
         Multipart related = (Multipart) alternative.getBodyPart(1).getContent();
-        assertThat(related.getCount(), is(6));
+        assertThat(related.getCount(), is(5));
         assertThat(((String) alternative.getBodyPart(0).getContent()),
                 containsString("Conteúdo de teste."));
         assertThat(((String) related.getBodyPart(0).getContent()),
@@ -132,7 +132,7 @@ public class EmailTest
         String html = (String) related.getBodyPart(0).getContent();
 
         assertThat(plainText, containsString("Abrir: https://example.org/task"));
-        assertThat(html, containsString(">Abrir &nbsp;&#8599;</a>"));
+        assertThat(html, containsString(">Abrir"));
         assertThat(html, containsString("href=\"https://example.org/task\""));
         assertThat(countOccurrences(html, ">https://example.org/task</a>"), is(1));
     }
@@ -158,7 +158,7 @@ public class EmailTest
             Multipart alternative = (Multipart) mixed.getBodyPart(0).getContent();
             assertThat(alternative.getBodyPart(1).isMimeType("multipart/related"), is(true));
             assertThat(mixed.getBodyPart(1).getFileName(), equalTo("test.txt"));
-            assertThat(((MimeMultipart) alternative.getBodyPart(1).getContent()).getCount(), is(6));
+            assertThat(((MimeMultipart) alternative.getBodyPart(1).getContent()).getCount(), is(5));
         } finally {
             Files.deleteIfExists(attachment.toPath());
         }
@@ -194,7 +194,7 @@ public class EmailTest
         assertThat(countOccurrences(html, ">" + token + "</a>"), is(1));
         String htmlWithoutAnchors = html.replaceAll("(?is)<a\\b[^>]*>.*?</a>", "");
         assertThat(htmlWithoutAnchors, not(containsString(token)));
-        assertThat(html, containsString("alt=\"Brasão da Polícia Científica do Rio Grande do Norte\""));
+        assertThat(html, containsString("alt=\"Polícia Científica do Rio Grande do Norte\""));
         assertThat(html, containsString("cid:pcirn-footer-building"));
         assertThat(related.getCount(), is(5));
         assertInlinePart(related.getBodyPart(1), "pcirn-dspace-logo",

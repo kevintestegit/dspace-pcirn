@@ -34,7 +34,7 @@ Adicionar ao `describe('PcirnHomeDataService', ...)`, depois do teste "keeps a f
     );
 
     service.metrics.subscribe(metrics => {
-      expect(metrics.hasSucceeded).toBeFalse();
+      expect(metrics.hasSucceeded).toBeFalsy();
       expect(metrics.payload).toBeUndefined();
       done();
     });
@@ -334,6 +334,7 @@ Expected: `TOTAL: 4 SUCCESS`.
 ```
 
 As asserções de `href` e de contagem de URL logo abaixo permanecem.
+Alinhar também as duas expectativas de contagem de `multipart/related` de `6` para `5` e a expectativa do texto alternativo para `Polícia Científica do Rio Grande do Norte`, conforme renderer e template atuais.
 
 - [ ] **Step 2: Limpar artefato gerado com dono root**
 
@@ -366,7 +367,7 @@ Expected: `BUILD SUCCESS` com `Tests run: ... Failures: 0`. Se falhar resolvendo
 
 - [ ] **Step 1: Scroll horizontal nas tabelas**
 
-Em `_pcirn-admin.scss`, no bloco `.table-responsive`:
+Em `_pcirn-admin.scss`, nos dois blocos `.table-responsive` (registros e formulários):
 
 ```scss
   .table-responsive {

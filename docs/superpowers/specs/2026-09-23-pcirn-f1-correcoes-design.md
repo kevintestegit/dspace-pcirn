@@ -13,8 +13,8 @@ Nenhuma mudança de arquitetura, rota, permissão ou backend além do teste de e
 | A2 | `themes/custom/app/home-page/pcirn-home-data.service.ts:139-157` | `combineLatest` emite no primeiro estado pendente; `failed` é `undefined` e `communities.payload.totalElements` lança `TypeError` — a grade de métricas nunca renderiza |
 | A5 | `themes/custom/app/item-page/simple/field-components/file-section/file-section.component.html:6,17-23` | perdeu o tamanho do arquivo e usa `$first` como "primário"; o teste `scripts/pcirn-item-document.test.mjs` proíbe `dsFileSize` (trava o bug) |
 | A6 | `app/access-control/epeople-registry/eperson-form/validators/email-taken.validator.ts:28-32` | `hasSucceeded && payload ? {emailTaken} : null` + `catchError(() => of(null))` → 403/5xx/rede viram "e-mail livre". O banco tem `eperson_email_key` UNIQUE e o REST não trata duplicidade com mensagem amigável |
-| A1 | `dspace-api/src/test/java/org/dspace/core/EmailTest.java:135` | asserta `&#8599;`, mas `PcirnEmailTemplateRenderer.java:132` gera `&#8594;` — nenhum código produz `&#8599;`; `mvn test` quebra |
-| Tabelas admin | `themes/custom/styles/_pcirn-admin.scss:99-105` (+ `:365,379`) | `.table-responsive { overflow: hidden }` com `min-width: 38rem/34rem` no mobile corta colunas sem scroll |
+| A1 | `dspace-api/src/test/java/org/dspace/core/EmailTest.java` | asserta `&#8599;`, mas o renderer gera `&#8594;`; também espera 6 partes relacionadas quando o renderer embute 4 imagens (5 partes com HTML) e usa um texto alternativo antigo |
+| Tabelas admin | `themes/custom/styles/_pcirn-admin.scss:99-105,195-199` (+ `:365,379`) | dois blocos `.table-responsive { overflow: hidden }` com `min-width: 38rem/34rem` no mobile cortam colunas sem scroll |
 | BS4/BS5 | `app/admin/admin-governance/admin-governance.component.html:5,47,63,67,76,78,86,88` | `mr-2`, `ml-2`, `badge-warning`, `badge-success` não existem no Bootstrap 5.3 usado pelo app |
 
 ## Decisões
@@ -49,9 +49,9 @@ Arquivos alterados:
 
 **A6** — `hasSucceeded && !payload` → `null` (livre); `hasSucceeded && payload` → `{ emailTaken: true }`; `!hasSucceeded` ou erro de stream → `{ emailCheckFailed: true }`. O formulário exibe a chave nova e bloqueia o salvamento.
 
-**A1** — a asserção vira `containsString(">Abrir")`, mantendo `href="https://example.org/task"` e `countOccurrences(html, ">https://example.org/task</a>") == 1`.
+**A1** — a asserção vira `containsString(">Abrir")`, mantendo `href="https://example.org/task"` e `countOccurrences(html, ">https://example.org/task</a>") == 1`. As expectativas de partes MIME passam de 6 para 5 e o texto alternativo acompanha o template atual.
 
-**Tabelas admin** — `.table-responsive` passa a `overflow-x: auto`; os `min-width` permanecem e o conteúdo passa a rolar em vez de sumir.
+**Tabelas admin** — os dois blocos `.table-responsive` passam a `overflow-x: auto`; os `min-width` permanecem e o conteúdo passa a rolar em vez de sumir.
 
 **Governance** — `mr-2` → `me-2`, `ml-2` → `ms-2`, `badge-warning`/`badge-success` → `text-bg-warning`/`text-bg-success`.
 
