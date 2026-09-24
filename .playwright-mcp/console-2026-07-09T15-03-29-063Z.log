@@ -1,9 +1,0 @@
-[    1133ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not found) @ http://localhost:4000/submission/new?collection=e18fceb6-8ea1-458b-affe-1401c5d49a3a:0
-[    1287ms] [LOG] Environment extended with app config @ http://localhost:4000/main.233af69b9778421a.js:0
-[    1325ms] [INFO]  @ http://localhost:4000/main.233af69b9778421a.js:0
-[    1325ms] [INFO] %cdspace-angular font-weight: bold; @ http://localhost:4000/main.233af69b9778421a.js:0
-[    1326ms] [INFO] Version: %c9.4.0-next font-weight: bold; @ http://localhost:4000/main.233af69b9778421a.js:0
-[    1326ms] [INFO] Environment: %cProduction color: red; font-weight: bold; @ http://localhost:4000/main.233af69b9778421a.js:0
-[    1326ms] [INFO]  @ http://localhost:4000/main.233af69b9778421a.js:0
-[    1816ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ http://localhost:8501/server/api/config/properties/google.analytics.key:0
-[    5107ms] [WARNING] The resource http://localhost:4000/assets/config.3153a190e02ef2b699516ae6e6c25b42.json was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:4000/submission/new?collection=e18fceb6-8ea1-458b-affe-1401c5d49a3a:0
