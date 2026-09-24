@@ -67,6 +67,7 @@ video/node_modules/
 video/out/
 
 # Local agent/browser tooling artifacts
+.maestri/
 .playwright-mcp/
 .playwright-cli/
 .buildx/
