@@ -55,8 +55,9 @@ services:
     ports:
     - published: 8501
       target: 8080
-    - published: 8500
-      target: 8000
+    - target: 8000
+      published: 8500
+      host_ip: 127.0.0.1
     volumes:
     # Keep DSpace assetstore directory between reboots
     - assetstore:/dspace/assetstore
