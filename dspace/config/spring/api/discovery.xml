@@ -69,8 +69,12 @@
                 <!-- PCIRN: buscas por categoria usadas pelo acesso rápido e atalhos da home -->
                 <entry key="pcirnNormas" value-ref="pcirnNormasConfiguration" />
                 <entry key="pcirnPops" value-ref="pcirnPopsConfiguration" />
+                <entry key="pcirnPap" value-ref="pcirnPapConfiguration" />
+                <entry key="pcirnGuiasManuais" value-ref="pcirnGuiasManuaisConfiguration" />
+                <entry key="pcirnNotasTecnicas" value-ref="pcirnNotasTecnicasConfiguration" />
                 <entry key="pcirnProducao" value-ref="pcirnProducaoConfiguration" />
                 <entry key="pcirnRelatorios" value-ref="pcirnRelatoriosConfiguration" />
+                <entry key="pcirnMemoriaInstitucional" value-ref="pcirnMemoriaInstitucionalConfiguration" />
                 <!--<entry key="123456789/7621" value-ref="defaultConfiguration"/>-->
                 <!-- Used to show filters and results on MyDSpace -->
                 <!-- Do not change the id of special entries or else they won't work -->
@@ -389,7 +393,7 @@
         <property name="defaultFilterQueries">
             <list>
                 <value>(search.resourcetype:Item AND latestVersion:true)</value>
-                <value>itemtype:(PORTARIA OR DECRETO OR LEI)</value>
+                <value>itemtype:(PORTARIA OR PORTARIA_E_ATO_NORMATIVO_INTERNO OR DECRETO OR LEI)</value>
                 <value>-withdrawn:true AND -discoverable:false</value>
             </list>
         </property>
@@ -402,6 +406,42 @@
             <list>
                 <value>(search.resourcetype:Item AND latestVersion:true)</value>
                 <value>itemtype:POP</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnPapConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnPap"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:PAP</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnGuiasManuaisConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnGuiasManuais"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:(MANUAL_GUIA OR MANUAL_GESTAO)</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnNotasTecnicasConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnNotasTecnicas"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:NOTA_TECNICA</value>
                 <value>-withdrawn:true AND -discoverable:false</value>
             </list>
         </property>
@@ -426,6 +466,18 @@
             <list>
                 <value>(search.resourcetype:Item AND latestVersion:true)</value>
                 <value>itemtype:(RELATORIO_PRODUTIVIDADE OR RELATORIO_CONTAS)</value>
+                <value>-withdrawn:true AND -discoverable:false</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="pcirnMemoriaInstitucionalConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
+          scope="prototype" parent="defaultConfiguration">
+        <property name="id" value="pcirnMemoriaInstitucional"/>
+        <property name="defaultFilterQueries">
+            <list>
+                <value>(search.resourcetype:Item AND latestVersion:true)</value>
+                <value>itemtype:MEMORIA_INSTITUCIONAL</value>
                 <value>-withdrawn:true AND -discoverable:false</value>
             </list>
         </property>
