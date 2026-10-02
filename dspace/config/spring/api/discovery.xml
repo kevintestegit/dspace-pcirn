@@ -414,6 +414,11 @@
     <bean id="pcirnPapConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
           scope="prototype" parent="defaultConfiguration">
         <property name="id" value="pcirnPap"/>
+        <property name="sidebarFacets">
+            <list>
+                <ref bean="searchFilterType" />
+            </list>
+        </property>
         <property name="defaultFilterQueries">
             <list>
                 <value>(search.resourcetype:Item AND latestVersion:true)</value>
@@ -426,6 +431,11 @@
     <bean id="pcirnGuiasManuaisConfiguration" class="org.dspace.discovery.configuration.DiscoveryConfiguration"
           scope="prototype" parent="defaultConfiguration">
         <property name="id" value="pcirnGuiasManuais"/>
+        <property name="sidebarFacets">
+            <list>
+                <ref bean="searchFilterType" />
+            </list>
+        </property>
         <property name="defaultFilterQueries">
             <list>
                 <value>(search.resourcetype:Item AND latestVersion:true)</value>
