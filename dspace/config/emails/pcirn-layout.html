@@ -4,18 +4,27 @@
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>$emailTitle</title>
+  <style>
+    @media only screen and (max-width:600px) {
+      .email-outer { padding:16px 8px !important; }
+      .email-header, .email-footer { padding:24px !important; }
+      .email-content { padding:28px 24px !important; }
+      .email-title { font-size:28px !important; line-height:35px !important; }
+      .email-column { display:block !important; width:100% !important; padding:12px 0 !important; border:0 !important; }
+    }
+  </style>
 </head>
 <body style="margin:0; padding:0; background-color:#edf4fb; color:#092e61; font-family:Arial,Helvetica,sans-serif;">
   <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">$emailPreheader</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; background-color:#edf4fb;">
     <tr>
-      <td align="center" style="padding:28px 12px;">
+      <td class="email-outer" align="center" style="padding:32px 12px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:760px; background-color:#ffffff; border-radius:12px; overflow:hidden;">
           <tr>
-            <td style="padding:28px 34px; background-color:#092e61;">
+            <td class="email-header" style="padding:30px 34px; background-color:#092e61;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td valign="middle" width="29%" style="width:29%; padding-right:18px; border-right:1px solid #2787d9;">
+                  <td class="email-column" valign="middle" width="29%" style="width:29%; padding-right:18px; border-right:1px solid #2787d9;">
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td valign="middle" style="padding-right:9px;"><img src="cid:pcirn-dspace-logo" alt="DSpace" width="46" style="display:block; width:46px; height:auto; border:0;"></td>
@@ -24,33 +33,34 @@
                       </tr>
                     </table>
                   </td>
-                  <td valign="middle" width="49%" style="width:49%; padding:0 18px; color:#ffffff;">
+                  <td class="email-column" valign="middle" width="49%" style="width:49%; padding:0 18px; color:#ffffff;">
                     <div style="font-size:20px; line-height:26px; font-weight:700;">Repositório Institucional da PCIRN</div>
-                    <div style="padding-top:6px; color:#dbeafa; font-size:9px; line-height:14px; letter-spacing:2.3px;">POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</div>
+                    <div style="padding-top:6px; color:#dbeafa; font-size:11px; line-height:17px; letter-spacing:1.2px;">POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</div>
                   </td>
-                  <td valign="middle" width="22%" style="width:22%; padding-left:18px; border-left:1px solid #2787d9; color:#e8f2ff; font-size:9px; line-height:16px; letter-spacing:2.2px;">CONHECIMENTO<br>QUE FORTALECE<br>A SOCIEDADE</td>
+                  <td class="email-column" valign="middle" width="22%" style="width:22%; padding-left:18px; border-left:1px solid #2787d9; color:#e8f2ff; font-size:11px; line-height:18px; letter-spacing:1.2px;">CONHECIMENTO<br>QUE FORTALECE<br>A SOCIEDADE</td>
                 </tr>
               </table>
             </td>
           </tr>
           <tr>
-            <td style="padding:34px 42px 24px; background-color:#ffffff;">
-              <div style="color:#0e4f97; font-size:11px; line-height:16px; font-weight:700; letter-spacing:2.8px;">NOTIFICAÇÃO DO REPOSITÓRIO</div>
+            <td class="email-content" style="padding:40px 42px 32px; background-color:#ffffff;">
+              <div style="color:#0e4f97; font-size:12px; line-height:18px; font-weight:700; letter-spacing:1.4px;">$emailCategory</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:11px;"><tr><td style="width:120px; border-top:2px solid #1976e9; font-size:0; line-height:0;">&nbsp;</td><td>&nbsp;</td></tr></table>
-              <h1 style="margin:20px 0 0; color:#092e61; font-size:36px; line-height:43px; font-weight:700;">$emailTitle</h1>
-              <div style="padding:18px 0 0; color:#4d6488; font-size:17px; line-height:27px;">$emailBodyHtml</div>
+              <h1 class="email-title" style="margin:24px 0 0; color:#092e61; font-size:32px; line-height:40px; overflow-wrap:anywhere; font-weight:700;">$emailTitle</h1>
+              <div style="padding:24px 0 0; color:#4d6488; font-size:18px; line-height:30px;">$emailBodyHtml</div>
               $emailActionBlock
+              <div style="color:#5a6d8d; font-size:14px; line-height:23px;">$emailAuxiliaryHtml</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;"><tr><td style="border-top:1px solid #c8ddf4; font-size:0; line-height:0;">&nbsp;</td></tr></table>
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:19px;"><tr><td valign="middle" width="38" style="width:38px; padding-right:14px;"><div style="width:30px; height:30px; border:2px solid #0c4a8e; border-radius:11px 11px 16px 16px; color:#0c4a8e; font-family:Arial,Helvetica,sans-serif; font-size:21px; font-weight:bold; line-height:30px; text-align:center;">!</div></td><td valign="middle" style="color:#5a6d8d; font-size:13px; line-height:20px;">Se você não reconhece esta mensagem, entre em contato com a equipe do Repositório PCIRN.</td></tr></table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;"><tr><td valign="middle" width="38" style="width:38px; padding-right:14px;"><div style="width:30px; height:30px; border:2px solid #0c4a8e; border-radius:11px 11px 16px 16px; color:#0c4a8e; font-family:Arial,Helvetica,sans-serif; font-size:21px; font-weight:bold; line-height:30px; text-align:center;">!</div></td><td valign="middle" style="color:#5a6d8d; font-size:14px; line-height:23px;">Se você não reconhece esta mensagem, entre em contato com a equipe do Repositório PCIRN.</td></tr></table>
             </td>
           </tr>
           <tr>
-            <td style="padding:22px 34px; background-color:#edf4fb;">
+            <td class="email-footer" style="padding:28px 34px; background-color:#edf4fb;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td valign="middle" width="23%" style="width:23%; padding-right:16px; border-right:1px solid #9abce0; color:#194c83; font-size:9px; line-height:20px; font-weight:700; letter-spacing:2.1px;">PERÍCIA<br>CIÊNCIA<br>INVESTIGAÇÃO<br>CREDIBILIDADE</td>
-                  <td valign="bottom" width="44%" style="width:44%; padding:0 16px;"><img src="cid:pcirn-footer-building" alt="Ilustração da sede da Polícia Científica" width="300" style="display:block; width:100%; max-width:300px; height:auto; border:0; opacity:0.78;"></td>
-                  <td valign="middle" width="33%" style="width:33%; padding-left:16px; color:#4d6488; font-size:11px; line-height:16px;"><strong style="color:#092e61; font-size:12px;">Repositório Institucional da PCIRN</strong><br>Polícia Científica do Rio Grande do Norte<br><br><span style="font-size:10px; letter-spacing:1px;">CIÊNCIA QUE IDENTIFICA.<br>INFORMAÇÃO QUE TRANSFORMA.</span><br><img src="cid:pcirn-policiacientifica" alt="Brasão da Polícia Científica do Rio Grande do Norte" width="56" style="display:block; width:56px; height:auto; margin-top:8px; border:0;"></td>
+                  <td class="email-column" valign="middle" width="23%" style="width:23%; padding-right:16px; border-right:1px solid #9abce0; color:#194c83; font-size:11px; line-height:22px; font-weight:700; letter-spacing:1.2px;">PERÍCIA<br>CIÊNCIA<br>INVESTIGAÇÃO<br>CREDIBILIDADE</td>
+                  <td class="email-column" valign="bottom" width="44%" style="width:44%; padding:0 16px;"><img src="cid:pcirn-footer-building" alt="Ilustração da sede da Polícia Científica" width="300" style="display:block; width:100%; max-width:300px; height:auto; border:0; opacity:0.78;"></td>
+                  <td class="email-column" valign="middle" width="33%" style="width:33%; padding-left:16px; color:#4d6488; font-size:13px; line-height:21px;"><strong style="color:#092e61; font-size:14px;">Repositório Institucional da PCIRN</strong><br>Polícia Científica do Rio Grande do Norte<br><br><span style="font-size:11px; letter-spacing:0.6px;">CIÊNCIA QUE IDENTIFICA.<br>INFORMAÇÃO QUE TRANSFORMA.</span><br><img src="cid:pcirn-policiacientifica" alt="Brasão da Polícia Científica do Rio Grande do Norte" width="56" style="display:block; width:56px; height:auto; margin-top:8px; border:0;"></td>
                 </tr>
               </table>
             </td>

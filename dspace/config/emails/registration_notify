@@ -8,6 +8,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Cadastro e acesso")
 #set($emailTitle = "Novo cadastro no repositório")
 #set($emailPreheader = "Um novo usuário foi cadastrado no repositório.")
 #set($subject = "${config.get('dspace.name')}: Registration Notification")
@@ -18,4 +19,6 @@ Nome:                   ${params[2]}
 E-mail:                 ${params[3]}
 Data:                   ${params[4]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

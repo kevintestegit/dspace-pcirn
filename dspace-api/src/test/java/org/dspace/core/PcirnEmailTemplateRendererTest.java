@@ -43,11 +43,11 @@ public final class PcirnEmailTemplateRendererTest {
                 "Título <PCIRN> & público",
                 "Abrir <item> & continuar",
                 "https://pcirn.example/item?id=1&mode=\"full\"",
-                "Prévia <ação> & necessária");
+                "Prévia <ação> & necessária", "NOTIFICAÇÃO DO REPOSITÓRIO", "");
 
         assertThat(rendered.html(), allOf(
-                containsString("<p>Primeiro &lt;parágrafo&gt; &amp; linha<br>com quebra.</p>"),
-                containsString("<p>Segundo parágrafo.</p>"),
+                containsString("Primeiro &lt;parágrafo&gt; &amp; linha<br>com quebra.</p>"),
+                containsString("Segundo parágrafo.</p>"),
                 containsString("Título &lt;PCIRN&gt; &amp; público"),
                 containsString("Abrir &lt;item&gt; &amp; continuar"),
                 containsString("Prévia &lt;ação&gt; &amp; necessária"),
@@ -91,6 +91,32 @@ public final class PcirnEmailTemplateRendererTest {
                 "brasao-estado-rn.png", "image/png");
         assertInlineResource(rendered.inlineResources(), "pcirn-footer-building",
                 "desenho1.png", "image/png");
+    }
+
+    @Test
+    public void groupsDetailsWithoutInterpretingHtmlOrLosingFreeText() throws IOException {
+        PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(EMAIL_DIRECTORY);
+        String html = renderer.render(
+                "Descrição.\n\nTítulo: <script> & documento\nColeção: Ciência\n"
+                        + "Identificador: https://example.org/item?a=1&b=2\n\n"
+                        + "Mensagem do usuário:\nNão é um campo.\n\nhttps://example.org/extra",
+                "Título", "Revisar submissão", "https://example.org/task", "Prévia",
+                "Submissões <PCIRN>", "Ajuda <equipe>").html();
+
+        assertThat(html, allOf(
+                containsString("<dl"), containsString("Título</dt>"),
+                containsString("&lt;script&gt; &amp; documento</dd>"),
+                containsString("Coleção</dt>"), containsString("Ciência</dd>"),
+                containsString("https://example.org/item?a=1&amp;b=2</dd>"),
+                containsString("Mensagem do usuário:<br>Não é um campo.</p>"),
+                containsString("https://example.org/extra</p>"),
+                containsString("Submissões &lt;PCIRN&gt;"),
+                containsString("Ajuda &lt;equipe&gt;"),
+                not(containsString("<script>"))));
+        assertThat(countOccurrences(html, "<dl"), is(1));
+        assertThat(html.indexOf("Revisar submissão") < html.indexOf("Ajuda &lt;equipe&gt;"), is(true));
+        assertThat(html.indexOf("Ajuda &lt;equipe&gt;")
+                < html.indexOf("Se você não reconhece esta mensagem"), is(true));
     }
 
     @Test
@@ -239,7 +265,7 @@ public final class PcirnEmailTemplateRendererTest {
         PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
                 EMAIL_DIRECTORY);
 
-        return renderer.render("Corpo", "Título", actionLabel, actionUrl, "Prévia");
+        return renderer.render("Corpo", "Título", actionLabel, actionUrl, "Prévia", "Categoria", "");
     }
 
     private PcirnEmailTemplateRenderer.RenderedEmail renderWithActionUrl(

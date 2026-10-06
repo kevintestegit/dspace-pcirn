@@ -6,6 +6,7 @@
 ## {3}  Description of task
 ## {4}  link to 'my DSpace' page
 ##
+#set($emailCategory = "Submissões e workflow")
 #set($emailTitle = "Você tem uma nova tarefa")
 #set($emailActionLabel = "Acessar minhas tarefas")
 #set($emailActionUrl = $params[4])
@@ -22,6 +23,8 @@ ${params[3]}
 
 Para assumir esta tarefa, acesse a página "Meu${config.get('dspace.shortname')}".
 
+#define($emailAuxiliary)
 Muito obrigado!
 
 A equipe do ${config.get('dspace.name')}
+#end

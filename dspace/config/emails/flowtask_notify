@@ -7,9 +7,12 @@
 ## {4}  Task result
 ## {5}  Workflow action taken
 ##
+#set($emailCategory = "Submissões e workflow")
 #set($emailTitle = "Relatório de tarefa de curadoria")
 #set($emailPreheader = "Uma tarefa de curadoria foi processada no repositório.")
 #set($subject = "${config.get('dspace.name')}: Curation Task Report")
+
+Uma tarefa de curadoria foi executada na submissão abaixo.
 
 Título:        ${params[0]}
 Coleção:       ${params[1]}
@@ -22,4 +25,6 @@ ${params[4]}
 
 Ação executada na submissão: ${params[5]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

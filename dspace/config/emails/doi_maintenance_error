@@ -10,13 +10,21 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Administração do repositório")
 #set($emailTitle = "Falha na manutenção do DOI")
 #set($emailPreheader = "Uma operação de manutenção de DOI não foi concluída.")
 #set($subject = "${config.get('dspace.name')}: Error ${params[0]} DOI ${params[3]}")
 
-Data:    ${params[1]}
+A operação ${params[0]} do DOI falhou.
 
-A operação ${params[0]} do DOI ${params[4]} para ${params[2]}, com o identificador ${params[3]}, falhou:
+Data: ${params[1]}
+Tipo de recurso: ${params[2]}
+Identificador: ${params[3]}
+DOI: ${params[4]}
+
+Motivo:
 ${params[5]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

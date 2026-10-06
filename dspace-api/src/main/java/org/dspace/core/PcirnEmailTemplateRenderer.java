@@ -14,6 +14,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,6 +41,9 @@ public final class PcirnEmailTemplateRenderer {
 
     private static final Pattern HTML_ENTITY = Pattern.compile(
             "&(?:#\\d+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);");
+
+    private static final Pattern DETAIL_LINE = Pattern.compile(
+            "^\\s*([\\p{L}][\\p{L}\\p{N} _-]{0,48}):[ \\t]+(.+)$");
 
     /**
      * Describes an image embedded in the rendered email as an inline resource.
@@ -79,6 +83,8 @@ public final class PcirnEmailTemplateRenderer {
      * @param actionLabel optional CTA label
      * @param actionUrl optional CTA URL
      * @param preheader optional email preheader
+     * @param category message category supplied by its template
+     * @param auxiliaryText optional secondary instructions and support text
      * @return rendered HTML and inline resources
      * @throws IOException if the shell or assets cannot be read, or the action
      *         URL is invalid
@@ -88,7 +94,9 @@ public final class PcirnEmailTemplateRenderer {
             String title,
             String actionLabel,
             String actionUrl,
-            String preheader) throws IOException {
+            String preheader,
+            String category,
+            String auxiliaryText) throws IOException {
         String layout = Files.readString(
                 emailDirectory.resolve(LAYOUT_FILE), StandardCharsets.UTF_8);
         String escapedActionLabel = escape(actionLabel);
@@ -101,7 +109,9 @@ public final class PcirnEmailTemplateRenderer {
         String html = layout
                 .replace("$emailPreheader", escape(preheader))
                 .replace("$emailTitle", escape(title))
+                .replace("$emailCategory", escape(category))
                 .replace("$emailActionBlock", actionBlock)
+                .replace("$emailAuxiliaryHtml", renderBody(auxiliaryText))
                 .replace("$emailBodyHtml", renderBody(bodyText));
 
         return new RenderedEmail(html, List.of(
@@ -113,23 +123,45 @@ public final class PcirnEmailTemplateRenderer {
 
     private String renderBody(String bodyText) {
         String normalized = value(bodyText).replace("\r\n", "\n").replace('\r', '\n');
-        return java.util.Arrays.stream(normalized.split("\\n\\s*\\n", -1))
-                .map(paragraph -> "<p>" + escape(paragraph).replace("\n", "<br>") + "</p>")
+        return Arrays.stream(normalized.strip().split("\\n\\s*\\n", -1))
+                .filter(paragraph -> !paragraph.isBlank())
+                .map(this::renderParagraph)
                 .collect(Collectors.joining("\n"));
+    }
+
+    private String renderParagraph(String paragraph) {
+        String[] lines = paragraph.split("\n");
+        if (lines.length > 1 && Arrays.stream(lines).allMatch(line -> DETAIL_LINE.matcher(line).matches())) {
+            StringBuilder details = new StringBuilder(
+                    "<div style=\"margin:0 0 24px; padding:18px 20px; background-color:#edf4fb; "
+                            + "border-radius:7px;\"><dl style=\"margin:0;\">");
+            for (String line : lines) {
+                Matcher detail = DETAIL_LINE.matcher(line);
+                detail.matches();
+                details.append("<dt style=\"padding-top:8px; color:#4d6488; font-size:14px; "
+                        + "line-height:21px;\">").append(escape(detail.group(1).strip()))
+                        .append("</dt><dd style=\"margin:2px 0 12px; color:#092e61; "
+                                + "font-size:18px; line-height:28px; overflow-wrap:anywhere;\">")
+                        .append(escape(detail.group(2))).append("</dd>");
+            }
+            return details.append("</dl></div>").toString();
+        }
+        return "<p style=\"margin:0 0 20px; overflow-wrap:anywhere;\">"
+                + escape(paragraph).replace("\n", "<br>") + "</p>";
     }
 
     private String renderActionBlock(String actionLabel, String actionUrl) {
         return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" "
-                + "cellspacing=\"0\" border=\"0\" style=\"margin:28px auto 0;\">"
-                + "<tr><td align=\"center\" style=\"padding:0 0 16px;\">"
+                + "cellspacing=\"0\" border=\"0\" style=\"margin:12px auto 28px;\">"
+                + "<tr><td align=\"center\" style=\"padding:8px 0 20px;\">"
                 + "<a href=\"" + actionUrl + "\" style=\"display:inline-block; "
-                + "padding:17px 34px; background-color:#0869e8; color:#ffffff; "
-                + "font-size:18px; line-height:22px; font-weight:bold; text-decoration:none; "
+                + "padding:18px 30px; background-color:#0869e8; color:#ffffff; "
+                + "font-size:18px; line-height:26px; font-weight:bold; text-decoration:none; "
                 + "border-radius:7px;\">"
                 + actionLabel + " &nbsp;&#8594;</a></td></tr>"
-                + "<tr><td align=\"center\" style=\"font-size:12px; line-height:19px; color:#5a6d8d;\">"
+                + "<tr><td align=\"center\" style=\"font-size:14px; line-height:22px; color:#5a6d8d;\">"
                 + "Se o botão não abrir, acesse: <a href=\"" + actionUrl
-                + "\" style=\"color:#0869e8; word-break:break-all;\">"
+                + "\" style=\"color:#5a6d8d; word-break:break-all;\">"
                 + actionUrl + "</a></td></tr></table>";
     }
 

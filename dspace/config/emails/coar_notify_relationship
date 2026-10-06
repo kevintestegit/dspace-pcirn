@@ -10,6 +10,7 @@
 ##             {7} Item
 ##
 ##
+#set($emailCategory = "Revisão e integração")
 #set($emailTitle = "Novo relacionamento de recurso")
 #set($emailPreheader = "Um serviço relacionou um novo recurso a um item.")
 #set($subject = "DSpace: The Service ${params[0]} has related a Resource ""${params[6].object.subject}""")
@@ -17,15 +18,16 @@
 Uma notificação de relacionamento foi recebida para o item: ${params[1]}
 
 Veja o relatório detalhado:
+
 Item: ${params[1]}
 URL do item: ${params[3]}
 Enviado por: ${params[4]}
 URL do recurso relacionado: ${params[6].object.subject}
-
-Novo status: RELATED
-
+Status: RELATED
 Pelo serviço: ${params[0]}
 URL do serviço: ${params[2]}
 Data: ${params[5]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

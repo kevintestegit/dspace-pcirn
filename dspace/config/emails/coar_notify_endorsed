@@ -8,6 +8,7 @@
 ##             {5} Date of the received LDN notification
 ##
 ##
+#set($emailCategory = "Revisão e integração")
 #set($emailTitle = "Item endossado pelo serviço")
 #set($emailPreheader = "Um serviço endossou um item no Repositório Institucional da PCIRN.")
 #set($subject = "DSpace: The Service ${params[0]} has endorsed the Item ""${params[1]}""")
@@ -15,14 +16,15 @@
 O serviço ${params[0]} recebeu uma notificação de endosso para o item: ${params[1]}
 
 Veja o relatório detalhado:
+
 Item: ${params[1]}
 URL do item: ${params[3]}
 Enviado por: ${params[4]}
-
-Novo status: ENDORSED
-
+Status: ENDORSED
 Pelo serviço: ${params[0]}
 URL do serviço: ${params[2]}
 Data: ${params[5]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

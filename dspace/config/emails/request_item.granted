@@ -8,6 +8,7 @@
 ##  {3} name of the grantor
 ##  {4} email address of the grantor (unused)
 ##  {5} custom message sent by the grantor.
+#set($emailCategory = "Solicitações de documentos")
 #set($emailTitle = "Solicitação de cópia aprovada")
 #set($emailPreheader = "Sua solicitação de cópia de documento foi aprovada.")
 #set($subject = 'Request for Copy of Restricted Document is Granted')
@@ -15,8 +16,8 @@ Prezado(a) ${params[0]},
 
 Sua solicitação de cópia do(s) arquivo(s) do documento abaixo foi aprovada por ${params[3]}. O(s) arquivo(s) solicitado(s) está(ão) anexado(s).
 
-    ${params[2]}
-    ${params[1]} 
+Título: ${params[2]}
+Identificador: ${params[1]}
 #if( $params[5] )
 
 Segue uma mensagem adicional de ${params[3]}:
@@ -24,5 +25,7 @@ Segue uma mensagem adicional de ${params[3]}:
 ${params[5]}
 #end
 
+#define($emailAuxiliary)
 Atenciosamente,
 A equipe do ${config.get('dspace.name')}
+#end

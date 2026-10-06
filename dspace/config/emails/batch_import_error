@@ -6,6 +6,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Administração do repositório")
 #set($emailTitle = "Falha na importação em lote")
 #set($emailPreheader = "A importação em lote não foi concluída no Repositório Institucional da PCIRN.")
 #set($subject = 'DSpace - The batch import was not completed.')
@@ -15,6 +16,6 @@ A importação em lote iniciada pela interface do DSpace não foi concluída, pe
 Para mais informações, entre em contato com o administrador do sistema:
  ${params[1]}
 
-
-
+#define($emailAuxiliary)
 A equipe do DSpace
+#end

@@ -2,6 +2,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Cadastro e acesso")
 #set($emailTitle = "Bem-vindo ao repositório")
 #set($emailPreheader = "Sua conta no Repositório Institucional da PCIRN está pronta para uso.")
 #set($subject = "Welcome new registered ${config.get('dspace.name')} user!")
@@ -11,6 +12,8 @@ para assinar avisos sobre novos conteúdos nas coleções de sua escolha.
 Sua nova conta também pode receber permissões para submeter novos conteúdos,
 editar e/ou aprovar submissões.
 
+#define($emailAuxiliary)
 Se precisar de ajuda com sua conta, envie um e-mail para ${config.get("mail.helpdesk")}.
 
 A equipe do ${config.get('dspace.name')}
+#end

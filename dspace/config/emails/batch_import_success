@@ -6,6 +6,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Administração do repositório")
 #set($emailTitle = "Importação em lote concluída")
 #set($emailPreheader = "A importação em lote foi concluída no Repositório Institucional da PCIRN.")
 #set($subject = 'DSpace - Batch import successfully completed')
@@ -13,5 +14,6 @@ A importação em lote de itens iniciada pela interface do DSpace foi concluída
 
 O arquivo de mapa da importação está disponível no seguinte caminho: ${params[0]}
 
-
+#define($emailAuxiliary)
 A equipe do DSpace
+#end

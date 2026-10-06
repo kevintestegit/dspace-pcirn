@@ -11,6 +11,7 @@
 ##  {6} URL of the requested Item including the secure access token
 ##  {7} expiration date of the granted access (timestamp, formatted in requestitem.cfg)
 
+#set($emailCategory = "Solicitações de documentos")
 #set($emailTitle = "Acesso seguro concedido")
 #set($emailActionLabel = "Acessar arquivos")
 #set($emailActionUrl = $params[6])
@@ -20,8 +21,8 @@ Prezado(a) ${params[0]},
 
 Sua solicitação de cópia do(s) arquivo(s) do documento abaixo foi aprovada. O botão abaixo dará acesso aos arquivos solicitados.
 
-    ${params[2]}
-    ${params[1]}
+Título: ${params[2]}
+Identificador: ${params[1]}
 
 #if( $params[7] )
 
@@ -37,5 +38,7 @@ Segue uma mensagem adicional do responsável pela aprovação:
 ${params[5]}
 #end
 
+#define($emailAuxiliary)
 Atenciosamente,
 A equipe do ${config.get('dspace.name')}
+#end

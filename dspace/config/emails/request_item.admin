@@ -8,6 +8,7 @@
 ##             {4} the approver's email address
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Solicitações de documentos")
 #set($emailTitle = "Solicitação de acesso aberto")
 #set($emailPreheader = "Um documento foi solicitado para disponibilização em acesso aberto.")
 #set($subject = "${config.get('dspace.name')}: Request for Open Access")
@@ -19,4 +20,6 @@ Handle do documento: ${params[1]}
 ID do arquivo: ${params[0]}
 Token: ${params[2]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

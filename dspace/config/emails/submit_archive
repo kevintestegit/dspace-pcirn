@@ -4,20 +4,23 @@
 ## {1}  Name of collection
 ## {2}  handle
 ##
+#set($emailCategory = "Submissões e workflow")
 #set($emailTitle = "Submissão aprovada e arquivada")
 #set($emailPreheader = "Sua submissão foi aprovada e arquivada no repositório.")
 #set($subject = "${config.get('dspace.name')}: Submission Approved and Archived")
 
-Você submeteu: ${params[0]}
+Você submeteu o seguinte item:
 
-Para a coleção: ${params[1]}
+Título: ${params[0]}
+Coleção: ${params[1]}
+Identificador: ${params[2]}
 
-Sua submissão foi aceita e arquivada em ${config.get('dspace.name')},
-e recebeu o seguinte identificador:
-${params[2]}
+Sua submissão foi aceita e arquivada em ${config.get('dspace.name')}.
 
 Use este identificador ao citar sua submissão.
 
+#define($emailAuxiliary)
 Muito obrigado!
 
 A equipe do ${config.get('dspace.name')}
+#end

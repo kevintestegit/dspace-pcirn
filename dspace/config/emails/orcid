@@ -4,6 +4,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Cadastro e acesso")
 #set($emailTitle = "Conclua seu cadastro com ORCID")
 #set($emailActionLabel = "Concluir cadastro com ORCID")
 #set($emailActionUrl = $params[0])
@@ -12,6 +13,7 @@
 #set($phone = $config.get('mail.message.helpdesk.telephone'))
 Para concluir o cadastro da sua conta no DSpace, clique no botão abaixo.
 
+#define($emailAuxiliary)
 Se precisar de ajuda com sua conta, envie um e-mail para
 
   ${config.get("mail.helpdesk")}
@@ -21,3 +23,4 @@ ou ligue para ${phone}.
 #end
 
 A equipe do ${config.get("dspace.name")}
+#end

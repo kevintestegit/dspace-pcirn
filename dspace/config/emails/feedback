@@ -10,6 +10,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Administração do repositório")
 #set($emailTitle = "Feedback recebido")
 #set($emailPreheader = "Um feedback foi recebido pelo Repositório Institucional da PCIRN.")
 #set($subject = "${config.get('dspace.name')}: Feedback Form Information")
@@ -26,4 +27,6 @@ Página de origem: ${params[3]}
 Agente do usuário: ${params[4]}
 Sessão: ${params[5]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

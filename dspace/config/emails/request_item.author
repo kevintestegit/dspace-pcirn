@@ -11,6 +11,7 @@
 ##             8 corresponding author email
 ##             9 configuration property "dspace.name"
 ##             10 configuration property "mail.helpdesk"
+#set($emailCategory = "Solicitações de documentos")
 #set($emailTitle = "Solicitação de cópia de documento")
 #set($emailActionLabel = "Responder solicitação")
 #set($emailActionUrl = $params[6])
@@ -19,7 +20,12 @@
 
 Prezado(a) ${params[7]},
 
-Um usuário do ${params[9]}, chamado ${params[0]} e com o e-mail ${params[1]}, solicitou uma cópia do(s) arquivo(s) associado(s) ao documento "${params[4]}" (${params[3]}), enviado por você.
+Um usuário do ${params[9]} solicitou uma cópia do(s) arquivo(s) de um documento enviado por você.
+
+Título: ${params[4]}
+Identificador: ${params[3]}
+Solicitante: ${params[0]}
+E-mail: ${params[1]}
 
 Esta solicitação foi acompanhada da seguinte mensagem:
 
@@ -27,6 +33,7 @@ Esta solicitação foi acompanhada da seguinte mensagem:
 
 Para responder, clique no botão abaixo. Independentemente de conceder ou negar a solicitação, recomendamos que você responda.
 
+#define($emailAuxiliary)
 SE VOCÊ NÃO É AUTOR DESTE DOCUMENTO e apenas o submeteu em nome do autor, ENCAMINHE ESTA MENSAGEM AO(S) AUTOR(ES). Somente o(s) autor(es) deve(m) responder à solicitação de envio de uma cópia.
 
 SE VOCÊ É AUTOR DO DOCUMENTO SOLICITADO, agradecemos sua colaboração!
@@ -34,3 +41,4 @@ SE VOCÊ É AUTOR DO DOCUMENTO SOLICITADO, agradecemos sua colaboração!
 Se tiver dúvidas sobre esta solicitação, entre em contato com ${params[10]}.
 
 A equipe do ${config.get('dspace.name')}
+#end

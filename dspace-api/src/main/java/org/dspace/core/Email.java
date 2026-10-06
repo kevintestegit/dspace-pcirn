@@ -413,6 +413,8 @@ public class Email {
         String emailActionLabel = getContextValue(vctx, "emailActionLabel");
         String emailActionUrl = getContextValue(vctx, "emailActionUrl");
         String emailPreheader = getContextValue(vctx, "emailPreheader");
+        String emailCategory = getContextValue(vctx, "emailCategory");
+        String emailAuxiliary = getContextValue(vctx, "emailAuxiliary");
 
         // Set some message header fields
         Instant date = Instant.now();
@@ -447,8 +449,9 @@ public class Email {
                 new PcirnEmailTemplateRenderer(Paths.get(
                         getConfigurationService().getProperty("dspace.dir"),
                         "config", "emails")).render(mergedBody, emailTitle,
-                        emailActionLabel, emailActionUrl, emailPreheader);
-        body = appendPlainTextActionFallback(mergedBody, emailActionLabel, emailActionUrl);
+                        emailActionLabel, emailActionUrl, emailPreheader, emailCategory, emailAuxiliary);
+        body = appendPlainTextActionFallback(mergedBody, emailActionLabel, emailActionUrl)
+                + (emailAuxiliary.isBlank() ? "" : "\n\n" + emailAuxiliary);
 
         // Attach the body. An absent charset falls back to UTF-8 so the plain and
         // HTML alternatives always declare the charset they are actually encoded in.

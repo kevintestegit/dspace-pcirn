@@ -6,15 +6,17 @@
 ## {3}  Reason for the rejection
 ## {4}  Link to 'My DSpace' page
 ##
+#set($emailCategory = "Submissões e workflow")
 #set($emailTitle = "Sua submissão precisa de atenção")
 #set($emailActionLabel = "Acessar minhas submissões")
 #set($emailActionUrl = $params[4])
 #set($emailPreheader = "Sua submissão foi rejeitada e precisa de atenção.")
 #set($subject = "${config.get('dspace.name')}: Submission Rejected")
 
-Você submeteu: ${params[0]}
+Você submeteu o seguinte item:
 
-Para a coleção: ${params[1]}
+Título: ${params[0]}
+Coleção: ${params[1]}
 
 Sua submissão foi rejeitada por ${params[2]},
 com a seguinte justificativa:
@@ -23,4 +25,6 @@ ${params[3]}
 
 Sua submissão não foi excluída. Você poderá acessá-la na página "Meu${config.get('dspace.shortname')}".
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

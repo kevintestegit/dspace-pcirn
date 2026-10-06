@@ -8,6 +8,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Administração do repositório")
 #set($emailTitle = "Falha na coleta")
 #set($emailPreheader = "A coleta de uma coleção encontrou um erro.")
 #set($subject = "${config.get('dspace.name')}: Harvesting Error")
@@ -21,4 +22,6 @@ ${params[3]}
 Exceção:
 ${params[4]}
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

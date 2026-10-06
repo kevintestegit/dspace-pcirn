@@ -3,6 +3,7 @@
 ## Parameters: {0} Main intro
 ##             {1} New items section
 ##             {2} Modified items section
+#set($emailCategory = "Inscrições e atualizações")
 #set($emailTitle = "Atualizações das suas inscrições")
 #set($emailPreheader = "Veja as novidades dos itens e coleções que você acompanha.")
 #set($subject = "${config.get('dspace.name')} Subscriptions")

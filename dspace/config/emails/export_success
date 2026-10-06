@@ -5,6 +5,7 @@
 ##
 ## See org.dspace.core.Email for information on the format of this file.
 ##
+#set($emailCategory = "Administração do repositório")
 #set($emailTitle = "Exportação pronta para download")
 #set($emailActionLabel = "Baixar arquivo")
 #set($emailActionUrl = $params[0])
@@ -16,4 +17,6 @@ O botão abaixo permite baixar o arquivo compactado.
 
 Este arquivo permanecerá disponível por pelo menos ${params[1]} horas.
 
+#define($emailAuxiliary)
 A equipe do ${config.get('dspace.name')}
+#end

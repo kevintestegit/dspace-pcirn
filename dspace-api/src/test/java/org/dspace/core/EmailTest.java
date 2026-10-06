@@ -188,8 +188,10 @@ public class EmailTest
         Multipart related = (Multipart) relatedPart.getContent();
         String html = (String) related.getBodyPart(0).getContent();
         assertThat(html, containsString("<!doctype html>"));
-        assertThat(html, containsString("Cadastre sua senha"));
-        assertThat(html, containsString("Cadastrar minha senha"));
+        assertThat(html, containsString("Redefina sua senha"));
+        assertThat(html, containsString("Redefinir minha senha"));
+        assertThat(html, containsString("Cadastro e acesso"));
+        assertThat(html.indexOf("Redefinir minha senha") < html.indexOf("Se você não solicitou"), is(true));
         assertThat(html, containsString("href=\"" + token + "\""));
         assertThat(countOccurrences(html, ">" + token + "</a>"), is(1));
         String htmlWithoutAnchors = html.replaceAll("(?is)<a\\b[^>]*>.*?</a>", "");
@@ -249,8 +251,14 @@ public class EmailTest
             assertThat(html, containsString("<!doctype html>"));
             assertThat(html, containsString(fixture.title()));
             assertThat(plainText, containsString(fixture.bodyMarker()));
+            if (entry.getKey().startsWith("coar_notify_")
+                    || Set.of("submit_task", "submit_archive", "submit_reject", "registration_notify",
+                            "feedback", "internal_error", "doi_maintenance_error").contains(entry.getKey())) {
+                assertThat(entry.getKey(), html, containsString("<dl"));
+            }
             for (String literal : new String[] {
-                "$emailTitle", "$emailActionLabel", "$emailActionUrl", "$emailPreheader", "#set("
+                "$emailTitle", "$emailActionLabel", "$emailActionUrl", "$emailPreheader",
+                "$emailCategory", "$emailAuxiliary", "#set(", "#define("
             }) {
                 assertThat(plainText, not(containsString(literal)));
                 assertThat(html, not(containsString(literal)));
@@ -264,7 +272,7 @@ public class EmailTest
                 "falha no lote", "falha no lote", "https://example.org/feedback"));
         fixtures.put("batch_import_success", fixture("Importação em lote concluída",
                 "concluída com sucesso", "/tmp/mapfile"));
-        fixtures.put("change_password", fixture("Cadastre sua senha",
+        fixtures.put("change_password", fixture("Redefina sua senha",
                 "Recebemos uma solicitação", "https://example.org/reset?token=pcirn-test"));
         fixtures.put("coar_notify_accepted", fixture("Revisão aceita pelo serviço",
                 "Item aceito", "Serviço LDN", "Item aceito", "https://example.org/service",

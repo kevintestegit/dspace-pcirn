@@ -11,6 +11,8 @@ import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -22,8 +24,10 @@ import javax.mail.Message;
 import javax.mail.internet.MimeMessage;
 
 import com.icegreen.greenmail.junit.GreenMailRule;
-import com.icegreen.greenmail.util.GreenMailUtil;
 import com.icegreen.greenmail.util.ServerSetupTest;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
+import jakarta.mail.Session;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.SolrDocument;
@@ -142,7 +146,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("New items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection:"));
         assertTrue(body.contains("New Items (1):"));
@@ -173,7 +177,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("New items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection:"));
         assertTrue(body.contains("New Items (2):"));
@@ -207,7 +211,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("Modified items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection:"));
         assertTrue(body.contains("Modified Items (1):"));
@@ -246,7 +250,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("Modified items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection:"));
         assertTrue(body.contains("Modified Items (2):"));
@@ -283,7 +287,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
         assertEquals(1, receivedMessages.length);
 
         MimeMessage message = receivedMessages[0];
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("New and modified items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection:"));
         assertTrue(body.contains("New Items (1):"));
@@ -311,7 +315,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("New items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection (via community subscription to \"Test Community\"):"));
         assertTrue(body.contains("New Items (1):"));
@@ -342,7 +346,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("New items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection (via community subscription to \"Test Community\"):"));
         assertTrue(body.contains("New Items (2):"));
@@ -375,7 +379,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("Modified items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection (via community subscription to \"Test Community\"):"));
         assertTrue(body.contains("Modified Items (1):"));
@@ -416,7 +420,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage message = receivedMessages[0];
         assertEquals(eperson.getEmail(), message.getRecipients(Message.RecipientType.TO)[0].toString());
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("Modified items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection (via community subscription to \"Test Community\"):"));
         assertTrue(body.contains("Modified Items (2):"));
@@ -455,7 +459,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
         assertEquals(1, receivedMessages.length);
 
         MimeMessage message = receivedMessages[0];
-        String body = GreenMailUtil.getBody(message);
+        String body = decodedPlainText(message);
         assertTrue(body.contains("New and modified items are available in the collections you have subscribed to:"));
         assertTrue(body.contains("Test Collection (via community subscription to \"Test Community\"):"));
         assertTrue(body.contains("New Items (1):"));
@@ -502,7 +506,7 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
 
         MimeMessage[] receivedMessages = greenMail.getReceivedMessages();
         assertEquals(1, receivedMessages.length);
-        String body = GreenMailUtil.getBody(receivedMessages[0]);
+        String body = decodedPlainText(receivedMessages[0]);
 
         assertTrue(body.contains("New and modified items are available in the collections you have subscribed to:"));
 
@@ -563,5 +567,16 @@ public class SubscriptionEmailNotificationServiceIT extends AbstractIntegrationT
         inputdoc.removeField("lastModified_dt");
         searchService.getSolr().add(inputdoc);
         searchService.getSolr().commit();
+    }
+
+    private static String decodedPlainText(MimeMessage message) throws Exception {
+        ByteArrayOutputStream serialized = new ByteArrayOutputStream();
+        message.writeTo(serialized);
+        jakarta.mail.internet.MimeMessage parsed = new jakarta.mail.internet.MimeMessage(
+            (Session) null, new ByteArrayInputStream(serialized.toByteArray()));
+        assertTrue(parsed.isMimeType("multipart/alternative"));
+        BodyPart plainText = ((Multipart) parsed.getContent()).getBodyPart(0);
+        assertTrue(plainText.isMimeType("text/plain"));
+        return (String) plainText.getContent();
     }
 }
