@@ -72,4 +72,11 @@ video/out/
 .playwright-cli/
 .buildx/
 .codex/
+.commandcode/
+.impeccable/
+.ruff_cache/
 output/
+
+# Snapshot local de estabilizacao: contem os configs nao versionados
+# (.env, smtp.env, local.cfg). NUNCA versionar.
+.estabilizacao-backup/
