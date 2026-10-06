@@ -13,7 +13,6 @@ import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.sql.SQLException;
 import java.text.NumberFormat;
 import java.time.Instant;
@@ -38,6 +37,7 @@ import org.dspace.content.service.BundleService;
 import org.dspace.content.service.ItemService;
 import org.dspace.core.Constants;
 import org.dspace.core.Context;
+import org.dspace.harvest.HarvestHttpClient;
 import org.dspace.services.ConfigurationService;
 import org.dspace.services.factory.DSpaceServicesFactory;
 import org.jdom2.Attribute;
@@ -174,7 +174,6 @@ public class OREIngestionCrosswalk
                 targetBundle = targetBundles.get(0);
             }
 
-            URL ARurl = null;
             InputStream in = null;
             if (href != null) {
                 try {
@@ -182,8 +181,7 @@ public class OREIngestionCrosswalk
                     String processedURL = encodeForURL(href);
                     if (validResourceUri(entryId, processedURL)) {
                         // Generate a request for the aggregated resource
-                        ARurl = new URL(processedURL);
-                        in = ARurl.openStream();
+                        in = HarvestHttpClient.open(URI.create(processedURL), 1024L * 1024 * 1024);
                     } else {
                         throw new FileNotFoundException("Failed to validate " + processedURL);
                     }
@@ -198,7 +196,10 @@ public class OREIngestionCrosswalk
 
             // ingest and update
             if (in != null) {
-                Bitstream newBitstream = bitstreamService.create(context, targetBundle, in);
+                Bitstream newBitstream;
+                try (InputStream resourceStream = in) {
+                    newBitstream = bitstreamService.create(context, targetBundle, resourceStream);
+                }
 
                 String bsName = resource.getAttributeValue("title");
                 newBitstream.setName(context, bsName);

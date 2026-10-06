@@ -31,8 +31,6 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.jdom2.input.DOMBuilder;
-import org.oclc.oai.harvester2.verb.Identify;
-import org.oclc.oai.harvester2.verb.ListIdentifiers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.w3c.dom.DOMException;
 import org.xml.sax.SAXException;
@@ -188,8 +186,8 @@ public class HarvestedCollectionServiceImpl implements HarvestedCollectionServic
 
         // First, see if we can contact the target server at all.
         try {
-            new Identify(oaiSource);
-        } catch (IOException | ParserConfigurationException | XPathExpressionException | SAXException ex) {
+            OaiResponse.request(oaiSource, "Identify");
+        } catch (IOException | ParserConfigurationException | SAXException ex) {
             errorSet.add(OAI_ADDRESS_ERROR + ": OAI server could not be reached.");
             return errorSet;
         }
@@ -228,7 +226,8 @@ public class HarvestedCollectionServiceImpl implements HarvestedCollectionServic
         try {
             //If we do not want to harvest from one set, then skip this.
             if (!"all".equals(oaiSetId)) {
-                ListIdentifiers ls = new ListIdentifiers(oaiSource, null, null, oaiSetId, DMDOAIPrefix);
+                OaiResponse ls = OaiResponse.request(oaiSource, "ListIdentifiers", "set", oaiSetId,
+                    "metadataPrefix", DMDOAIPrefix);
 
                 // The only error we can really get here is "noSetHierarchy"
                 if (ls.getErrors() != null && ls.getErrors().getLength() > 0) {
@@ -251,7 +250,7 @@ public class HarvestedCollectionServiceImpl implements HarvestedCollectionServic
                     }
                 }
             }
-        } catch (IOException | ParserConfigurationException | XPathExpressionException | DOMException |
+        } catch (IOException | ParserConfigurationException | DOMException |
                  SAXException e) {
             errorSet.add(OAI_ADDRESS_ERROR + ": OAI server could not be reached");
             return errorSet;

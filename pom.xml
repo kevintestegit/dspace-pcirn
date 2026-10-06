@@ -1723,12 +1723,6 @@
                 <artifactId>icu4j</artifactId>
                 <version>62.2</version>
             </dependency>
-            <!-- Codebase at https://github.com/DSpace/oclc-harvester2 -->
-            <dependency>
-                <groupId>org.dspace</groupId>
-                <artifactId>oclc-harvester2</artifactId>
-                <version>1.0.0</version>
-            </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpcore</artifactId>

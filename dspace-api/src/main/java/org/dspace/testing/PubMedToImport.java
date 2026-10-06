@@ -15,7 +15,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -85,17 +84,20 @@ public class PubMedToImport {
                 }
             }
 
-            SAXParserFactory factory = SAXParserFactory.newInstance();
-            SAXParser saxParser = factory.newSAXParser();
+            SAXParser saxParser = org.dspace.app.util.XMLUtils.getSAXParser();
 
             saxParser.parse(source, new PubMedHandler());
 
         } catch (Exception e) {
-            // ignore
+            throw new IllegalStateException("Unable to convert PubMed XML", e);
         }
     }
 
     private static class PubMedHandler extends DefaultHandler {
+        @Override
+        public void skippedEntity(String name) throws SAXException {
+            throw new SAXException("Unresolved XML entity: " + name);
+        }
         private static int recordCount = 1;
         private static List<MockMetadataValue> dcValues;
 

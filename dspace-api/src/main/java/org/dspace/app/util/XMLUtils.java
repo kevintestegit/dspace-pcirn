@@ -21,6 +21,8 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.transform.Source;
 import javax.xml.transform.TransformerConfigurationException;
@@ -36,6 +38,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+import org.xml.sax.ext.DefaultHandler2;
 
 /**
  * Simple class to read information from small XML using DOM manipulation
@@ -43,6 +46,37 @@ import org.xml.sax.SAXException;
  * @author Andrea Bollini
  */
 public class XMLUtils {
+
+    /**
+     * Create a streaming XML parser that rejects entity declarations and external resources.
+     * External DOCTYPE declarations in ordinary PubMed exports are accepted without loading their DTD.
+     * @return hardened SAX parser
+     * @throws ParserConfigurationException if the required protections are unavailable
+     * @throws SAXException if the parser cannot enforce the required protections
+     */
+    public static SAXParser getSAXParser() throws ParserConfigurationException, SAXException {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        factory.setXIncludeAware(false);
+        SAXParser parser = factory.newSAXParser();
+        parser.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        parser.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        parser.setProperty("http://xml.org/sax/properties/declaration-handler", new DefaultHandler2() {
+            @Override
+            public void internalEntityDecl(String name, String value) throws SAXException {
+                throw new SAXException("XML entity declarations are not permitted");
+            }
+
+            @Override
+            public void externalEntityDecl(String name, String publicId, String systemId) throws SAXException {
+                throw new SAXException("XML entity declarations are not permitted");
+            }
+        });
+        return parser;
+    }
 
     /**
      * Default constructor

@@ -71,10 +71,6 @@ import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.jdom2.input.DOMBuilder;
 import org.jdom2.output.XMLOutputter;
-import org.oclc.oai.harvester2.verb.GetRecord;
-import org.oclc.oai.harvester2.verb.Identify;
-import org.oclc.oai.harvester2.verb.ListMetadataFormats;
-import org.oclc.oai.harvester2.verb.ListRecords;
 import org.xml.sax.SAXException;
 
 /**
@@ -326,7 +322,8 @@ public class OAIHarvester {
             List<Element> records;
             Set<String> errorSet = new HashSet<>();
 
-            ListRecords listRecords = new ListRecords(oaiSource, fromDate, toDate, oaiSetId, descMDPrefix);
+            OaiResponse listRecords = OaiResponse.request(oaiSource, "ListRecords", "from", fromDate,
+                "until", toDate, "set", oaiSetId, "metadataPrefix", descMDPrefix);
             log.debug(
                 "Harvesting request parameters: listRecords " + oaiSource + " " + fromDate + " " + toDate + " " +
                     oaiSetId + " " + descMDPrefix);
@@ -395,7 +392,7 @@ public class OAIHarvester {
                 if (resumptionToken == null || resumptionToken.length() == 0) {
                     listRecords = null;
                 } else {
-                    listRecords = new ListRecords(oaiSource, resumptionToken);
+                    listRecords = OaiResponse.request(oaiSource, "ListRecords", "resumptionToken", resumptionToken);
                 }
                 ourContext.turnOffAuthorisationSystem();
                 try {
@@ -746,7 +743,7 @@ public class OAIHarvester {
      */
     private String oaiGetDateGranularity(String oaiSource)
         throws IOException, ParserConfigurationException, SAXException, XPathExpressionException {
-        Identify iden = new Identify(oaiSource);
+        OaiResponse iden = OaiResponse.request(oaiSource, "Identify");
         return iden.getDocument().getElementsByTagNameNS(OAI_NS.getURI(), "granularity").item(0).getTextContent();
     }
 
@@ -770,7 +767,7 @@ public class OAIHarvester {
         String metaPrefix = null;
 
         // Query the OAI server for the metadata
-        ListMetadataFormats lmf = new ListMetadataFormats(oaiSource);
+        OaiResponse lmf = OaiResponse.request(oaiSource, "ListMetadataFormats");
 
         Document lmfResponse = db.build(lmf.getDocument());
         List<Element> mdFormats = lmfResponse.getRootElement().getChild("ListMetadataFormats", OAI_NS)
@@ -844,7 +841,8 @@ public class OAIHarvester {
      */
     protected List<Element> getMDrecord(String oaiSource, String itemOaiId, String metadataPrefix)
         throws IOException, ParserConfigurationException, SAXException, XPathExpressionException, HarvestingException {
-        GetRecord getRecord = new GetRecord(oaiSource, itemOaiId, metadataPrefix);
+        OaiResponse getRecord = OaiResponse.request(oaiSource, "GetRecord", "identifier", itemOaiId,
+            "metadataPrefix", metadataPrefix);
         Set<String> errorSet = new HashSet<>();
         // If the metadata is not available for this item, can the whole thing
         if (getRecord.getErrors() != null && getRecord.getErrors().getLength() > 0) {
