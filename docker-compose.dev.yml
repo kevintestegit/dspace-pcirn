@@ -1,0 +1,214 @@
+# Development stack: DSpace backend, Solr and the Angular dev server, all
+# backed by a PostgreSQL container and by the local source tree.
+#
+# Production uses docker-compose.yml instead, which has no database container
+# and connects to the PostgreSQL instance administered by the NTI.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml --env-file .env up -d
+#
+# The `dspace` service relies on the module `target/classes` directories that
+# scripts/backend-dev.sh populates. Run `scripts/backend-dev.sh init` first.
+networks:
+  dspacenet:
+    ipam:
+      config:
+        # Custom subnet so the host can be trusted by the REST API.
+        # Keep in sync with proxies__P__trusted__P__ipranges below.
+        - subnet: 10.250.50.0/24
+    external: false
+
+volumes:
+  assetstore:
+  pgdata:
+  solr_data:
+
+services:
+  dspace:
+    container_name: dspace
+    env_file:
+      - ./smtp.env
+      - path: ./.env.local
+        required: false
+    environment:
+      # dspace.cfg is overridden through environment variables. The mapping is
+      # documented in dspace/config/config-definition.xml:
+      #   __P__ => "."      dspace__P__dir       => dspace.dir
+      #   __D__ => "-"      google__D__metadata  => google-metadata
+      dspace__P__dir: /dspace
+      dspace__P__server__P__url: ${dspace__P__server__P__url:-http://localhost:8501/server}
+      dspace__P__ui__P__url: ${dspace__P__ui__P__url:-http://localhost:4000}
+      # The UI reaches the backend by container name on the Compose network.
+      dspace__P__server__P__ssr__P__url: ${dspace__P__server__P__ssr__P__url:-http://dspace:8080/server}
+      dspace__P__name: ${dspace__P__name:-Repositório PCIRN}
+      dspace__P__shortname: ${dspace__P__shortname:-PCIRN}
+      db__P__url: ${db__P__url:-jdbc:postgresql://dspacedb:5432/dspace}
+      db__P__username: ${db__P__username:-dspace}
+      db__P__password: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      solr__P__server: ${solr__P__server:-http://dspacesolr:8983/solr}
+      proxies__P__trusted__P__ipranges: ${proxies__P__trusted__P__ipranges:-10.250.50}
+      LOGGING_CONFIG: ${LOGGING_CONFIG:-/dspace/config/log4j2-container.xml}
+      # LDAP is unused. Spring Boot still builds an LdapContextSource pointed at
+      # localhost:389, which fails the /actuator/health check.
+      MANAGEMENT_HEALTH_LDAP_ENABLED: "false"
+      MANAGEMENT_HEALTH_GEOIP_ENABLED: "false"
+      MANAGEMENT_HEALTH_SEO_ENABLED: "false"
+      LOADER_PATH: /dspace/overrides/additions:/dspace/overrides/server:/dspace/overrides/dspace-api:/dspace/overrides/dspace-server-webapp:/dspace/overrides/dspace-services:/dspace/overrides/dspace-oai:/dspace/overrides/dspace-rdf:/dspace/overrides/dspace-sword:/dspace/overrides/dspace-swordv2:/dspace/overrides/dspace-iiif:/dspace/overrides/dspace-saml2
+    image: "${DOCKER_REGISTRY:-docker.io}/${DOCKER_OWNER:-dspace}/dspace:${DSPACE_VER:-dspace-9_x-test}"
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/server/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    depends_on:
+      dspacedb:
+        condition: service_healthy
+      dspacesolr:
+        condition: service_healthy
+    networks:
+      - dspacenet
+    ports:
+      - published: 8501
+        target: 8080
+      - host_ip: 127.0.0.1
+        published: 8500
+        target: 8000
+    volumes:
+      - assetstore:/dspace/assetstore
+      # Local config and compiled classes are mounted so the running backend
+      # reflects the working tree without rebuilding the image.
+      - ./dspace/config:/dspace/config
+      - ./dspace/modules/additions/target/classes:/dspace/overrides/additions
+      - ./dspace/modules/server/target/classes:/dspace/overrides/server
+      - ./dspace-api/target/classes:/dspace/overrides/dspace-api
+      - ./dspace-server-webapp/target/classes:/dspace/overrides/dspace-server-webapp
+      - ./dspace-services/target/classes:/dspace/overrides/dspace-services
+      - ./dspace-oai/target/classes:/dspace/overrides/dspace-oai
+      - ./dspace-rdf/target/classes:/dspace/overrides/dspace-rdf
+      - ./dspace-sword/target/classes:/dspace/overrides/dspace-sword
+      - ./dspace-swordv2/target/classes:/dspace/overrides/dspace-swordv2
+      - ./dspace-iiif/target/classes:/dspace/overrides/dspace-iiif
+      - ./dspace-saml2/target/classes:/dspace/overrides/dspace-saml2
+    # The database schema belongs to the image, not to container startup, so
+    # migrations run as an explicit step and a failure is visible instead of
+    # turning into a restart loop. Development is the exception: the schema is
+    # bootstrapped here so a fresh pgdata volume becomes usable in one command.
+    entrypoint:
+      - /bin/bash
+      - '-c'
+      - |
+        while (!</dev/tcp/dspacedb/5432) > /dev/null 2>&1; do sleep 1; done
+        /dspace/bin/dspace database migrate
+        exec java -jar /dspace/webapps/server-boot.jar
+
+  dspacedb:
+    container_name: dspacedb
+    image: "docker.io/postgres:${POSTGRES_VERSION:-15}"
+    environment:
+      PGDATA: /pgdata
+      POSTGRES_DB: dspace
+      POSTGRES_USER: dspace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dspace", "-d", "dspace"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      dspacenet:
+    ports:
+      - host_ip: 127.0.0.1
+        published: 55432
+        target: 5432
+    volumes:
+      - pgdata:/pgdata
+
+  dspacesolr:
+    container_name: dspacesolr
+    image: "${DOCKER_REGISTRY:-docker.io}/${DOCKER_OWNER:-dspace}/dspace-solr:${DSPACE_VER:-dspace-9_x}"
+    build:
+      context: ./dspace/src/main/docker/dspace-solr/
+      additional_contexts:
+        solrconfigs: ./dspace/solr/
+      args:
+        SOLR_VERSION: "${SOLR_VER:-9.8}"
+    networks:
+      dspacenet:
+    ports:
+      - host_ip: 127.0.0.1
+        published: 8984
+        target: 8983
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8983/solr/admin/info/system"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    working_dir: /var/solr/data
+    volumes:
+      - solr_data:/var/solr/data
+    # Root is needed to seed the cores into the mounted data directory; Solr
+    # itself then runs as the "solr" user.
+    user: root
+    entrypoint:
+      - /bin/bash
+      - '-c'
+      - |
+        init-var-solr
+        precreate-core authority /opt/solr/server/solr/configsets/authority
+        cp -r /opt/solr/server/solr/configsets/authority/* authority
+        precreate-core oai /opt/solr/server/solr/configsets/oai
+        cp -r /opt/solr/server/solr/configsets/oai/* oai
+        precreate-core search /opt/solr/server/solr/configsets/search
+        cp -r /opt/solr/server/solr/configsets/search/* search
+        precreate-core statistics /opt/solr/server/solr/configsets/statistics
+        cp -r /opt/solr/server/solr/configsets/statistics/* statistics
+        precreate-core qaevent /opt/solr/server/solr/configsets/qaevent
+        cp -r /opt/solr/server/solr/configsets/qaevent/* qaevent
+        precreate-core suggestion /opt/solr/server/solr/configsets/suggestion
+        cp -r /opt/solr/server/solr/configsets/suggestion/* suggestion
+        chown -R solr:solr /var/solr
+        runuser -u solr -- solr-foreground
+
+  dspace-angular:
+    container_name: dspace-angular
+    depends_on:
+      dspace:
+        condition: service_healthy
+    image: node:22-alpine
+    working_dir: /app
+    user: "1000:1000"
+    command: npm run serve -- --host 0.0.0.0 --poll 1000
+    environment:
+      NODE_ENV: development
+      DSPACE_UI_SSL: ${DSPACE_UI_SSL:-false}
+      DSPACE_UI_HOST: ${DSPACE_UI_HOST:-0.0.0.0}
+      DSPACE_UI_PORT: ${DSPACE_UI_PORT:-4000}
+      DSPACE_UI_NAMESPACE: ${DSPACE_UI_NAMESPACE:-/}
+      DSPACE_UI_BASEURL: ${DSPACE_UI_BASEURL:-http://localhost:4000}
+      DSPACE_REST_SSL: ${DSPACE_REST_SSL:-false}
+      DSPACE_REST_HOST: ${DSPACE_REST_HOST:-localhost}
+      DSPACE_REST_PORT: ${DSPACE_REST_PORT:-8501}
+      DSPACE_REST_NAMESPACE: ${DSPACE_REST_NAMESPACE:-/server}
+      DSPACE_REST_SSRBASEURL: ${DSPACE_REST_SSRBASEURL:-http://dspace:8080/server}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://localhost:4000/',r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    networks:
+      - dspacenet
+    ports:
+      - published: 4000
+        target: 4000
+    volumes:
+      - ./dspace-angular/source:/app
