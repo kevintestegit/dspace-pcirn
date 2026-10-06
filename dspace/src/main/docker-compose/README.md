@@ -19,8 +19,14 @@ The root directory of this project contains the primary Dockerfiles & Docker Com
 which are used to start the backend.
 
 - docker-compose.yml
-    - Docker compose file to orchestrate DSpace REST API (backend) components.
+    - Production stack: DSpace REST API (backend), Solr and the Angular SSR server.
+    - No database container. Connects to the PostgreSQL instance administered by the NTI
+      through `DB_URL`, `DB_USERNAME` and `DB_PASSWORD`; see ../../../docs/operations/PRODUCTION.md.
     - Uses the `Dockerfile` in the same directory.
+- docker-compose.dev.yml
+    - Development stack: the same services plus a local `dspacedb` PostgreSQL container
+      and the Angular dev server, running against the local source tree.
+    - Uses the `Dockerfile.test` in the same directory.
 - docker-compose-cli.yml
     - Docker compose file to run DSpace CLI (Command Line Interface) tasks within a running DSpace instance in Docker. See instructions below.
     - Uses the `Dockerfile.cli` in the same directory.
@@ -40,8 +46,8 @@ Documentation for all Dockerfiles used by these compose scripts can be found in 
 - db.restore.yml
   - Docker compose file that pre-populate a database instance using a *local* SQL dump (hardcoded to `./pgdump.sql`)
   - Useful for restoring data from a local backup, or [Upgrading PostgreSQL in Docker](#Upgrading PostgreSQL in Docker)
-- docker-compose-angular.yml
-  - Docker compose file that will start a published DSpace User Interface container that interacts with the branch.
+- (removed) docker-compose-angular.yml
+  - The Angular service now lives in docker-compose.dev.yml and docker-compose.yml, so this override no longer exists.
 - docker-compose-shibboleth.yml
   - Docker compose file that will start a *test/demo* Shibboleth SP container (in Apache) that proxies requests to the DSpace container
   - ONLY useful for testing/development. NOT production ready.
@@ -58,23 +64,23 @@ Documentation for all Dockerfiles used by these compose scripts can be found in 
 
 ## To refresh / pull DSpace images from Dockerhub
 ```
-docker compose -f docker-compose.yml -f docker-compose-cli.yml pull
+docker compose -f docker-compose.dev.yml -f docker-compose-cli.yml pull
 ```
 
 ## To build DSpace images using code in your branch
 ```
-docker compose -f docker-compose.yml -f docker-compose-cli.yml build
+docker compose -f docker-compose.dev.yml -f docker-compose-cli.yml build
 ```
 
 OPTIONALLY, you can build DSpace images using a different JDK_VERSION like this:
 ```
-docker compose -f docker-compose.yml -f docker-compose-cli.yml build --build-arg JDK_VERSION=17
+docker compose -f docker-compose.dev.yml -f docker-compose-cli.yml build --build-arg JDK_VERSION=17
 ```
 Default is Java 11, but other LTS releases (e.g. 17) are also supported.
 
 ## Run DSpace 9 REST from your current branch
 
-Set `POSTGRES_PASSWORD` in the environment or the root `.env` file before starting Compose.
+Set `POSTGRES_PASSWORD` in the environment or the root `.env` file before starting the development Compose stack.
 Use a unique password and keep the file out of Git, with permissions `600`.
 The backend, CLI and PostgreSQL read the same variable. For an existing database, changing this
 variable alone does not change the database role password: update the role and the backend
@@ -92,7 +98,7 @@ docker compose -p d9 up -d
 ## Run DSpace 9 REST and Angular from your branch
 
 ```
-docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-angular.yml up -d
+docker compose -p d9 -f docker-compose.dev.yml up -d
 ```
 NOTE: This starts the UI in development mode. It will take a few minutes to see the UI as the Angular code needs to be compiled.
 
@@ -110,7 +116,7 @@ That container provides a [Cantaloupe image server](https://cantaloupe-project.g
 which can be used when IIIF support is enabled in DSpace (`iiif.enabled=true`).
 
 ```
-docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-iiif.yml up -d
+docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/docker-compose-iiif.yml up -d
 ```
 
 ## Run DSpace 9 REST and Shibboleth SP (in Apache) from your branch
@@ -148,17 +154,17 @@ The remainder of these instructions assume you are using ngrok (though other pro
 3. Build the Shibboleth container (if you haven't built or pulled it before):
    ```
    cd [dspace-src]
-   docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml build
+   docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml build
    ```
 
 4. Start all containers, passing your public hostname as the `DSPACE_HOSTNAME` environment variable:
    ```
-   DSPACE_HOSTNAME=[subdomain].ngrok.io docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml up -d
+   DSPACE_HOSTNAME=[subdomain].ngrok.io docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml up -d
    ```
    NOTE: For Windows you MUST either set the environment variable separately, or use the 'env' command provided with Git/Cygwin
    (you may already have this command if you are running Git for Windows). See https://superuser.com/a/1079563
    ```
-   env DSPACE_HOSTNAME=[subdomain].ngrok.io docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml up -d
+   env DSPACE_HOSTNAME=[subdomain].ngrok.io docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml up -d
    ```
 
 5. Finally, for https://samltest.id/, you need to upload your Shibboleth Metadata for the site to "trust" you.
@@ -186,7 +192,7 @@ The remainder of these instructions assume you are using ngrok (though other pro
         ```
       * Spin up the `dspace-angular` container alongside the others, e.g.
         ```
-        DSPACE_HOSTNAME=[subdomain].ngrok.io docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-angular.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml up -d
+        DSPACE_HOSTNAME=[subdomain].ngrok.io docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/docker-compose-shibboleth.yml up -d
         ```
 ## Run DSpace 9 REST and Matomo from your branch
 
@@ -196,7 +202,7 @@ This Matomo container uses the port 8081 to expose its API and User Interface.
 
 You can start both DSpace and Matomo with the following commnad:
 ```shell
-docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/docker-compose-matomo.yml up -d
+docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/docker-compose-matomo.yml up -d
 ```
 
 Once started you can complete the Matomo configuration directly from the [Matomo Home Page](http://localhost:8081/matomo.php).
@@ -250,7 +256,7 @@ Prerequisites
 
 Start DSpace REST with a postgres database dump downloaded from the internet.
 ```
-docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/db.entities.yml up -d
+docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/db.entities.yml up -d
 ```
 
 Download an assetstore from a tar file on the internet.
@@ -341,14 +347,14 @@ Here's how to fix those issues by migrating your old Postgres data to the new ve
     ```
 5. Just for safety, pull down the latest versions of all images
     ```
-    docker compose -f docker-compose.yml -f docker-compose-cli.yml pull
+    docker compose -f docker-compose.dev.yml -f docker-compose-cli.yml pull
     ```
 6. Start everything up using our `db.restore.yml` script.  This script will recreate the database
 using the local `./pgdump.sql` file. IMPORTANT: If you renamed that "pgdump.sql" file or stored it elsewhere,
 then you MUST change the name/directory in the `db.restore.yml` script.
     ```
     # Restore database from "./pgdump.sql" (this path is hardcoded in db.restore.yml)
-    docker compose -p d9 -f docker-compose.yml -f dspace/src/main/docker-compose/db.restore.yml up -d
+    docker compose -p d9 -f docker-compose.dev.yml -f dspace/src/main/docker-compose/db.restore.yml up -d
     ```
 7. Finally, reindex all database contents into Solr (just to be sure Solr indexes are current).
     ```

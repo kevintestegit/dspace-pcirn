@@ -26,7 +26,7 @@ if [[ "${1:-}" == "init" ]]; then
     -Denforcer.skip=true -Dcheckstyle.skip=true -Dlicense.skip=true -Dxml.skip=true \
     -pl dspace-services,dspace-api,dspace-server-webapp,dspace/modules/additions,dspace/modules/server \
     -am install
-  echo "init ok. Use scripts/backend-dev.sh apos alterar codigo Java."
+  echo "init ok. Depois de alterar codigo Java, rode scripts/backend-dev.sh."
   exit 0
 fi
 
@@ -38,4 +38,5 @@ fi
 mvn_in_docker -DskipTests -Denforcer.skip=true -Dcheckstyle.skip=true -Dlicense.skip=true \
   compile -pl "$(IFS=,; echo "${modules[*]}")"
 
-docker compose up -d --no-build --force-recreate dspace
+docker compose -f "${ROOT}/docker-compose.dev.yml" --project-directory "${ROOT}" \
+  up -d --no-build dspace
