@@ -16,7 +16,33 @@ docker compose --env-file .env.production \
 ```
 
 O banco e o Solr ficam somente na rede Docker. UI e REST ficam ligados a `127.0.0.1`; um proxy TLS deve encaminhar o tráfego público para as portas `4000` e `8501`.
-Use `deploy/nginx/pcirn.conf.example` como base do proxy e, quando o endereço público existir, ajuste `PUBLIC_UI_URL` e `PUBLIC_REST_URL` para as URLs do proxy (sem as portas internas).
+Use `deploy/nginx/pcirn.conf.example` como base do proxy. Instale um certificado válido e substitua
+`SERVER_ADDRESS` no hostname e nos caminhos do certificado antes de ativar o Nginx. Ajuste
+`PUBLIC_UI_URL` e `PUBLIC_REST_URL` para URLs HTTPS do proxy, sem as portas internas.
+O exemplo redireciona HTTP para HTTPS e aplica HSTS apenas no servidor HTTPS.
+
+O login OIDC começa em `/server/api/authn/oidc/login`. O callback exige o estado de uso único
+da sessão que iniciou a navegação. O cookie de sessão é Secure, HttpOnly e SameSite=Lax;
+esse fluxo exige HTTPS e afinidade de sessão caso haja mais de uma instância REST.
+
+## Segredos e contexto de build
+
+Arquivos `.env`, `.env.*` e `smtp.env` são excluídos do contexto Docker, inclusive em subdiretórios.
+Mantenha os arquivos usados no runtime com permissão `600`, fora de artefatos distribuídos.
+Essa exclusão não remove segredos de snapshots, imagens intermediárias ou caches já criados.
+Restrinja o acesso a esses artefatos e verifique se foram compartilhados. Se houve exposição,
+revogue e substitua as chaves Brevo/SMTP e coordene a troca da senha PostgreSQL com a atualização
+dos consumidores. Alterar apenas `POSTGRES_PASSWORD` não muda a senha de um banco já inicializado.
+
+## Harvesting e depósitos ZIP
+
+OAI e ORE usam somente destinos HTTP(S) públicos nas portas 80/443, com validação DNS em cada
+conexão e em redirecionamentos. Proxies de saída não são usados por esse cliente. Respostas OAI
+têm limite de 16 MiB; recursos ORE, 1 GiB. Provedores internos e portas alternativas são rejeitados.
+
+Depósitos SimpleZip são descompactados em área temporária antes de criar bitstreams. Os limites
+em `swordv2-server.cfg` são positivos: 1.000 entradas, 100 MiB por entrada, 1 GiB total e razão
+máxima de compressão de 100. A área temporária precisa de espaço para o limite total configurado.
 
 ## Backup
 

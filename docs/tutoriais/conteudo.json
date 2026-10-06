@@ -1,0 +1,409 @@
+{
+  "version": "1.0",
+  "date": "06/10/2026",
+  "documents": [
+    {
+      "id": "consulta-download",
+      "group": "consulta",
+      "title": "Consulta e download de documentos",
+      "en_title": "Finding and downloading documents",
+      "summary": "Encontre documentos por busca e filtros, consulte os metadados, baixe arquivos e copie o identificador permanente.",
+      "en_summary": "Find documents with search and filters, read metadata, download files and copy the permanent identifier.",
+      "audience": "Cidadãos e servidores",
+      "slides": [
+        {
+          "title": "Pesquise no repositório",
+          "text": "Na página inicial, digite palavras do título, o número de uma portaria ou um assunto. Acione Pesquisar. A consulta aos documentos publicados não exige login.",
+          "shot": "home-search"
+        },
+        {
+          "title": "Refine os resultados",
+          "text": "Na página Publicações, confira os resultados e use os filtros disponíveis. Combine a busca com o tipo de documento, unidade responsável ou data quando esses filtros aparecerem. Remova um filtro para ampliar a consulta.",
+          "shot": "search"
+        },
+        {
+          "title": "Navegue por comunidades e coleções",
+          "text": "Em Comunidades, escolha a unidade desejada. Abra uma coleção para consultar os documentos reunidos nela. A navegação por unidade é útil quando você não conhece o título exato.",
+          "shot": "communities"
+        },
+        {
+          "title": "Abra e confira o documento",
+          "text": "Selecione o título de um resultado. Confira título, unidade responsável, data e demais metadados. Antes de usar um documento, verifique também a versão ou edição informada e o conteúdo do arquivo.",
+          "shot": "item"
+        },
+        {
+          "title": "Visualize ou baixe o arquivo",
+          "text": "Na área de arquivos do documento, selecione a ação de visualização ou download disponível. O navegador pode abrir o PDF em uma aba ou salvá-lo. No visualizador, use os controles de baixar e imprimir.",
+          "shot": "item-files"
+        },
+        {
+          "title": "Compartilhe o endereço permanente",
+          "text": "Na página do documento, copie a URI permanente apresentada. Prefira esse identificador ao endereço de uma sessão ou busca. Confira o endereço copiado antes de compartilhá-lo.",
+          "shot": "item-uri"
+        },
+        {
+          "title": "Quando precisar de ajuda",
+          "text": "Se não localizar o documento, revise as palavras da busca e os filtros. Para suporte, acesse Fale Conosco. Informe título ou número do documento e descreva a dificuldade; não envie senhas ou dados sigilosos.",
+          "shot": "contact"
+        }
+      ]
+    },
+    {
+      "id": "acesso",
+      "group": "servidores",
+      "title": "Acesso ao repositório",
+      "en_title": "Accessing the repository",
+      "summary": "Entre no sistema, consulte sua área MeuDSpace e saiba como solicitar habilitação para submeter documentos.",
+      "en_summary": "Sign in, access MyDSpace and learn how to request document submission permissions.",
+      "audience": "Servidores da PCIRN",
+      "slides": [
+        {
+          "title": "Consulta pública e acesso de servidor",
+          "text": "A consulta e os tutoriais são públicos. O login é necessário para ações como submeter documentos e executar tarefas de revisão. Na navegação superior, selecione Entrar.",
+          "shot": "home"
+        },
+        {
+          "title": "Entre com a conta habilitada",
+          "text": "Na tela de acesso, utilize o método de autenticação apresentado para sua conta. Digite suas credenciais somente nessa tela ou no provedor institucional indicado.",
+          "shot": "login"
+        },
+        {
+          "title": "Confira os termos e sua identificação",
+          "text": "Se o sistema solicitar aceite dos termos de uso, leia o texto e confirme somente se concordar. Depois de entrar, confira sua identificação no menu do usuário. Não compartilhe sua conta.",
+          "shot": "user-menu"
+        },
+        {
+          "title": "Abra o MeuDSpace",
+          "text": "No menu do usuário, selecione MeuDSpace. Essa área reúne seus depósitos e, quando houver autorização, tarefas de revisão. As opções disponíveis dependem dos grupos e das permissões da conta.",
+          "shot": "mydspace"
+        },
+        {
+          "title": "Solicite ajuda para acesso ou permissões",
+          "text": "Se não conseguir entrar, utilize a recuperação de senha quando disponível. Se Novo documento ou a coleção do seu setor não aparecer, solicite ao NUGECID a conferência da habilitação. Não crie depósitos em outra unidade para contornar a ausência de permissão.",
+          "shot": "contact"
+        },
+        {
+          "title": "Encerre a sessão",
+          "text": "Ao terminar, use a opção de sair no menu do usuário, principalmente em equipamentos compartilhados. Feche arquivos baixados que contenham informações institucionais e siga as orientações internas de guarda documental.",
+          "shot": "user-menu"
+        }
+      ]
+    },
+    {
+      "id": "submissao",
+      "group": "servidores",
+      "title": "Submissão de documentos",
+      "en_title": "Submitting documents",
+      "summary": "Selecione a coleção do setor, preencha os metadados, anexe o arquivo e acompanhe o depósito e as devoluções.",
+      "en_summary": "Choose your sector collection, enter metadata, upload the file and track submissions and returns.",
+      "audience": "Servidores habilitados para depósito",
+      "slides": [
+        {
+          "title": "Prepare o documento",
+          "text": "Confira se o documento já está publicado. Tenha o arquivo final e os dados oficiais: título, unidade responsável, data, tipo e, quando houver, código e versão. Não deposite material sigiloso ou dados pessoais sem orientação institucional.",
+          "shot": "search"
+        },
+        {
+          "title": "Inicie um novo documento",
+          "text": "Entre com sua conta habilitada. No menu do usuário, selecione Novo documento. Essa ação aparece somente para contas com permissão de submissão.",
+          "shot": "user-menu"
+        },
+        {
+          "title": "Escolha a coleção do seu setor",
+          "text": "Na seleção de coleção, escolha o destino correspondente à unidade e ao tipo de acervo. Confira o nome antes de continuar. Se o destino correto não estiver disponível, consulte o NUGECID.",
+          "shot": "collection-select"
+        },
+        {
+          "title": "Informe o título oficial",
+          "text": "Preencha Título conforme o documento. Use o título alternativo ou sigla quando houver. Confira a grafia antes de prosseguir. Os campos com asterisco são obrigatórios.",
+          "shot": "submission-title"
+        },
+        {
+          "title": "Identifique a unidade e a data",
+          "text": "Informe a Unidade responsável e a Data de emissão, aprovação ou vigência. Preencha primeiro o ano; mês e dia devem corresponder à informação disponível no documento. Informe autor ou relator e identificador ou código oficial quando se aplicarem.",
+          "shot": "submission-one"
+        },
+        {
+          "title": "Informe a versão ou edição",
+          "text": "Preencha Versão ou edição conforme o documento, especialmente em POPs e manuais que possuam essa informação. Selecione o idioma na lista do formulário. Não invente dados que não constem do documento oficial.",
+          "shot": "submission-version"
+        },
+        {
+          "title": "Descreva o conteúdo",
+          "text": "Selecione o Tipo de documento no vocabulário institucional: digite parte do nome e escolha uma opção da lista. Apenas digitar não preenche o campo. Informe assunto e palavras-chave, resumo ou ementa e período de cobertura quando cabíveis.",
+          "shot": "submission-two"
+        },
+        {
+          "title": "Anexe e confira o arquivo",
+          "text": "Use a área de envio de arquivos para anexar a versão final. Confira nome, formato, tamanho e conteúdo. Para documentos textuais, prepare um PDF legível e pesquisável; siga a orientação do NUGECID sobre PDF/A.",
+          "shot": "submission-upload"
+        },
+        {
+          "title": "Leia a licença de distribuição",
+          "text": "Leia a licença apresentada na submissão. Confirme o aceite para prosseguir quando estiver de acordo. O aceite não substitui a conferência de autoria, permissão para divulgação e adequação do documento.",
+          "shot": "submission-license"
+        },
+        {
+          "title": "Revise e envie para validação",
+          "text": "Confira a coleção, os metadados, o arquivo e a licença. Selecione Depositar. Se precisar interromper, selecione Salvar para continuar depois. Submeter não significa publicação imediata: o documento segue para revisão do NUGECID.",
+          "shot": "submission-finish"
+        },
+        {
+          "title": "Acompanhe e corrija uma devolução",
+          "text": "Abra o MeuDSpace e localize seu depósito. Se o NUGECID devolver o documento, leia a justificativa, corrija o arquivo ou os campos solicitados e conclua novamente o depósito. Verifique o resultado e as notificações recebidas.",
+          "shot": "returned"
+        }
+      ]
+    },
+    {
+      "id": "revisao-publicacao",
+      "group": "nugecid",
+      "title": "Revisão e publicação pelo NUGECID",
+      "en_title": "NUGECID review and publication",
+      "summary": "Assuma a tarefa, confira arquivos e metadados, devolva para correção ou valide a publicação.",
+      "en_summary": "Claim tasks, check files and metadata, return submissions for corrections or approve publication.",
+      "audience": "Equipe autorizada do NUGECID",
+      "slides": [
+        {
+          "title": "Localize as tarefas de revisão",
+          "text": "Entre com uma conta autorizada do NUGECID e abra o MeuDSpace. Selecione a visualização de tarefas de fluxo de trabalho. A configuração institucional possui uma etapa de revisão pelo NUGECID.",
+          "shot": "workflow"
+        },
+        {
+          "title": "Assuma a tarefa",
+          "text": "Identifique o depósito pela coleção e pelo título. Use a ação de assumir ou requerer apresentada na tarefa. Confira o documento antes de decidir; assumir a tarefa não publica o item.",
+          "shot": "workflow"
+        },
+        {
+          "title": "Confira e edite os metadados",
+          "text": "Abra Editar e confira título, unidade responsável, data, tipo, código, versão e descrição. Corrija os campos conforme o documento oficial. Se faltar uma informação que dependa do depositante, devolva com uma orientação objetiva.",
+          "shot": "workflow-edit"
+        },
+        {
+          "title": "Verifique o arquivo e a divulgação",
+          "text": "Abra o arquivo e confira integridade, legibilidade, correspondência com os metadados e versão final. Confirme se o material pode ser divulgado no repositório. Não presuma que selecionar um campo torna seguro publicar conteúdo sigiloso.",
+          "shot": "submission-upload"
+        },
+        {
+          "title": "Devolva com uma justificativa clara",
+          "text": "Quando houver pendências, selecione Retornar ao setor. Informe o que precisa ser corrigido e confirme a devolução. O depósito retorna ao responsável para ajuste e reenvio; não use exclusão como alternativa à devolução.",
+          "shot": "workflow-return"
+        },
+        {
+          "title": "Valide para publicação",
+          "text": "Com os campos e o arquivo conferidos, utilize Validar para aprovar a tarefa. A aprovação conclui o fluxo configurado e disponibiliza o documento conforme as políticas de acesso da instalação.",
+          "shot": "workflow-claimed"
+        },
+        {
+          "title": "Confira o documento disponibilizado",
+          "text": "Depois de validar, abra o item publicado. Confira os metadados, o arquivo e a URI permanente. Verifique a consulta e o download sem login em uma sessão separada. Se houver uma divergência, corrija-a pelos procedimentos autorizados.",
+          "shot": "item"
+        }
+      ]
+    },
+    {
+      "id": "fluxo-deposito",
+      "group": "nugecid",
+      "title": "Fluxo de depósito institucional",
+      "en_title": "Institutional deposit workflow",
+      "summary": "Veja os responsáveis e o caminho entre preparação, submissão, revisão, correção e publicação.",
+      "en_summary": "See who handles preparation, submission, review, corrections and publication.",
+      "audience": "Servidores e NUGECID",
+      "slides": [
+        {
+          "title": "Da preparação à publicação",
+          "text": "O servidor prepara e submete o documento na coleção autorizada. O NUGECID confere arquivo e metadados. A validação conclui o fluxo; uma pendência retorna ao depositante para correção e reenvio.",
+          "flow": true
+        },
+        {
+          "title": "Responsabilidades do servidor",
+          "text": "Preparar a versão final. Conferir se o documento pode ser divulgado. Selecionar a coleção correta. Preencher os campos conforme o documento. Anexar o arquivo e aceitar a licença. Acompanhar o depósito e corrigir as pendências indicadas.",
+          "shot": "submission-one"
+        },
+        {
+          "title": "Responsabilidades do NUGECID",
+          "text": "Assumir a tarefa. Conferir documento, metadados e adequação para divulgação. Corrigir ou devolver com justificativa. Validar quando a revisão estiver concluída. Conferir a publicação, o endereço permanente e o download público.",
+          "shot": "workflow-claimed"
+        },
+        {
+          "title": "Onde buscar orientação",
+          "text": "Os tutoriais são públicos e ficam em Navegação no rodapé. O login libera apenas as ações autorizadas para sua conta. Para dúvidas sobre habilitação, depósito ou revisão, use Fale Conosco e informe a etapa em que encontrou dificuldade.",
+          "shot": "contact"
+        }
+      ]
+    }
+  ],
+  "captures": {
+    "home": {
+      "width": 1200,
+      "height": 680,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "search": {
+      "width": 1200,
+      "height": 650,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "communities": {
+      "width": 1200,
+      "height": 512,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "contact": {
+      "width": 402,
+      "height": 340,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "login": {
+      "width": 374,
+      "height": 153,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "mydspace": {
+      "width": 1200,
+      "height": 650,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "user-menu": {
+      "width": 368,
+      "height": 305,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": [
+        [
+          15.390625,
+          86.71875,
+          337.21875,
+          42.71875
+        ]
+      ]
+    },
+    "collection-select": {
+      "width": 500,
+      "height": 345,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "submission-one": {
+      "width": 1062,
+      "height": 153,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "submission-two": {
+      "width": 1062,
+      "height": 104,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "submission-upload": {
+      "width": 1104,
+      "height": 391,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "submission-license": {
+      "width": 1104,
+      "height": 650,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "workflow": {
+      "width": 771,
+      "height": 309,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": [
+        [
+          16,
+          255.53125,
+          115.8125,
+          38
+        ]
+      ]
+    },
+    "workflow-claimed": {
+      "width": 771,
+      "height": 281,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "workflow-edit": {
+      "width": 1062,
+      "height": 97,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "workflow-return": {
+      "width": 500,
+      "height": 391,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "returned": {
+      "width": 771,
+      "height": 171,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "submission-finish": {
+      "width": 1070,
+      "height": 38,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": [
+        [
+          678.671875,
+          0,
+          264.078125,
+          38
+        ],
+        [
+          950.75,
+          0,
+          119.25,
+          38
+        ]
+      ]
+    },
+    "submission-title": {
+      "width": 1062,
+      "height": 97,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "submission-version": {
+      "width": 1062,
+      "height": 97,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "item": {
+      "width": 760,
+      "height": 453,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "item-files": {
+      "width": 302,
+      "height": 79,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "item-uri": {
+      "width": 684,
+      "height": 52,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    },
+    "home-search": {
+      "width": 1090,
+      "height": 157,
+      "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
+      "highlights": []
+    }
+  }
+}
