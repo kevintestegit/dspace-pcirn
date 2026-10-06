@@ -12,11 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
-import java.util.zip.ZipFile;
 
 import org.dspace.authorize.AuthorizeException;
 import org.dspace.content.Bitstream;
@@ -31,6 +28,8 @@ import org.dspace.content.service.BundleService;
 import org.dspace.content.service.WorkspaceItemService;
 import org.dspace.core.Constants;
 import org.dspace.core.Context;
+import org.dspace.services.ConfigurationService;
+import org.dspace.services.factory.DSpaceServicesFactory;
 import org.swordapp.server.Deposit;
 import org.swordapp.server.SwordAuthException;
 import org.swordapp.server.SwordError;
@@ -130,22 +129,19 @@ public class SimpleZipContentIngester extends AbstractSwordContentIngester {
     private List<Bitstream> unzipToBundle(Context context, File depositFile,
                                           Bundle target)
         throws DSpaceSwordException, SwordError, SwordAuthException {
-        try {
-            // get the zip file into a usable form
-            ZipFile zip = new ZipFile(depositFile);
-
+        ConfigurationService config = DSpaceServicesFactory.getInstance().getConfigurationService();
+        try (StagedZip zip = StagedZip.expand(depositFile,
+            config.getIntProperty("swordv2-server.zip.max-entries", 1000),
+            config.getLongProperty("swordv2-server.zip.max-entry-bytes", 100L * 1024 * 1024),
+            config.getLongProperty("swordv2-server.zip.max-total-bytes", 1024L * 1024 * 1024),
+            config.getIntProperty("swordv2-server.zip.max-compression-ratio", 100))) {
             List<Bitstream> derivedResources = new ArrayList<Bitstream>();
-            Enumeration zenum = zip.entries();
-            while (zenum.hasMoreElements()) {
-                ZipEntry entry = (ZipEntry) zenum.nextElement();
-                String entryName = entry.getName();
-                java.nio.file.Path entryPath = java.nio.file.Paths.get(entryName).normalize();
-                if (entryPath.isAbsolute() || entryPath.startsWith("..")) {
-                    throw new SwordError(UriRegistry.ERROR_BAD_REQUEST, "Invalid zip entry: " + entryName);
+            for (int i = 0; i < zip.files().size(); i++) {
+                String entryName = zip.name(i);
+                Bitstream bs;
+                try (InputStream stream = java.nio.file.Files.newInputStream(zip.files().get(i))) {
+                    bs = bitstreamService.create(context, target, stream);
                 }
-
-                InputStream stream = zip.getInputStream(entry);
-                Bitstream bs = bitstreamService.create(context, target, stream);
                 BitstreamFormat format = this
                     .getFormat(context, entryName);
                 bs.setFormat(context, format);
@@ -158,7 +154,9 @@ public class SimpleZipContentIngester extends AbstractSwordContentIngester {
         } catch (ZipException e) {
             throw new SwordError(UriRegistry.ERROR_BAD_REQUEST,
                                  "unable to unzip provided package", e);
-        } catch (IOException | SQLException e) {
+        } catch (IOException e) {
+            throw new SwordError(UriRegistry.ERROR_BAD_REQUEST, "ZIP deposit rejected", e);
+        } catch (SQLException e) {
             throw new DSpaceSwordException(e);
         } catch (AuthorizeException e) {
             throw new SwordAuthException(e);
