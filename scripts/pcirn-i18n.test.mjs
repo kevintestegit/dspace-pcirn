@@ -55,7 +55,7 @@ test('footer template uses translated keys and no hardcoded column titles', () =
     'Navegação',
     'Ajuda e informações',
     'Plataforma',
-    'Desenvolvido por',
+    'Customizado por',
     'Polícia Científica do Rio Grande do Norte. Todos os direitos reservados.',
   ]) {
     assert.doesNotMatch(tpl, new RegExp(`>\\s*${str}\\s*<`));

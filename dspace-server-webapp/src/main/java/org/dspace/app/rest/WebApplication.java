@@ -181,8 +181,8 @@ public class WebApplication {
                             // for our Access-Control-Allow-Origin header
                             .allowCredentials(corsAllowCredentials).allowedOrigins(corsAllowedOrigins)
                             // Allow list of request preflight headers allowed to be sent to us from the client
-                            .allowedHeaders("Accept", "Accept-Language", "Authorization", "Content-Type", "Origin", "X-On-Behalf-Of",
-                                "X-Requested-With", "X-XSRF-TOKEN", "X-CORRELATION-ID", "X-REFERRER",
+                            .allowedHeaders("Accept", "Accept-Language", "Authorization", "Content-Type", "Origin",
+                                "X-On-Behalf-Of", "X-Requested-With", "X-XSRF-TOKEN", "X-CORRELATION-ID", "X-REFERRER",
                                 "x-captcha-payload")
                             // Allow list of response headers allowed to be sent by us (the server) to the client
                             .exposedHeaders("Authorization", "DSPACE-XSRF-TOKEN", "Location", "WWW-Authenticate");

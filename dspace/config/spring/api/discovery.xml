@@ -3530,6 +3530,7 @@
                         <ref bean="sortDateAccessioned" />
                         <ref bean="sortDateIssued" />
                         <ref bean="sortTitle" />
+                        <ref bean="sortScore" />
                     </list>
                 </property>
             </bean>

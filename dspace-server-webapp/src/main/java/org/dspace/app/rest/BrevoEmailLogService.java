@@ -11,6 +11,7 @@ import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
+
 import java.net.URI;
 import java.util.List;
 
@@ -128,7 +129,8 @@ public class BrevoEmailLogService {
             throw new ResponseStatusException(BAD_REQUEST, "Brevo email content is incomplete and cannot be resent");
         }
         if (original.path("attachmentCount").asInt(0) > 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "Brevo email with attachments cannot be resent from this page");
+            throw new ResponseStatusException(BAD_REQUEST,
+                "Brevo email with attachments cannot be resent from this page");
         }
         if (StringUtils.isBlank(senderEmail)) {
             throw new ResponseStatusException(SERVICE_UNAVAILABLE, "DSpace mail.from.address is not configured");
