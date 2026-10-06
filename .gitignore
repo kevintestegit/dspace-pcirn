@@ -62,9 +62,8 @@ rebel.xml
 # Superpowers brainstorming mockups
 .superpowers/
 
-# Video explainer: dependencies and generated media
-video/node_modules/
-video/out/
+# Video explainer: one-off promotional renderer, not part of the application
+video/
 
 # Local agent/browser tooling artifacts
 .maestri/
