@@ -29,6 +29,7 @@ import java.util.Map;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.Cookie;
+import org.apache.http.client.utils.URIBuilder;
 import org.dspace.app.rest.model.AuthnRest;
 import org.dspace.app.rest.security.jwt.EPersonClaimProvider;
 import org.dspace.app.rest.test.AbstractControllerIntegrationTest;
@@ -45,7 +46,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
  * Integration tests for {@link OidcAuthenticationRestController}.
@@ -83,6 +86,12 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
     public void setup() {
         originalOidcClient = oidcAuthentication.getOidcClient();
         oidcAuthentication.setOidcClient(oidcClientMock);
+        configurationService.setProperty("authentication-oidc.can-self-register", "true");
+
+        for (String key : new String[] {"authorize-endpoint", "client-id", "client-secret", "redirect-url",
+            "token-endpoint", "user-info-endpoint"}) {
+            configurationService.setProperty("authentication-oidc." + key, "https://provider.example/" + key);
+        }
 
         configurationService.setProperty("authentication-oidc.user-info.email", EMAIL);
         configurationService.setProperty("authentication-oidc.user-info.first-name", FIRST_NAME);
@@ -108,7 +117,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
         when(oidcClientMock.getAccessToken(CODE)).thenReturn(buildOidcTokenResponse(ACCESS_TOKEN));
         when(oidcClientMock.getUserInfo(ACCESS_TOKEN)).thenReturn(buildUserInfo("test@email.it", "Test", "User"));
 
-        MvcResult mvcResult = getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        MvcResult mvcResult = getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl(configurationService.getProperty("dspace.ui.url")))
@@ -136,7 +145,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
         when(oidcClientMock.getAccessToken(CODE)).thenReturn(buildOidcTokenResponse(ACCESS_TOKEN));
         when(oidcClientMock.getUserInfo(ACCESS_TOKEN)).thenReturn(buildUserInfo("test@email.it"));
 
-        MvcResult mvcResult = getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        MvcResult mvcResult = getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl(configurationService.getProperty("dspace.ui.url")))
@@ -160,7 +169,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
         when(oidcClientMock.getAccessToken(CODE)).thenReturn(buildOidcTokenResponse(ACCESS_TOKEN));
         when(oidcClientMock.getUserInfo(ACCESS_TOKEN)).thenReturn(buildUserInfo("test@email.it"));
 
-        MvcResult mvcResult = getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        MvcResult mvcResult = getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().isUnauthorized())
             .andExpect(cookie().doesNotExist("Authorization-cookie"))
@@ -204,7 +213,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
 
         context.restoreAuthSystemState();
 
-        MvcResult mvcResult = getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        MvcResult mvcResult = getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl(configurationService.getProperty("dspace.ui.url")))
@@ -237,7 +246,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
 
         context.restoreAuthSystemState();
 
-        getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().isUnauthorized())
             .andExpect(cookie().doesNotExist("Authorization-cookie"))
@@ -264,7 +273,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
 
         context.restoreAuthSystemState();
 
-        getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().isUnauthorized())
             .andExpect(cookie().doesNotExist("Authorization-cookie"))
@@ -291,7 +300,7 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
 
         context.restoreAuthSystemState();
 
-        getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc")
+        getClient().perform(oidcCallback()
             .param("code", CODE))
             .andExpect(status().isUnauthorized())
             .andExpect(cookie().doesNotExist("Authorization-cookie"))
@@ -310,6 +319,22 @@ public class OidcAuthenticationRestControllerIT extends AbstractControllerIntegr
         token.setRefreshToken(REFRESH_TOKEN);
         token.setScope(String.join(" ", OIDC_SCOPES));
         return token;
+    }
+
+    private MockHttpServletRequestBuilder oidcCallback() throws Exception {
+        MvcResult initiation = getClient().perform(get("/api/authn/oidc/login"))
+            .andExpect(status().is3xxRedirection()).andReturn();
+        String state = new URIBuilder(initiation.getResponse().getRedirectedUrl()).getQueryParams().stream()
+            .filter(parameter -> "state".equals(parameter.getName())).findFirst().orElseThrow().getValue();
+        return get("/api/" + AuthnRest.CATEGORY + "/oidc")
+            .session((MockHttpSession) initiation.getRequest().getSession(false)).param("state", state);
+    }
+
+    @Test
+    public void testRejectsCodeWithoutBrowserState() throws Exception {
+        getClient().perform(get("/api/" + AuthnRest.CATEGORY + "/oidc").param("code", CODE))
+            .andExpect(status().isUnauthorized()).andExpect(cookie().doesNotExist("Authorization-cookie"));
+        verifyNoInteractions(oidcClientMock);
     }
 
     private Map<String, Object> buildUserInfo(String email) {

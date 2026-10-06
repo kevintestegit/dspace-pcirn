@@ -15,14 +15,17 @@ import static org.apache.commons.lang3.StringUtils.isAnyBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.sql.SQLException;
-import java.util.Iterator;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -49,7 +52,12 @@ public class OidcAuthenticationBean implements AuthenticationMethod {
 
     public static final String OIDC_AUTH_ATTRIBUTE = "oidc";
 
-    private final static String LOGIN_PAGE_URL_FORMAT = "%s?client_id=%s&response_type=code&scope=%s&redirect_uri=%s";
+    private final static String LOGIN_PAGE_URL_FORMAT =
+        "%s?client_id=%s&response_type=code&scope=%s&redirect_uri=%s&state=%s";
+
+    private static final String LOGIN_STATE = "oidc.login.state";
+    private static final String LOGIN_STATE_EXPIRY = "oidc.login.expiry";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private static final Logger LOGGER = LogManager.getLogger();
 
@@ -106,6 +114,11 @@ public class OidcAuthenticationBean implements AuthenticationMethod {
             return NO_SUCH_USER;
         }
 
+        if (!consumeLoginState(request)) {
+            LOGGER.warn("OIDC callback has no valid browser-bound login state");
+            return BAD_ARGS;
+        }
+
         String code = (String) request.getParameter("code");
         if (StringUtils.isEmpty(code)) {
             LOGGER.warn("The incoming request has not code parameter");
@@ -148,6 +161,15 @@ public class OidcAuthenticationBean implements AuthenticationMethod {
 
     @Override
     public String loginPageURL(Context context, HttpServletRequest request, HttpServletResponse response) {
+        return configurationService.getProperty("dspace.server.url") + "/api/authn/oidc/login";
+    }
+
+    /**
+     * Begin an OIDC transaction on browser navigation, rather than an incidental authentication challenge.
+     * @param request initiating browser request
+     * @return provider authorization URL
+     */
+    public String startLogin(HttpServletRequest request) {
 
         String authorizeUrl = configurationService.getProperty("authentication-oidc.authorize-endpoint");
         String clientId = configurationService.getProperty("authentication-oidc.client-id");
@@ -165,28 +187,44 @@ public class OidcAuthenticationBean implements AuthenticationMethod {
         if (isAnyBlank(authorizeUrl, clientId, redirectUri, clientSecret, tokenUrl, userInfoUrl)) {
             LOGGER.error("Missing mandatory configuration properties for OidcAuthenticationBean");
 
-            // prepare a Map of the properties which can not have sane defaults, but are still required
-            final Map<String, String> map = Map.of("authorizeUrl", authorizeUrl, "clientId", clientId, "redirectUri",
-                redirectUri, "clientSecret", clientSecret, "tokenUrl", tokenUrl, "userInfoUrl", userInfoUrl);
-            final Iterator<Entry<String, String>> iterator = map.entrySet().iterator();
-
-            while (iterator.hasNext()) {
-                final Entry<String, String> entry = iterator.next();
-
-                if (isBlank(entry.getValue())) {
-                    LOGGER.error(" * {} is missing", entry::getKey);
-                }
-            }
             return "";
         }
 
         try {
-            return format(LOGIN_PAGE_URL_FORMAT, authorizeUrl, clientId, scopes, encode(redirectUri, "UTF-8"));
+            byte[] random = new byte[32];
+            RANDOM.nextBytes(random);
+            String state = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+            HttpSession session = request.getSession(true);
+            request.changeSessionId();
+            session.setMaxInactiveInterval(300);
+            synchronized (session) {
+                session.setAttribute(LOGIN_STATE, state);
+                session.setAttribute(LOGIN_STATE_EXPIRY, System.currentTimeMillis() + 300000);
+            }
+            return format(LOGIN_PAGE_URL_FORMAT, authorizeUrl, encode(clientId, "UTF-8"), encode(scopes, "UTF-8"),
+                encode(redirectUri, "UTF-8"), state);
         } catch (UnsupportedEncodingException e) {
             LOGGER.error(e::getMessage, e);
             return "";
         }
 
+    }
+
+    private boolean consumeLoginState(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return false;
+        }
+        synchronized (session) {
+            String expected = (String) session.getAttribute(LOGIN_STATE);
+            Long expiry = (Long) session.getAttribute(LOGIN_STATE_EXPIRY);
+            session.removeAttribute(LOGIN_STATE);
+            session.removeAttribute(LOGIN_STATE_EXPIRY);
+            String actual = request.getParameter("state");
+            return expected != null && actual != null && expiry != null && expiry > System.currentTimeMillis()
+                && MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+                    actual.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private int logInEPerson(Context context, EPerson ePerson) {
