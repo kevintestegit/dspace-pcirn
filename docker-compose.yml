@@ -1,54 +1,64 @@
+# Production stack: DSpace backend, Solr and the Angular SSR server.
+#
+# There is no database container here. DSpace connects over JDBC to the
+# PostgreSQL instance administered by the NTI, which must be reachable from
+# this host before the stack is started. DB_URL, DB_USERNAME and DB_PASSWORD
+# are required; the stack refuses to start without them.
+#
+# Usage:
+#   docker compose -f docker-compose.yml --env-file .env.production up -d
+#
+# The DSpace schema is NOT migrated on container start. After deploying a
+# version that changes the schema, run the migration explicitly and watch its
+# output:
+#   docker compose -f docker-compose.yml --env-file .env.production \
+#     run --rm dspace /dspace/bin/dspace database migrate
+#
+# UI and REST bind to 127.0.0.1 and expect a TLS reverse proxy in front.
 networks:
   dspacenet:
     ipam:
       config:
-        # Define a custom subnet for our DSpace network, so that we can easily trust requests from host to container.
-        # If you customize this value, be sure to customize the 'proxies.trusted.ipranges' env variable below.
-        - subnet: 10.250.50.0/24
-    # Explicitly set external=false because this script creates the network.
+        # Must remain in sync with proxies__P__trusted__P__ipranges below:
+        # the REST API only honours X-Forwarded-* from this range.
+        - subnet: ${DSPACE_NETWORK_SUBNET:-10.250.50.0/24}
     external: false
+
+volumes:
+  assetstore:
+  solr_data:
+
 services:
-  # DSpace (backend) webapp container
   dspace:
-    container_name: dspace
-    env_file:
-      - ./smtp.env
-      - path: ./.env.local
-        required: false
+    image: "${DSPACE_IMAGE:?Defina DSPACE_IMAGE com a imagem versionada do backend}"
+    restart: unless-stopped
     environment:
-      # Below syntax may look odd, but it is how to override dspace.cfg settings via env variables.
-      # See https://github.com/DSpace/DSpace/blob/main/dspace/config/config-definition.xml
-      # __P__ => "." (e.g. dspace__P__dir => dspace.dir)
-      # __D__ => "-" (e.g. google__D__metadata => google-metadata)
-      # Uncomment to set a non-default value for dspace.dir, dspace.server.url or dspace.ui.url
-      # dspace__P__dir: /dspace
-      dspace__P__server__P__url: ${dspace__P__server__P__url:-http://10.9.233.96:8501/server}
-      dspace__P__ui__P__url: ${dspace__P__ui__P__url:-http://10.9.233.96:4000}
-      # Set SSR URL to the Docker container name so that UI can contact container directly in Production mode.
-      # (This is necessary for docker-compose-angular.yml as it uses production mode by default)
-      dspace__P__server__P__ssr__P__url: ${dspace__P__server__P__ssr__P__url:-http://dspace:8080/server}
-      dspace__P__name: ${dspace__P__name:-Repositório PCIRN}
-      dspace__P__shortname: ${dspace__P__shortname:-PCIRN}
-      # db.url: Ensure we are using the 'dspacedb' image for our database
-      db__P__url: ${db__P__url:-jdbc:postgresql://dspacedb:5432/dspace}
-      db__P__password: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no ambiente ou no arquivo .env}
-      # solr.server: Ensure we are using the 'dspacesolr' image for Solr
-      solr__P__server: ${solr__P__server:-http://dspacesolr:8983/solr}
-      # matomo.tracker.url: Ensure we are using the 'matomo' image for Matomo
-      matomo__P__tracker__P__url: ${matomo__P__tracker__P__url:-http://matomo}
-      # proxies.trusted.ipranges: This setting is required for a REST API running in Docker to trust requests
-      # from the host machine. This IP range MUST correspond to the 'dspacenet' subnet defined above.
-      proxies__P__trusted__P__ipranges: ${proxies__P__trusted__P__ipranges:-10.250.50}
-      LOGGING_CONFIG: ${LOGGING_CONFIG:-/dspace/config/log4j2-container.xml}
-      # ponytail: LDAP não usado; Spring Boot cria LdapContextSource (localhost:389) e derruba /actuator/health. Desliga só o indicator.
+      # dspace.cfg is overridden through environment variables. The mapping is
+      # documented in dspace/config/config-definition.xml:
+      #   __P__ => "."      dspace__P__dir       => dspace.dir
+      #   __D__ => "-"      google__D__metadata  => google-metadata
+      dspace__P__dir: /dspace
+      dspace__P__name: ${DSPACE_NAME:-Repositório PCIRN}
+      dspace__P__shortname: ${DSPACE_SHORTNAME:-PCIRN}
+      # Public URLs are served by the reverse proxy; internal ports must not
+      # appear here.
+      dspace__P__server__P__url: ${PUBLIC_REST_URL:?Defina PUBLIC_REST_URL em .env.production}
+      dspace__P__ui__P__url: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL em .env.production}
+      # SSR resolves the backend by container name over the Compose network.
+      dspace__P__server__P__ssr__P__url: http://dspace:8080/server
+      # External PostgreSQL administered by the NTI.
+      db__P__url: ${DB_URL:?Defina DB_URL em .env.production}
+      db__P__username: ${DB_USERNAME:?Defina DB_USERNAME em .env.production}
+      db__P__password: ${DB_PASSWORD:?Defina DB_PASSWORD em .env.production}
+      solr__P__server: http://dspacesolr:8983/solr
+      proxies__P__trusted__P__ipranges: ${TRUSTED_PROXY_NETWORK:-10.250.50}
+      LOGGING_CONFIG: /dspace/config/log4j2-container.xml
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      # LDAP is unused. Spring Boot still builds an LdapContextSource pointed at
+      # localhost:389, which fails the /actuator/health check.
       MANAGEMENT_HEALTH_LDAP_ENABLED: "false"
       MANAGEMENT_HEALTH_GEOIP_ENABLED: "false"
       MANAGEMENT_HEALTH_SEO_ENABLED: "false"
-      LOADER_PATH: /dspace/overrides/additions:/dspace/overrides/server:/dspace/overrides/dspace-api:/dspace/overrides/dspace-server-webapp:/dspace/overrides/dspace-services:/dspace/overrides/dspace-oai:/dspace/overrides/dspace-rdf:/dspace/overrides/dspace-sword:/dspace/overrides/dspace-swordv2:/dspace/overrides/dspace-iiif:/dspace/overrides/dspace-saml2
-    image: "${DOCKER_REGISTRY:-docker.io}/${DOCKER_OWNER:-dspace}/dspace:${DSPACE_VER:-dspace-9_x-test}"
-    build:
-      context: .
-      dockerfile: Dockerfile.test
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/server/actuator/health"]
       interval: 30s
@@ -56,87 +66,42 @@ services:
       retries: 5
       start_period: 180s
     depends_on:
-      dspacedb:
-        condition: service_healthy
       dspacesolr:
         condition: service_healthy
     networks:
       - dspacenet
     ports:
-    - published: 8501
-      target: 8080
-    - target: 8000
-      published: 8500
-      host_ip: 127.0.0.1
+      - host_ip: 127.0.0.1
+        published: ${REST_BIND_PORT:-8501}
+        target: 8080
     volumes:
-    # Keep DSpace assetstore directory between reboots
-    - assetstore:/dspace/assetstore
-    # Mount local [src]/dspace/config/ to container. This syncs your local configs with container
-    # NOTE: Environment variables specified above will OVERRIDE any configs in local.cfg or dspace.cfg
-    - ./dspace/config:/dspace/config
-    - ./dspace/modules/additions/target/classes:/dspace/overrides/additions
-    - ./dspace/modules/server/target/classes:/dspace/overrides/server
-    - ./dspace-api/target/classes:/dspace/overrides/dspace-api
-    - ./dspace-server-webapp/target/classes:/dspace/overrides/dspace-server-webapp
-    - ./dspace-services/target/classes:/dspace/overrides/dspace-services
-    - ./dspace-oai/target/classes:/dspace/overrides/dspace-oai
-    - ./dspace-rdf/target/classes:/dspace/overrides/dspace-rdf
-    - ./dspace-sword/target/classes:/dspace/overrides/dspace-sword
-    - ./dspace-swordv2/target/classes:/dspace/overrides/dspace-swordv2
-    - ./dspace-iiif/target/classes:/dspace/overrides/dspace-iiif
-    - ./dspace-saml2/target/classes:/dspace/overrides/dspace-saml2
-    # Ensure that the database is ready BEFORE starting tomcat
-    # 1. While a TCP connection to dspacedb port 5432 is not available, continue to sleep
-    # 2. Then, run database migration to init database tables
-    # 3. Finally, start DSpace
-    entrypoint:
-    - /bin/bash
-    - '-c'
-    - |
-      while (!</dev/tcp/dspacedb/5432) > /dev/null 2>&1; do sleep 1; done;
-      /dspace/bin/dspace database migrate
-      java -cp /dspace/webapps/server-boot.jar org.springframework.boot.loader.launch.PropertiesLauncher
-  # DSpace PostgreSQL database container
-  dspacedb:
-    container_name: dspacedb
-    # Uses the base PostgreSQL image
-    image: "docker.io/postgres:${POSTGRES_VERSION:-15}"
-    environment:
-      PGDATA: /pgdata
-      POSTGRES_DB: dspace
-      POSTGRES_USER: dspace
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no ambiente ou no arquivo .env}
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "dspace", "-d", "dspace"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      dspacenet:
-    ports:
-    - published: 55432
-      target: 5432
-      host_ip: 127.0.0.1
-    volumes:
-    # Keep Postgres data directory between reboots
-    - pgdata:/pgdata
-  # DSpace Solr container
+      # The assetstore is state and must outlive every image. In production it
+      # is a bind mount so it can be inspected, backed up and moved with rsync.
+      - ${ASSETSTORE_PATH:?Defina ASSETSTORE_PATH em .env.production}:/dspace/assetstore
+      # DSpace reads its configuration from the image. local.cfg is layered on
+      # top from the host so operators can change settings without rebuilding.
+      - ./dspace/config/local.cfg:/dspace/config/local.cfg:ro
+    # No database wait and no migration: the entrypoint only starts the
+    # application. A failed connection or a pending migration surfaces as a
+    # startup error instead of an endless loop.
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        case "$${dspace__P__server__P__url}" in
+          https://*) ;;
+          *) echo "PUBLIC_REST_URL must use HTTPS" >&2; exit 1 ;;
+        esac
+        case "$${dspace__P__ui__P__url}" in
+          https://*) ;;
+          *) echo "PUBLIC_UI_URL must use HTTPS" >&2; exit 1 ;;
+        esac
+        exec java -jar /dspace/webapps/server-boot.jar
+
   dspacesolr:
-    container_name: dspacesolr
-    image: "${DOCKER_REGISTRY:-docker.io}/${DOCKER_OWNER:-dspace}/dspace-solr:${DSPACE_VER:-dspace-9_x}"
-    build:
-      context: ./dspace/src/main/docker/dspace-solr/
-      # Provide path to Solr configs necessary to build Docker image
-      additional_contexts:
-        solrconfigs: ./dspace/solr/
-      args:
-        SOLR_VERSION: "${SOLR_VER:-9.8}"
+    image: "${SOLR_IMAGE:?Defina SOLR_IMAGE com a imagem versionada do Solr}"
+    restart: unless-stopped
     networks:
       dspacenet:
-    ports:
-    - published: 8984
-      target: 8983
-      host_ip: 127.0.0.1
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8983/solr/admin/info/system"]
       interval: 30s
@@ -145,37 +110,63 @@ services:
       start_period: 60s
     working_dir: /var/solr/data
     volumes:
-    # Keep Solr data directory between reboots
-    - solr_data:/var/solr/data
-    # NOTE: We are not running Solr as "root", but we need root permissions to copy our cores to the mounted
-    # /var/solr/data directory. Then we start Solr as the "solr" user.
+      # Solr data may be dropped and rebuilt from the database, so keeping it
+      # only avoids a cold rebuild after a simple restart.
+      - solr_data:/var/solr/data
+    # Root is needed to seed the cores into the mounted data directory; Solr
+    # itself then runs as the "solr" user.
     user: root
-    # Initialize all DSpace Solr cores then start Solr:
-    # * First, run precreate-core to create the core (if it doesn't yet exist). If exists already, this is a no-op
-    # * Second, copy configsets to this core:
-    #   Updates to Solr configs require the container to be rebuilt/restarted: `docker compose -p d7 up -d --build dspacesolr`
-    # * Third, ensure all new folders are owned by "solr" user
-    # * Finally, start Solr as the "solr" user via the provided solr-foreground script
     entrypoint:
-    - /bin/bash
-    - '-c'
-    - |
-      init-var-solr
-      precreate-core authority /opt/solr/server/solr/configsets/authority
-      cp -r /opt/solr/server/solr/configsets/authority/* authority
-      precreate-core oai /opt/solr/server/solr/configsets/oai
-      cp -r /opt/solr/server/solr/configsets/oai/* oai
-      precreate-core search /opt/solr/server/solr/configsets/search
-      cp -r /opt/solr/server/solr/configsets/search/* search
-      precreate-core statistics /opt/solr/server/solr/configsets/statistics
-      cp -r /opt/solr/server/solr/configsets/statistics/* statistics
-      precreate-core qaevent /opt/solr/server/solr/configsets/qaevent
-      cp -r /opt/solr/server/solr/configsets/qaevent/* qaevent
-      precreate-core suggestion /opt/solr/server/solr/configsets/suggestion
-      cp -r /opt/solr/server/solr/configsets/suggestion/* suggestion
-      chown -R solr:solr /var/solr
-      runuser -u solr -- solr-foreground
-volumes:
-  assetstore:
-  pgdata:
-  solr_data:
+      - /bin/bash
+      - '-c'
+      - |
+        init-var-solr
+        precreate-core authority /opt/solr/server/solr/configsets/authority
+        cp -r /opt/solr/server/solr/configsets/authority/* authority
+        precreate-core oai /opt/solr/server/solr/configsets/oai
+        cp -r /opt/solr/server/solr/configsets/oai/* oai
+        precreate-core search /opt/solr/server/solr/configsets/search
+        cp -r /opt/solr/server/solr/configsets/search/* search
+        precreate-core statistics /opt/solr/server/solr/configsets/statistics
+        cp -r /opt/solr/server/solr/configsets/statistics/* statistics
+        precreate-core qaevent /opt/solr/server/solr/configsets/qaevent
+        cp -r /opt/solr/server/solr/configsets/qaevent/* qaevent
+        precreate-core suggestion /opt/solr/server/solr/configsets/suggestion
+        cp -r /opt/solr/server/solr/configsets/suggestion/* suggestion
+        chown -R solr:solr /var/solr
+        runuser -u solr -- solr-foreground
+
+  dspace-angular:
+    image: "${ANGULAR_IMAGE:?Defina ANGULAR_IMAGE com a imagem versionada do frontend}"
+    restart: unless-stopped
+    depends_on:
+      dspace:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DSPACE_UI_SSL: ${DSPACE_UI_SSL:-false}
+      DSPACE_UI_HOST: 0.0.0.0
+      DSPACE_UI_PORT: 4000
+      DSPACE_UI_NAMESPACE: /
+      DSPACE_UI_BASEURL: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL em .env.production}
+      DSPACE_REST_SSL: "true"
+      DSPACE_REST_HOST: ${PUBLIC_REST_HOST:?Defina PUBLIC_REST_HOST em .env.production}
+      DSPACE_REST_PORT: 443
+      DSPACE_REST_NAMESPACE: /server
+      DSPACE_REST_SSRBASEURL: http://dspace:8080/server
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://localhost:4000/',r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    networks:
+      - dspacenet
+    ports:
+      - host_ip: 127.0.0.1
+        published: ${UI_BIND_PORT:-4000}
+        target: 4000
