@@ -99,7 +99,7 @@ Escopo: 77 commits autorais, 96 arquivos no backend + submódulo Angular (~124 a
   ```
   SELECT count(*) FROM metadatavalue WHERE text_value LIKE '%localhost:4000%';  --> 28
   ```
-  (enquanto `dspace/config/local.cfg:2` define `dspace.ui.url = http://10.9.233.96:4000`)
+  (enquanto `dspace/config/local.cfg:2` define `dspace.ui.url = http://<host-de-desenvolvimento>:4000`)
 - **Impacto**: 28 valores de `dc.identifier.uri` (inclusive em coleções criadas pelas migrações) apontam para um host que não existe em produção — links canônicos quebrados que as migrações perpetuam.
 - **Correção**: usar `${dspace.ui.url}` (ou handle puro) em vez do literal, e corrigir os 28 registros existentes via nova migração.
 
@@ -135,7 +135,7 @@ Escopo: 77 commits autorais, 96 arquivos no backend + submódulo Angular (~124 a
 
 - `.env.bak` (310 B), `docker-compose.yml.bak` (6.198 B) e `docker-compose-network-fix.yml` commitados.
 - `dspace-angular/config/config.yml` commitado apontando para `sandbox.dspace.org` (`rest.host: sandbox.dspace.org`, `ssl: true`, `port: 443`), enquanto produção usa `PUBLIC_UI_URL`/`DSPACE_REST_HOST`. O `.gitignore` do submódulo (`config/.gitignore`: `config.*.yml`) **não cobre** `config.yml` — o padrão exige um segmento no meio.
-- `.env` commitado com IP interno (`10.9.233.96`) — sem credenciais (verificado), mas deveria ser `.env.example`.
+- `.env` commitado com IP interno (`<host-de-desenvolvimento>`) — sem credenciais (verificado), mas deveria ser `.env.example`.
 - **Correção**: remover os `.bak`, mover `config.yml` para `config.example.yml` e ampliar o padrão do `.gitignore`.
 
 ### A14 — [BAIXO] Documentação contraditória sobre o modelo de acesso

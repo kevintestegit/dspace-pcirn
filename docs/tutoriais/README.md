@@ -57,4 +57,4 @@ Organização inspirada em https://repositorio.ufrn.br/tutoriais: lista pública
 
 ## Aplicação à interface em uso
 
-Em 06/10/2026, a página, o link do rodapé e os cinco PDFs foram aplicados ao contêiner `dspace-angular`. A imagem local `itep/dspace-angular:tutoriais-20261006` registra a atualização; a configuração de execução existente foi atualizada para usá-la nas próximas recriações. A página publicada é `http://10.9.233.96:4000/info/tutoriais`. Foram conferidos acesso sem login, PDFs, Navegação, teclado, responsividade e auditoria de acessibilidade da página.
+Em 06/10/2026, a página, o link do rodapé e os cinco PDFs foram aplicados ao contêiner `dspace-angular`. A imagem local `itep/dspace-angular:tutoriais-20261006` registra a atualização; a configuração de execução existente foi atualizada para usá-la nas próximas recriações. A página publicada é `http://<host-de-desenvolvimento>:4000/info/tutoriais`. Foram conferidos acesso sem login, PDFs, Navegação, teclado, responsividade e auditoria de acessibilidade da página.
