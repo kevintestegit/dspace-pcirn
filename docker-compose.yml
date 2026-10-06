@@ -31,6 +31,7 @@ services:
       dspace__P__shortname: ${dspace__P__shortname:-PCIRN}
       # db.url: Ensure we are using the 'dspacedb' image for our database
       db__P__url: ${db__P__url:-jdbc:postgresql://dspacedb:5432/dspace}
+      db__P__password: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no ambiente ou no arquivo .env}
       # solr.server: Ensure we are using the 'dspacesolr' image for Solr
       solr__P__server: ${solr__P__server:-http://dspacesolr:8983/solr}
       # matomo.tracker.url: Ensure we are using the 'matomo' image for Matomo
@@ -48,15 +49,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/server/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
     depends_on:
-    - dspacedb
+      dspacedb:
+        condition: service_healthy
+      dspacesolr:
+        condition: service_healthy
     networks:
       - dspacenet
     ports:
     - published: 8501
       target: 8080
-    - published: 8500
-      target: 8000
+    - target: 8000
+      published: 8500
+      host_ip: 127.0.0.1
     volumes:
     # Keep DSpace assetstore directory between reboots
     - assetstore:/dspace/assetstore
@@ -94,12 +105,18 @@ services:
       PGDATA: /pgdata
       POSTGRES_DB: dspace
       POSTGRES_USER: dspace
-      POSTGRES_PASSWORD: dspace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no ambiente ou no arquivo .env}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dspace", "-d", "dspace"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       dspacenet:
     ports:
     - published: 55432
       target: 5432
+      host_ip: 127.0.0.1
     volumes:
     # Keep Postgres data directory between reboots
     - pgdata:/pgdata
@@ -119,6 +136,13 @@ services:
     ports:
     - published: 8984
       target: 8983
+      host_ip: 127.0.0.1
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8983/solr/admin/info/system"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     working_dir: /var/solr/data
     volumes:
     # Keep Solr data directory between reboots

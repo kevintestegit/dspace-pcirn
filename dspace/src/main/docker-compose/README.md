@@ -73,6 +73,18 @@ docker compose -f docker-compose.yml -f docker-compose-cli.yml build --build-arg
 Default is Java 11, but other LTS releases (e.g. 17) are also supported.
 
 ## Run DSpace 9 REST from your current branch
+
+Set `POSTGRES_PASSWORD` in the environment or the root `.env` file before starting Compose.
+Use a unique password and keep the file out of Git, with permissions `600`.
+The backend, CLI and PostgreSQL read the same variable. For an existing database, changing this
+variable alone does not change the database role password: update the role and the backend
+configuration together.
+
+PostgreSQL (`55432`) and Solr (`8984`) bind to `127.0.0.1`. Containers access them through
+the Docker network. Docker healthchecks monitor PostgreSQL, Solr, the REST API and Angular;
+the backend waits for the data services and Angular waits for the backend to be healthy.
+Use `docker compose ps` to inspect their status.
+
 ```
 docker compose -p d9 up -d
 ```

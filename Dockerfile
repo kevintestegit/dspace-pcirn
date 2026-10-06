@@ -60,7 +60,7 @@ COPY --from=ant_build /dspace $dspace__P__dir
 WORKDIR $dspace__P__dir
 # Need host command for "[dspace]/bin/make-handle-config"
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends host \
+    && apt-get install -y --no-install-recommends host curl \
     && apt-get purge -y --auto-remove \
     && rm -rf /var/lib/apt/lists/*
 # Expose Tomcat port (8080) & Handle Server HTTP port (8000)

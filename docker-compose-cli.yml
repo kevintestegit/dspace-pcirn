@@ -18,6 +18,7 @@ services:
       # __D__ => "-" (e.g. google__D__metadata => google-metadata)
       # db.url: Ensure we are using the 'dspacedb' image for our database
       db__P__url: ${db__P__url:-jdbc:postgresql://dspacedb:5432/dspace}
+      db__P__password: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no ambiente ou no arquivo .env}
       # solr.server: Ensure we are using the 'dspacesolr' image for Solr
       solr__P__server: ${solr__P__server:-http://dspacesolr:8983/solr}
     volumes:

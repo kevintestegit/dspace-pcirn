@@ -1,4 +1,12 @@
 .git/
+.env
+.env.*
+**/.env
+**/.env.*
+smtp.env
+**/smtp.env
+backups/
+**/*.dump
 .idea/
 .settings/
 */target/

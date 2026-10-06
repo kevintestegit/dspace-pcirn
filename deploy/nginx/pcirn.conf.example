@@ -3,6 +3,16 @@
 server {
     listen 80;
     server_name SERVER_ADDRESS;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name SERVER_ADDRESS;
+    ssl_certificate /etc/letsencrypt/live/SERVER_ADDRESS/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/SERVER_ADDRESS/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     client_max_body_size 200m;
 
