@@ -62,6 +62,13 @@ rebel.xml
 # Superpowers brainstorming mockups
 .superpowers/
 
+# Working notes and generated content derived from the institutional database.
+# docs/pcirn-publicados holds extracted metadata and abstracts of ITEP/RN
+# portarias, including the names and matrículas of servidores; it must not be
+# published. Both stay on disk and are regenerated from the database.
+docs/pcirn-publicados/
+docs/superpowers/
+
 # Video explainer: one-off promotional renderer, not part of the application
 video/
 
