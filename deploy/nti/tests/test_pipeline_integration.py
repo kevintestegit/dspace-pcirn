@@ -284,5 +284,78 @@ class ReleaseArtifactTests(unittest.TestCase):
             self.assertTrue(path.is_file(), f'applied migration missing: {script}')
 
 
+class PublishTagTests(unittest.TestCase):
+    """Which names a publication attaches to the images.
+
+    The step is executed here rather than read: the rule it applies decides
+    whether a candidate can move a tag a server may already be tracking, so it
+    is worth running against a fake docker.
+    """
+
+    FAKE_DOCKER = r'''#!/usr/bin/env python3
+import json
+import os
+import pathlib
+import sys
+
+root = pathlib.Path(os.environ['PCIRN_TAG_TEST'])
+with (root / 'calls.jsonl').open('a') as log:
+    log.write(json.dumps(sys.argv[1:]) + '\n')
+# `imagetools inspect --format '{{json .Manifest.Digest}}'` prints a quoted
+# JSON string, which the step reduces with `tr -d '"'`.
+print(json.dumps('sha256:' + 'd' * 64))
+'''
+
+    def published_tags(self, version):
+        """Run the workflow's publish step with a fake docker."""
+        import yaml
+        workflow = yaml.safe_load(
+            (REPO / '.github/workflows/publish-images.yml').read_text())
+        step = next(s for s in workflow['jobs']['publish']['steps']
+                    if s.get('name') == 'Create and push the manifest list')
+        script = (step['run']
+                  .replace('${{ needs.validate.outputs.version }}', version)
+                  .replace('${{ env.REGISTRY }}', 'ghcr.io')
+                  .replace('${{ matrix.repository }}',
+                           'kevintestegit/dspace-pcirn-backend'))
+        with tempfile.TemporaryDirectory(prefix='pcirn-tags-') as name:
+            base = Path(name)
+            digests = base / 'digests'
+            digests.mkdir()
+            for digest in ('a' * 64, 'b' * 64):
+                (digests / digest).touch()
+            binaries = base / 'bin'
+            binaries.mkdir()
+            docker = binaries / 'docker'
+            docker.write_text(self.FAKE_DOCKER)
+            docker.chmod(0o755)
+            output = base / 'github-output'
+            output.touch()
+            process = subprocess.run(
+                ['bash', '-c', script], cwd=digests, text=True, capture_output=True,
+                env=dict(os.environ,
+                         PATH=str(binaries) + os.pathsep + os.environ['PATH'],
+                         PCIRN_TAG_TEST=str(base), GITHUB_OUTPUT=str(output)))
+            self.assertEqual(process.returncode, 0, process.stderr + process.stdout)
+            calls = [json.loads(line) for line
+                     in (base / 'calls.jsonl').read_text().splitlines()]
+            create = next(args for args in calls
+                          if args[:3] == ['buildx', 'imagetools', 'create'])
+            return [create[index + 1].split(':', 1)[1]
+                    for index, value in enumerate(create) if value == '--tag']
+
+    def test_pre_release_does_not_move_the_major_tag(self):
+        # The major tag stays on the last final release: a server tracking it
+        # must never pick up a candidate.
+        self.assertEqual(self.published_tags('v1.0.0-rc1'), ['v1.0.0-rc1'])
+        self.assertEqual(self.published_tags('v1.2.0-beta.1'), ['v1.2.0-beta.1'])
+        self.assertEqual(self.published_tags('v1.2.0-alpha'), ['v1.2.0-alpha'])
+
+    def test_final_release_moves_the_major_tag(self):
+        self.assertEqual(self.published_tags('v1.0.0'), ['v1.0.0', 'v1'])
+        self.assertEqual(self.published_tags('v2.3.4'), ['v2.3.4', 'v2'])
+        self.assertEqual(self.published_tags('v10.20.30'), ['v10.20.30', 'v10'])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -48,6 +48,11 @@ construídas e enviadas. As arquiteturas são enviadas primeiro por digest
 (`push-by-digest=true`); um job separado cria o manifest list. Se uma
 arquitetura falhar, nenhuma tag é criada e a versão não existe para consumo.
 
+Uma versão final recebe também a tag da série (`v1.0.0` publica `:v1.0.0` e
+`:v1`). Uma pré-release publica apenas a própria versão (`v1.0.0-rc1` publica
+`:v1.0.0-rc1`, e nada mais): a série continua apontando para a última versão
+final, de modo que um servidor que acompanha `:v1` nunca recebe um candidato.
+
 ## Imutabilidade e digests
 
 Uma tag como `v1.0.0` é um ponteiro mutável; o que identifica os bytes é o

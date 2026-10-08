@@ -379,10 +379,15 @@ jobs:
             exit 1
           fi
           # The version tag is the only mutable name, and it is written once.
-          docker buildx imagetools create \
-            --tag "${image}:${version}" \
-            --tag "${image}:${version%%.*}" \
-            "${refs[@]}"
+          # A pre-release keeps its own tag and never moves the major one, so
+          # whatever tracks :v1 stays on the last final release. The accepted
+          # version shape only allows a suffix after "-", which is the test.
+          tags=(--tag "${image}:${version}")
+          case "${version}" in
+            *-*) ;;
+            *) tags+=(--tag "${image}:${version%%.*}") ;;
+          esac
+          docker buildx imagetools create "${tags[@]}" "${refs[@]}"
           docker buildx imagetools inspect "${image}:${version}"
           digest="$(docker buildx imagetools inspect "${image}:${version}" \
             --format '{{json .Manifest.Digest}}' | tr -d '"')"
