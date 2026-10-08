@@ -305,6 +305,31 @@ class ReleaseArtifactTests(unittest.TestCase):
         self.assertIn('release-manifest.sh', workflow)
         self.assertIn('flyway-history.json', workflow)
 
+    def test_workflow_gates_publication_on_validation(self):
+        """Publication must depend on the validate job, and build on nothing else."""
+        import yaml
+        workflow = yaml.safe_load(
+            (REPO / '.github/workflows/publish-images.yml').read_text())
+        jobs = workflow['jobs']
+        self.assertIn('validate', jobs)
+        self.assertEqual(jobs['build']['needs'], 'validate')
+        self.assertEqual(set(jobs['publish']['needs']), {'validate', 'build'})
+        self.assertEqual(set(jobs['manifest']['needs']), {'validate', 'publish'})
+        # Only the publish job attaches a tag, so one architecture failing
+        # cannot leave a partially built version pullable.
+        self.assertNotIn('tags:', json.dumps(jobs['build']))
+
+    def test_workflow_builds_every_image_for_both_architectures(self):
+        import yaml
+        workflow = yaml.safe_load(
+            (REPO / '.github/workflows/publish-images.yml').read_text())
+        entries = workflow['jobs']['build']['strategy']['matrix']['include']
+        built = {(e['image'], e['platform']) for e in entries}
+        expected = {(image, platform)
+                    for image in ('backend', 'angular', 'solr')
+                    for platform in ('linux/amd64', 'linux/arm64')}
+        self.assertEqual(built, expected)
+
     def test_published_history_covers_every_applied_migration(self):
         history = json.loads((REPO / 'scripts/flyway-history.json').read_text())
         for migration in history:

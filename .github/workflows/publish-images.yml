@@ -79,16 +79,30 @@ jobs:
         run: |
           set -euo pipefail
           # A superproject can record a submodule commit that was never pushed.
-          # Publishing then produces images nobody else can rebuild, and the
-          # install step would fail to fetch the submodule. The check queries
-          # the remote itself rather than trusting remote-tracking refs, which
-          # can be stale.
+          # The gate that actually stops that is the checkout above: with
+          # `submodules: recursive` it fetches the recorded commit by hash, and
+          # the job fails if the fork does not have it.
+          #
+          # This step states the requirement explicitly so the failure is
+          # legible, and it catches the case where the fork has the commit but
+          # no branch points at it. Note it cannot be stricter than the
+          # checkout: the working tree is at the recorded commit, so once the
+          # fork serves it, it is trivially an ancestor of the branch that
+          # carries it. A commit that is genuinely absent never reaches here.
           rev="$(git -C dspace-angular/source rev-parse HEAD)"
           # The URL comes from .gitmodules, not from the submodule's own
           # remotes: in a fresh clone `origin` there still points at upstream
           # DSpace, which would validate the wrong repository.
           url="$(git config --file .gitmodules --get submodule.dspace-angular/source.url)"
           echo "Angular submodule ${rev} from ${url}"
+
+          # A branch containing the commit must exist; equality with a branch
+          # tip is the case the checkout just proved.
+          if git ls-remote --heads "${url}" | awk '{print $1}' | grep -qx "${rev}"; then
+            echo "A branch of ${url} points at ${rev}."
+            exit 0
+          fi
+
           found=0
           while read -r head; do
             if git -C dspace-angular/source merge-base --is-ancestor "${rev}" "${head}" 2>/dev/null; then
@@ -97,10 +111,10 @@ jobs:
             fi
           done < <(git ls-remote --heads "${url}" | awk '{print $1}')
           if [ "${found}" -eq 0 ]; then
-            echo "::error::submodule commit ${rev} is not reachable from any branch of ${url}; push it first"
+            echo "::error::submodule commit ${rev} is not on any branch of ${url}; push the Angular fork before tagging"
             exit 1
           fi
-          echo "Submodule commit is reachable from a remote branch."
+          echo "Submodule commit is on a branch of the fork."
 
       - name: Confirm applied migrations are still present
         run: |
