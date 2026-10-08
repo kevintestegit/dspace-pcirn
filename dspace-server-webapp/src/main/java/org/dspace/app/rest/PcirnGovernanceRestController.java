@@ -10,8 +10,10 @@ package org.dspace.app.rest;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.dspace.app.rest.exception.UnprocessableEntityException;
@@ -63,6 +65,7 @@ public class PcirnGovernanceRestController {
     private static final String CURATION_GROUP_NAME = "NUGECID";
     private static final String MODE_PUBLIC = "public";
     private static final String MODE_RESTRICTED = "restricted";
+    private static final String GOVERNANCE_POLICY_NAME = "pcirn-governance";
 
     private final CommunityService communityService;
     private final CollectionService collectionService;
@@ -178,6 +181,36 @@ public class PcirnGovernanceRestController {
             Group sectorGroup = findGroup(context, request.sectorGroup());
             validateSectorGroup(sectorGroup, anonymous, administrator);
             Group readGroup = resolveCollectionReadGroup(context, collection, sectorGroup, anonymous, administrator);
+            List<ResourcePolicy> formerBindings = new ArrayList<>();
+            boolean unidentifiedBinding = false;
+            Set<UUID> knownSectors = new HashSet<>();
+            for (Community community : communityService.findAll(context)) {
+                Group group = findSectorGroup(context, community, anonymous, administrator);
+                if (group != null) {
+                    knownSectors.add(group.getID());
+                }
+            }
+            for (ResourcePolicy policy : resourcePolicyService.find(context, collection, Constants.ADD)) {
+                Group group = policy.getGroup();
+                if (isGovernancePolicy(policy) && group != null
+                    && !group.getID().equals(sectorGroup.getID()) && !group.getID().equals(anonymous.getID())
+                    && (administrator == null || !group.getID().equals(administrator.getID()))
+                    && !CURATION_GROUP_NAME.equals(group.getName())) {
+                    if (GOVERNANCE_POLICY_NAME.equals(policy.getRpName()) || knownSectors.contains(group.getID())) {
+                        formerBindings.add(policy);
+                    } else {
+                        unidentifiedBinding = true;
+                    }
+                }
+            }
+            if (formerBindings.stream().map(policy -> policy.getGroup().getID()).distinct().count() > 1
+                || formerBindings.isEmpty() && unidentifiedBinding) {
+                throw new UnprocessableEntityException("Collection has ambiguous previous sector permissions");
+            }
+            for (ResourcePolicy policy : formerBindings) {
+                applyCollectionRead(context, collection, policy.getGroup(), readGroup);
+                resourcePolicyService.delete(context, policy);
+            }
             Group previousReadGroup = anonymous.getID().equals(readGroup.getID()) ? sectorGroup : anonymous;
             applyCollectionRead(context, collection, previousReadGroup, readGroup);
             ensurePolicy(context, collection, sectorGroup, Constants.ADD);
@@ -206,10 +239,13 @@ public class PcirnGovernanceRestController {
         throws SQLException {
         Group publishGroup = null;
         List<ResourcePolicy> policies = new ArrayList<>(resourcePolicyService.find(context, collection, Constants.ADD));
-        policies.sort(Comparator.comparing(policy -> policy.getGroup() == null ? "" : policy.getGroup().getName()));
+        policies.sort(Comparator.comparing((ResourcePolicy policy) ->
+            !GOVERNANCE_POLICY_NAME.equals(policy.getRpName())).thenComparing(policy ->
+                policy.getGroup() == null ? "" : policy.getGroup().getName()));
         for (ResourcePolicy policy : policies) {
             Group group = policy.getGroup();
-            if (group == null || administrator != null && group.getID().equals(administrator.getID())) {
+            if (!isGovernancePolicy(policy) || group == null || CURATION_GROUP_NAME.equals(group.getName())
+                || administrator != null && group.getID().equals(administrator.getID())) {
                 continue;
             }
             publishGroup = group;
@@ -263,8 +299,10 @@ public class PcirnGovernanceRestController {
         throws SQLException, AuthorizeException {
         if (from != null) {
             for (ResourcePolicy policy : resourcePolicyService.find(context, dso, action)) {
-                if (policy.getGroup() != null && policy.getGroup().getID().equals(from.getID())) {
+                if (isGovernancePolicy(policy) && policy.getGroup() != null
+                    && policy.getGroup().getID().equals(from.getID())) {
                     policy.setGroup(to);
+                    policy.setRpName(GOVERNANCE_POLICY_NAME);
                     resourcePolicyService.update(context, policy);
                 }
             }
@@ -272,20 +310,36 @@ public class PcirnGovernanceRestController {
         ensurePolicy(context, dso, to, action);
     }
 
+    private boolean isGovernancePolicy(ResourcePolicy policy) {
+        return !ResourcePolicy.TYPE_CUSTOM.equals(policy.getRpType())
+            && (policy.getRpName() == null || GOVERNANCE_POLICY_NAME.equals(policy.getRpName()))
+            && policy.getEPerson() == null && policy.getStartDate() == null && policy.getEndDate() == null;
+    }
+
     private void ensurePolicy(Context context, DSpaceObject dso, Group group, int action)
         throws SQLException, AuthorizeException {
         if (group == null) {
             return;
         }
-        if (authorizeService.findByTypeGroupAction(context, dso, group, action) == null) {
-            authorizeService.addPolicy(context, dso, action, group);
+        for (ResourcePolicy policy : resourcePolicyService.find(context, dso, action)) {
+            if (isGovernancePolicy(policy) && policy.getGroup() != null
+                && policy.getGroup().getID().equals(group.getID())) {
+                if (action == Constants.ADD) {
+                    policy.setRpName(GOVERNANCE_POLICY_NAME);
+                    resourcePolicyService.update(context, policy);
+                }
+                return;
+            }
         }
+        ResourcePolicy policy = authorizeService.createResourcePolicy(context, dso, group, null, action, null);
+        policy.setRpName(GOVERNANCE_POLICY_NAME);
+        resourcePolicyService.update(context, policy);
     }
 
     private Group resolveCollectionReadGroup(Context context, Collection collection, Group requested,
                                              Group anonymous, Group administrator) throws SQLException {
         Group restricted = null;
-        for (Community community : collection.getCommunities()) {
+        for (Community community : communityService.getAllParents(context, collection)) {
             Group sectorGroup = findSectorGroup(context, community, anonymous, administrator);
             if (sectorGroup != null && !hasAnonymousRead(context, community, anonymous)) {
                 if (!sectorGroup.getID().equals(requested.getID())) {
@@ -301,11 +355,14 @@ public class PcirnGovernanceRestController {
     private Group findSectorGroup(Context context, Community community, Group anonymous, Group administrator)
         throws SQLException {
         List<ResourcePolicy> policies = new ArrayList<>(resourcePolicyService.find(context, community, Constants.READ));
-        policies.sort(Comparator.comparing(policy -> policy.getGroup() == null ? "" : policy.getGroup().getName()));
+        policies.sort(Comparator.comparing((ResourcePolicy policy) ->
+            !GOVERNANCE_POLICY_NAME.equals(policy.getRpName())).thenComparing(policy ->
+                policy.getGroup() == null ? "" : policy.getGroup().getName()));
         Group sectorGroup = null;
         for (ResourcePolicy policy : policies) {
             Group group = policy.getGroup();
-            if (group == null || group.getID().equals(anonymous.getID())) {
+            if (!isGovernancePolicy(policy) || group == null || CURATION_GROUP_NAME.equals(group.getName())
+                || group.getID().equals(anonymous.getID())) {
                 continue;
             }
             if (administrator != null && group.getID().equals(administrator.getID())) {
@@ -319,7 +376,8 @@ public class PcirnGovernanceRestController {
 
     private boolean hasAnonymousRead(Context context, DSpaceObject dso, Group anonymous) throws SQLException {
         for (ResourcePolicy policy : resourcePolicyService.find(context, dso, Constants.READ)) {
-            if (policy.getGroup() != null && policy.getGroup().getID().equals(anonymous.getID())) {
+            if (isGovernancePolicy(policy) && policy.getGroup() != null
+                && policy.getGroup().getID().equals(anonymous.getID())) {
                 return true;
             }
         }
