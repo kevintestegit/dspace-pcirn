@@ -43,14 +43,20 @@ dspacepcirn status --root /srv/dspacepcirn
 ```
 
 Os binários ficam em `ROOT/bin`, a configuração em `ROOT/config.json`, o Compose
-em `ROOT/compose.yml`, a configuração complementar em `ROOT/dspace/config/local.cfg`
-e os dados em `ROOT/data/{assetstore,solr}`. O projeto Compose deriva do hash do
-caminho absoluto, isolando instalações em diretórios diferentes. As portas padrão
-são 127.0.0.1:8501 e 127.0.0.1:4000; o NTI configura o proxy TLS conforme
+em `ROOT/compose.yml`, a configuração complementar em `ROOT/dspace/config/local.cfg`,
+o e-mail em `ROOT/smtp.env` e os dados em `ROOT/data/{assetstore,solr}`. O
+projeto Compose deriva do hash do caminho absoluto, isolando instalações em
+diretórios diferentes. As portas padrão são 127.0.0.1:8501 e 127.0.0.1:4000; o
+NTI configura o proxy TLS conforme
 [exemplo existente](../nginx/pcirn.conf.example). Em hosts com outra stack usando
 essas portas, use outro host ou ajuste o Compose dedicado antes do start,
 incluindo portas, subnet e trusted proxy range juntos para evitar sobreposição
 de redes Docker (o padrão é 10.250.50.0/24).
+
+O backend carrega `ROOT/smtp.env` como `env_file`. O install cria o arquivo a
+partir de `smtp.env.example` — com o envio desabilitado — e nunca o sobrescreve;
+preencha o SMTP institucional e remova `mail__P__server__P__disabled` para
+habilitar as notificações. O arquivo precisa existir para o Compose subir.
 
 Arquivos existentes nunca são sobrescritos por install. Configuração fornecida
 que divergir da existente causa erro. A segunda instalação da mesma release apenas
@@ -180,6 +186,9 @@ bash -n install.sh deploy/nti/dspacepcirn
 Executáveis simulados verificam a CLI por subprocessos, sem daemon Docker ou banco.
 Incluem falhas em pull, dump, migration, conexão, health e restore, corrupção de
 backup, autorização, concorrência, proteção de credenciais e travessia de archives.
+`test_production_operations.py` cobre a superfície fora da CLI — entrypoint do
+Compose, `scripts/backup-dspace.sh`, publicação manual e SMTP — e usa o Docker
+apenas para renderizar configurações; sem o CLI do Docker esses casos são pulados.
 Referências técnicas: [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
 [interpolação Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
 e [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).

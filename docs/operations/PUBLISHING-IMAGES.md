@@ -27,7 +27,11 @@ Somente tags que casam com `vMAJOR.MINOR.PATCH`, opcionalmente com sufixo
 uma versão entra em produção é o NTI, executando o pull da versão escolhida.
 
 Também pode ser disparado manualmente (`workflow_dispatch`) informando uma tag
-que já exista.
+que já exista. O job `validate` resolve a tag para `refs/tags/<tag>` e todos os
+jobs fazem checkout **desse** ref, nunca do topo do branch em que o workflow foi
+iniciado; o manifesto registra o commit que foi construído, não o `GITHUB_SHA`
+do evento. Publicar manualmente uma tag antiga não pode, portanto, etiquetar
+código novo com a versão antiga.
 
 ## Portões antes da publicação
 
@@ -100,7 +104,8 @@ tag. É isso que torna o rollback confiável: o manifesto diz qual digest foi
 publicado para cada versão.
 
 `source` e `createdAt` são chaves extras; a CLI ignora o que não conhece e elas
-servem para registrar qual commit produziu as imagens.
+servem para registrar qual commit produziu as imagens. O `source.commit` é o
+commit do ref publicado — o `HEAD` do checkout da tag.
 
 As imagens também levam proveniência e SBOM (`provenance: true`, `sbom: true`),
 consultáveis com:

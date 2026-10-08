@@ -19,6 +19,12 @@ cp smtp.env.example smtp.env
 chmod 600 .env.production smtp.env
 ```
 
+Os dois arquivos precisam existir: o Compose carrega `smtp.env` como `env_file`
+do serviço `dspace` e recusa subir sem ele. As chaves usam o mapeamento de
+ambiente do DSpace (`mail__P__server` é `mail.server`), o mesmo do stack de
+desenvolvimento. Enquanto o SMTP institucional não estiver definido, mantenha
+`mail__P__server__P__disabled=true`, como no exemplo.
+
 Preencher em `.env.production`, no mínimo: `DB_URL`, `DB_USERNAME`,
 `DB_PASSWORD`, `PUBLIC_UI_URL`, `PUBLIC_REST_URL`, `PUBLIC_REST_HOST`,
 `ASSETSTORE_PATH` e as três imagens versionadas. A stack se recusa a subir se
@@ -108,6 +114,10 @@ docker compose -f docker-compose.yml --env-file .env.production \
   run --rm dspace /dspace/bin/dspace <comando>
 ```
 
+Em ambos os casos o comando e seus argumentos chegam ao DSpace: o entrypoint do
+serviço executa o que recebe em vez da aplicação quando há um comando, então
+`database info` e `database migrate` fazem o que dizem.
+
 Reconstrução do índice de busca, necessária quando a configuração de descoberta
 muda:
 
@@ -154,13 +164,36 @@ scripts/backup-dspace.sh /var/backups/dspace
 ```
 
 O script detecta o modo: com o container `dspacedb` em execução faz o dump pelo
-container; sem ele, usa um cliente PostgreSQL descartável contra o banco do NTI,
-lendo `DB_URL` e `DB_PASSWORD` de `.env.production`. Grava `dspace.dump`,
-`assetstore.tar.gz` e `SHA256SUMS`, validando os dois artefatos antes de
-publicá-los.
+container; sem ele, usa um cliente PostgreSQL descartável contra o banco do NTI.
+Em produção `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` e `ASSETSTORE_PATH` vêm de
+`.env.production` lido **pelo Compose**, e não por `source`: os valores são
+exatamente os que a stack usa, e nada no arquivo é executado como shell.
 
-Guardar os três arquivos juntos. O índice Solr é derivado e pode ser
-reconstruído com `index-discovery -b`.
+Os parâmetros TLS de `DB_URL` — `sslmode`, `sslrootcert`, `sslcert`, `sslkey` —
+são repassados ao cliente, com os certificados montados somente leitura no
+mesmo caminho. Um parâmetro JDBC que o cliente não sabe usar interrompe o backup
+em vez de ser descartado em silêncio.
+
+Grava quatro arquivos, validando os três primeiros antes de publicá-los:
+
+| arquivo | conteúdo |
+|---|---|
+| `dspace.dump` | dump custom do PostgreSQL |
+| `assetstore.tar.gz` | bitstreams |
+| `solr-statistics.tar.gz` | core `statistics` do Solr |
+| `SHA256SUMS` | SHA-256 dos três |
+
+Guardar os quatro juntos. O índice de busca é derivado e pode ser reconstruído
+com `index-discovery -b`; as estatísticas de uso **não** são. O core
+`statistics` é o único registro de visualizações e downloads, então ele é
+arquivado separadamente e restaurado junto com o banco e o assetstore, com a
+stack parada:
+
+```bash
+docker compose -f docker-compose.yml --env-file .env.production \
+  run --rm --no-deps -v "$PWD/solr-statistics.tar.gz:/restore.tar.gz:ro" \
+  --entrypoint tar dspacesolr -C /var/solr/data -xzf /restore.tar.gz
+```
 
 ## Aceite antes da publicação
 
