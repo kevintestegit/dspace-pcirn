@@ -1,0 +1,404 @@
+# Builds and publishes the PCIRN images to GitHub Container Registry.
+#
+# Triggered only by version tags (v1.2.3, v1.2.3-rc1). Pushing to a branch
+# never publishes: the NTI decides when a version goes to production.
+#
+# Each architecture is built on its own runner and pushed by digest, then the
+# digests are combined into one manifest list per image. Consumers therefore
+# pull a tag that resolves to an immutable multi-arch digest, and the release
+# manifest records the exact digests that were published.
+#
+# Required repository secrets: none. Authentication uses the workflow's own
+# GITHUB_TOKEN with packages:write.
+name: Publish images
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish (e.g. v1.0.0)'
+        required: true
+        type: string
+
+# Deny by default; each job requests only what it needs.
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ${{ github.repository_owner }}/dspace-pcirn-backend
+  ANGULAR_IMAGE: ${{ github.repository_owner }}/dspace-pcirn-angular
+  SOLR_IMAGE: ${{ github.repository_owner }}/dspace-pcirn-solr
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate. Nothing is built or published until this passes.
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout codebase with the Angular submodule
+        uses: actions/checkout@v7
+        with:
+          # The Angular image is built from the submodule; without this the
+          # build would have no source.
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Resolve and check the version
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_TAG}" ]; then
+            tag="${INPUT_TAG}"
+            git rev-parse --verify "refs/tags/${tag}" >/dev/null \
+              || { echo "::error::tag ${tag} does not exist"; exit 1; }
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          # A release version is immutable, so the shape is enforced here
+          # rather than discovered later by whoever pulls the image.
+          if ! printf '%s' "${tag}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::'${tag}' is not a version tag (expected vMAJOR.MINOR.PATCH)"
+            exit 1
+          fi
+          echo "version=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Publishing ${tag} from $(git rev-parse HEAD)"
+
+      - name: Confirm the submodule commit is available
+        run: |
+          set -euo pipefail
+          # A superproject can record a submodule commit that was never pushed.
+          # Publishing then produces images nobody else can rebuild, and the
+          # install step would fail to fetch the submodule. The check queries
+          # the remote itself rather than trusting remote-tracking refs, which
+          # can be stale.
+          rev="$(git -C dspace-angular/source rev-parse HEAD)"
+          # The URL comes from .gitmodules, not from the submodule's own
+          # remotes: in a fresh clone `origin` there still points at upstream
+          # DSpace, which would validate the wrong repository.
+          url="$(git config --file .gitmodules --get submodule.dspace-angular/source.url)"
+          echo "Angular submodule ${rev} from ${url}"
+          found=0
+          while read -r head; do
+            if git -C dspace-angular/source merge-base --is-ancestor "${rev}" "${head}" 2>/dev/null; then
+              found=1
+              break
+            fi
+          done < <(git ls-remote --heads "${url}" | awk '{print $1}')
+          if [ "${found}" -eq 0 ]; then
+            echo "::error::submodule commit ${rev} is not reachable from any branch of ${url}; push it first"
+            exit 1
+          fi
+          echo "Submodule commit is reachable from a remote branch."
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and run the unit tests
+        # The same gate the branch build uses. A tag that does not compile or
+        # fails its tests must not reach the registry.
+        run: >
+          mvn --no-transfer-progress -V install -P-assembly
+          -DskipUnitTests=false -Dsurefire.rerunFailingTestsCount=2
+
+  # ---------------------------------------------------------------------------
+  # Per-architecture builds. Each pushes by digest and exports that digest.
+  # ---------------------------------------------------------------------------
+  build:
+    name: ${{ matrix.image }} (${{ matrix.arch }})
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The backend image is the DSpace application; the Angular image is
+          # built from the submodule; the Solr image carries this repository's
+          # search configsets, which production depends on.
+          - image: backend
+            arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - image: backend
+            arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - image: angular
+            arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - image: angular
+            arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          - image: solr
+            arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - image: solr
+            arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout codebase with the Angular submodule
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        # Only needed if the runner cannot run the target architecture natively.
+        if: matrix.arch == 'arm64' && matrix.runner == 'ubuntu-latest'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ${{ env.REGISTRY }}
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the build inputs
+        id: inputs
+        run: |
+          set -euo pipefail
+          case "${{ matrix.image }}" in
+            angular)
+              {
+                echo "context=dspace-angular/source"
+                echo "file=dspace-angular/source/Dockerfile.dist"
+                echo "repository=${ANGULAR_IMAGE}"
+                echo "contexts="
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            solr)
+              {
+                echo "context=dspace/src/main/docker/dspace-solr"
+                echo "file=dspace/src/main/docker/dspace-solr/Dockerfile"
+                echo "repository=${SOLR_IMAGE}"
+                # The Dockerfile copies its configsets from a named build
+                # context, which compose supplies through
+                # additional_contexts and this workflow through build-contexts.
+                echo "contexts=solrconfigs=./dspace/solr/"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              {
+                echo "context=."
+                echo "file=Dockerfile"
+                echo "repository=${BACKEND_IMAGE}"
+                echo "contexts="
+              } >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ steps.inputs.outputs.context }}
+          file: ${{ steps.inputs.outputs.file }}
+          build-contexts: ${{ steps.inputs.outputs.contexts }}
+          platforms: ${{ matrix.platform }}
+          # Pushed by digest only. The human-facing tags are attached to the
+          # manifest list once every architecture is present.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ steps.inputs.outputs.repository }},push-by-digest=true,name-canonical=true,push=true
+          # Provenance and SBOM are attached to the image, so a consumer can
+          # verify how it was built.
+          provenance: true
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+
+      - name: Export the digest
+        run: |
+          set -euo pipefail
+          digest="${{ steps.build.outputs.digest }}"
+          [ -n "${digest}" ] || { echo "::error::no digest produced"; exit 1; }
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload the digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.image }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # Combine the per-architecture digests into one manifest list per image and
+  # attach the version tag. This is the only step that creates a pullable tag.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            repository: ${{ github.repository_owner }}/dspace-pcirn-backend
+          - image: angular
+            repository: ${{ github.repository_owner }}/dspace-pcirn-angular
+          - image: solr
+            repository: ${{ github.repository_owner }}/dspace-pcirn-solr
+    steps:
+      - name: Download the digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digest-${{ matrix.image }}-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ${{ env.REGISTRY }}
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push the manifest list
+        id: manifest
+        working-directory: /tmp/digests
+        run: |
+          set -euo pipefail
+          version="${{ needs.validate.outputs.version }}"
+          image="${{ env.REGISTRY }}/${{ matrix.repository }}"
+          refs=()
+          for digest in *; do
+            refs+=("${image}@sha256:${digest}")
+          done
+          if [ "${#refs[@]}" -lt 2 ]; then
+            echo "::error::expected amd64 and arm64 digests, found ${#refs[@]}"
+            exit 1
+          fi
+          # The version tag is the only mutable name, and it is written once.
+          docker buildx imagetools create \
+            --tag "${image}:${version}" \
+            --tag "${image}:${version%%.*}" \
+            "${refs[@]}"
+          docker buildx imagetools inspect "${image}:${version}"
+          digest="$(docker buildx imagetools inspect "${image}:${version}" \
+            --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Record the published digest
+        run: |
+          mkdir -p /tmp/published
+          printf '%s %s\n' \
+            "${{ matrix.image }}" \
+            "${{ steps.manifest.outputs.digest }}" \
+            > "/tmp/published/${{ matrix.image }}.txt"
+          cat "/tmp/published/${{ matrix.image }}.txt"
+
+      - name: Upload the published digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: published-${{ matrix.image }}
+          path: /tmp/published/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Release manifest: version, commit, digests per architecture.
+  # ---------------------------------------------------------------------------
+  manifest:
+    name: Release manifest
+    needs: [validate, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Checkout codebase with the Angular submodule
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Download the published digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: published-*
+          path: /tmp/published
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ${{ env.REGISTRY }}
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate the release manifest
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          scripts/release-manifest.sh \
+            --version "${VERSION}" \
+            --commit "${GITHUB_SHA}" \
+            --angular-commit "$(git -C dspace-angular/source rev-parse HEAD)" \
+            --backend-digest "$(awk '{print $2}' /tmp/published/backend.txt)" \
+            --angular-digest "$(awk '{print $2}' /tmp/published/angular.txt)" \
+            --solr-digest "$(awk '{print $2}' /tmp/published/solr.txt)" \
+            --output release-manifest.json
+          cat release-manifest.json
+
+      - name: Upload the manifest
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-manifest
+          path: release-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attach the manifest to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          files: release-manifest.json
+          generate_release_notes: true
+          body: |
+            Images published to GitHub Container Registry:
+
+            - `ghcr.io/${{ env.BACKEND_IMAGE }}:${{ needs.validate.outputs.version }}`
+            - `ghcr.io/${{ env.ANGULAR_IMAGE }}:${{ needs.validate.outputs.version }}`
+
+            Both are multi-architecture manifest lists covering `linux/amd64`
+            and `linux/arm64`. `release-manifest.json` records the source commit
+            and the digest of each image, so a deployment can pin the exact
+            bytes it runs.
