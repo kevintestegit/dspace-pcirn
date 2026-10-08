@@ -30,7 +30,7 @@ volumes:
 
 services:
   dspace:
-    image: "${DSPACE_IMAGE:?Defina DSPACE_IMAGE com a imagem versionada do backend}"
+    image: "${DSPACE_IMAGE:?Set DSPACE_IMAGE to the versioned backend image}"
     restart: unless-stopped
     environment:
       # dspace.cfg is overridden through environment variables. The mapping is
@@ -42,14 +42,14 @@ services:
       dspace__P__shortname: ${DSPACE_SHORTNAME:-PCIRN}
       # Public URLs are served by the reverse proxy; internal ports must not
       # appear here.
-      dspace__P__server__P__url: ${PUBLIC_REST_URL:?Defina PUBLIC_REST_URL em .env.production}
-      dspace__P__ui__P__url: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL em .env.production}
+      dspace__P__server__P__url: ${PUBLIC_REST_URL:?Set PUBLIC_REST_URL in .env.production}
+      dspace__P__ui__P__url: ${PUBLIC_UI_URL:?Set PUBLIC_UI_URL in .env.production}
       # SSR resolves the backend by container name over the Compose network.
       dspace__P__server__P__ssr__P__url: http://dspace:8080/server
       # External PostgreSQL administered by the NTI.
-      db__P__url: ${DB_URL:?Defina DB_URL em .env.production}
-      db__P__username: ${DB_USERNAME:?Defina DB_USERNAME em .env.production}
-      db__P__password: ${DB_PASSWORD:?Defina DB_PASSWORD em .env.production}
+      db__P__url: ${DB_URL:?Set DB_URL in .env.production}
+      db__P__username: ${DB_USERNAME:?Set DB_USERNAME in .env.production}
+      db__P__password: ${DB_PASSWORD:?Set DB_PASSWORD in .env.production}
       solr__P__server: http://dspacesolr:8983/solr
       proxies__P__trusted__P__ipranges: ${TRUSTED_PROXY_NETWORK:-10.250.50}
       LOGGING_CONFIG: /dspace/config/log4j2-container.xml
@@ -77,11 +77,25 @@ services:
     volumes:
       # The assetstore is state and must outlive every image. In production it
       # is a bind mount so it can be inspected, backed up and moved with rsync.
-      - ${ASSETSTORE_PATH:?Defina ASSETSTORE_PATH em .env.production}:/dspace/assetstore
+      - ${ASSETSTORE_PATH:?Set ASSETSTORE_PATH in .env.production}:/dspace/assetstore
       # DSpace reads its configuration from the image. The operator's local.cfg
       # is layered on top from outside the image, so settings can change
       # without rebuilding and no local configuration is ever baked in.
-      - ${LOCAL_CFG_PATH:?Defina LOCAL_CFG_PATH em .env.production}:/dspace/config/local.cfg:ro
+      #
+      # The default resolves against the Compose project directory, which is
+      # what the NTI installer uses: it writes <root>/dspace/config/local.cfg
+      # and runs Compose with --project-directory <root>. An operator
+      # deploying by hand sets LOCAL_CFG_PATH to a path outside the repository.
+      #
+      # create_host_path: false is deliberate. Without it Compose silently
+      # creates a directory when the path is missing, and DSpace would start
+      # against an empty config directory instead of failing.
+      - type: bind
+        source: ${LOCAL_CFG_PATH:-./dspace/config/local.cfg}
+        target: /dspace/config/local.cfg
+        read_only: true
+        bind:
+          create_host_path: false
     # No database wait and no migration: the entrypoint only starts the
     # application. A failed connection or a pending migration surfaces as a
     # startup error instead of an endless loop.
@@ -99,7 +113,7 @@ services:
         exec java -jar /dspace/webapps/server-boot.jar
 
   dspacesolr:
-    image: "${SOLR_IMAGE:?Defina SOLR_IMAGE com a imagem versionada do Solr}"
+    image: "${SOLR_IMAGE:?Set SOLR_IMAGE to the versioned Solr image}"
     restart: unless-stopped
     networks:
       dspacenet:
@@ -138,7 +152,7 @@ services:
         runuser -u solr -- solr-foreground
 
   dspace-angular:
-    image: "${ANGULAR_IMAGE:?Defina ANGULAR_IMAGE com a imagem versionada do frontend}"
+    image: "${ANGULAR_IMAGE:?Set ANGULAR_IMAGE to the versioned frontend image}"
     restart: unless-stopped
     depends_on:
       dspace:
@@ -149,9 +163,9 @@ services:
       DSPACE_UI_HOST: 0.0.0.0
       DSPACE_UI_PORT: 4000
       DSPACE_UI_NAMESPACE: /
-      DSPACE_UI_BASEURL: ${PUBLIC_UI_URL:?Defina PUBLIC_UI_URL em .env.production}
+      DSPACE_UI_BASEURL: ${PUBLIC_UI_URL:?Set PUBLIC_UI_URL in .env.production}
       DSPACE_REST_SSL: "true"
-      DSPACE_REST_HOST: ${PUBLIC_REST_HOST:?Defina PUBLIC_REST_HOST em .env.production}
+      DSPACE_REST_HOST: ${PUBLIC_REST_HOST:?Set PUBLIC_REST_HOST in .env.production}
       DSPACE_REST_PORT: 443
       DSPACE_REST_NAMESPACE: /server
       DSPACE_REST_SSRBASEURL: http://dspace:8080/server
