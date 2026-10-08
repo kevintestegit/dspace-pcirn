@@ -7,6 +7,14 @@ smtp.env
 **/smtp.env
 backups/
 **/*.dump
+# local.cfg is the operator's own configuration and is gitignored, but the
+# Dockerfile copies the whole tree, so without this the database password, the
+# personal addresses and the development host end up inside the published
+# image. Production mounts local.cfg from the host instead.
+dspace/config/local.cfg
+# The Angular runtime config is generated per environment. The local copy
+# carries the development host and must not be compiled into the bundle.
+dspace-angular/source/src/assets/config.json
 .idea/
 .settings/
 */target/
