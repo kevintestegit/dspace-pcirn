@@ -46,24 +46,61 @@ arquitetura falhar, nenhuma tag é criada e a versão não existe para consumo.
 
 ## Imutabilidade e digests
 
-Uma tag como `v1.0.0` é um ponteiro mutável. O que identifica os bytes é o
-digest. O `release-manifest.json`, anexado à release, registra:
+Uma tag como `v1.0.0` é um ponteiro mutável; o que identifica os bytes é o
+digest. O `release-manifest.json`, anexado à release, é o **contrato consumido
+pelo instalador do NTI** (`deploy/nti/README.md`, seção "Contrato esperado do
+pipeline GHCR"):
 
 ```json
 {
-  "version": "v1.0.0",
-  "source": { "commit": "...", "angularCommit": "..." },
-  "images": [
-    { "name": "backend", "repository": "ghcr.io/<owner>/dspace-pcirn-backend",
-      "digest": "sha256:...", "reference": "ghcr.io/<owner>/dspace-pcirn-backend@sha256:..." }
-  ],
-  "platforms": ["linux/amd64", "linux/arm64"]
+  "schema_version": 1,
+  "version": "1.0.0",
+  "images": {
+    "backend":  "ghcr.io/<owner>/dspace-pcirn-backend@sha256:<64 hex>",
+    "solr":     "ghcr.io/<owner>/dspace-pcirn-solr@sha256:<64 hex>",
+    "frontend": "ghcr.io/<owner>/dspace-pcirn-angular@sha256:<64 hex>"
+  },
+  "database": {
+    "migrations": [
+      { "version": "9.4.2026.09.23",
+        "script": "V9.4_2026.09.23__pcirn_memoria_institucional_collection.sql",
+        "checksum": 20958078 }
+    ]
+  }
 }
+```
+
+Pontos que a CLI do instalador verifica e que o pipeline precisa respeitar:
+
+- `version` é SemVer **sem** o `v` da tag; `images` só aceita
+  `ghcr.io/<minusculas>/<nome>@sha256:<64 hex>`, nunca tag ou `latest`;
+- as três chaves — `backend`, `solr`, `frontend` — são obrigatórias;
+- `database.migrations` traz o histórico Flyway completo, com `version` em
+  pontos, `script` e `checksum` como persistidos em `public.schema_version`.
+  Checksum **não** é derivável de SHA-256 do SQL: o Flyway usa o próprio
+  algoritmo e migrations Java valem `-1`. Por isso o histórico é extraído do
+  banco por `scripts/flyway-history.sh` e versionado em
+  `scripts/flyway-history.json`;
+- a CLI compara esse histórico linha a linha contra o banco do NTI e **recusa a
+  atualização** se divergir. Logo, alterar uma migration já aplicada quebra a
+  instalação — e é por isso que as nove migrações PCIRN estão congeladas.
+
+O job `validate` falha se alguma migration listada em `flyway-history.json`
+tiver desaparecido do repositório. Ao adicionar uma migration nova, regenere o
+arquivo:
+
+```bash
+scripts/flyway-history.sh \
+  --database-url "jdbc:postgresql://HOST:5432/dspace" \
+  --output scripts/flyway-history.json
 ```
 
 Para fixar a versão exata em produção, use `repository@sha256:...` no lugar da
 tag. É isso que torna o rollback confiável: o manifesto diz qual digest foi
 publicado para cada versão.
+
+`source` e `createdAt` são chaves extras; a CLI ignora o que não conhece e elas
+servem para registrar qual commit produziu as imagens.
 
 As imagens também levam proveniência e SBOM (`provenance: true`, `sbom: true`),
 consultáveis com:

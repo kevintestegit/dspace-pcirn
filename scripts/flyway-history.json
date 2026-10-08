@@ -1,0 +1,437 @@
+[
+  {
+    "version": "1",
+    "script": "<< Flyway Baseline >>",
+    "checksum": null
+  },
+  {
+    "version": "1.1",
+    "script": "V1.1__Initial_DSpace_1.1_database_schema.sql",
+    "checksum": 1147897299
+  },
+  {
+    "version": "1.2",
+    "script": "V1.2__Upgrade_to_DSpace_1.2_schema.sql",
+    "checksum": 903973515
+  },
+  {
+    "version": "1.3",
+    "script": "V1.3__Upgrade_to_DSpace_1.3_schema.sql",
+    "checksum": -783235991
+  },
+  {
+    "version": "1.3.9",
+    "script": "org.dspace.storage.rdbms.migration.V1_3_9__Drop_constraint_for_DSpace_1_4_schema",
+    "checksum": -1
+  },
+  {
+    "version": "1.4",
+    "script": "V1.4__Upgrade_to_DSpace_1.4_schema.sql",
+    "checksum": -831219528
+  },
+  {
+    "version": "1.5",
+    "script": "V1.5__Upgrade_to_DSpace_1.5_schema.sql",
+    "checksum": -1234304544
+  },
+  {
+    "version": "1.5.9",
+    "script": "org.dspace.storage.rdbms.migration.V1_5_9__Drop_constraint_for_DSpace_1_6_schema",
+    "checksum": -1
+  },
+  {
+    "version": "1.6",
+    "script": "V1.6__Upgrade_to_DSpace_1.6_schema.sql",
+    "checksum": -495469766
+  },
+  {
+    "version": "1.7",
+    "script": "V1.7__Upgrade_to_DSpace_1.7_schema.sql",
+    "checksum": -589640641
+  },
+  {
+    "version": "1.8",
+    "script": "V1.8__Upgrade_to_DSpace_1.8_schema.sql",
+    "checksum": -171791117
+  },
+  {
+    "version": "3.0",
+    "script": "V3.0__Upgrade_to_DSpace_3.x_schema.sql",
+    "checksum": -1098885663
+  },
+  {
+    "version": "4.0",
+    "script": "V4.0__Upgrade_to_DSpace_4.x_schema.sql",
+    "checksum": 1191833374
+  },
+  {
+    "version": "4.9.2015.10.26",
+    "script": "V4.9_2015.10.26__DS-2818_registry_update.sql",
+    "checksum": 1675451156
+  },
+  {
+    "version": "5.0.2014.08.08",
+    "script": "V5.0_2014.08.08__DS-1945_Helpdesk_Request_a_Copy.sql",
+    "checksum": -1208221648
+  },
+  {
+    "version": "5.0.2014.09.25",
+    "script": "org.dspace.storage.rdbms.migration.V5_0_2014_09_25__DS_1582_Metadata_For_All_Objects_drop_constraint",
+    "checksum": -1
+  },
+  {
+    "version": "5.0.2014.09.26",
+    "script": "V5.0_2014.09.26__DS-1582_Metadata_For_All_Objects.sql",
+    "checksum": 1509433410
+  },
+  {
+    "version": "5.0.2014.11.04",
+    "script": "org.dspace.storage.rdbms.xmlworkflow.V5_0_2014_11_04__Enable_XMLWorkflow_Migration",
+    "checksum": -1
+  },
+  {
+    "version": "5.6.2016.08.23",
+    "script": "V5.6_2016.08.23__DS-3097.sql",
+    "checksum": 410632858
+  },
+  {
+    "version": "5.7.2017.04.11",
+    "script": "V5.7_2017.04.11__DS-3563_Index_metadatavalue_resource_type_id_column.sql",
+    "checksum": 912059617
+  },
+  {
+    "version": "5.7.2017.05.05",
+    "script": "org.dspace.storage.rdbms.migration.V5_7_2017_05_05__DS_3431_Add_Policies_for_BasicWorkflow",
+    "checksum": -1
+  },
+  {
+    "version": "6.0.2015.03.06",
+    "script": "org.dspace.storage.rdbms.migration.V6_0_2015_03_06__DS_2701_Dso_Uuid_Migration",
+    "checksum": -1
+  },
+  {
+    "version": "6.0.2015.03.07",
+    "script": "V6.0_2015.03.07__DS-2701_Hibernate_migration.sql",
+    "checksum": -542830952
+  },
+  {
+    "version": "6.0.2015.08.31",
+    "script": "org.dspace.storage.rdbms.migration.V6_0_2015_08_31__DS_2701_Hibernate_Workflow_Migration",
+    "checksum": -1
+  },
+  {
+    "version": "6.0.2015.09.01",
+    "script": "org.dspace.storage.rdbms.xmlworkflow.V6_0_2015_09_01__DS_2701_Enable_XMLWorkflow_Migration",
+    "checksum": -1
+  },
+  {
+    "version": "6.0.2016.01.03",
+    "script": "V6.0_2016.01.03__DS-3024.sql",
+    "checksum": 95468273
+  },
+  {
+    "version": "6.0.2016.01.26",
+    "script": "org.dspace.storage.rdbms.migration.V6_0_2016_01_26__DS_2188_Remove_DBMS_Browse_Tables",
+    "checksum": -1
+  },
+  {
+    "version": "6.0.2016.02.25",
+    "script": "V6.0_2016.02.25__DS-3004-slow-searching-as-admin.sql",
+    "checksum": -1623115511
+  },
+  {
+    "version": "6.0.2016.04.01",
+    "script": "V6.0_2016.04.01__DS-1955_Increase_embargo_reason.sql",
+    "checksum": 283892016
+  },
+  {
+    "version": "6.0.2016.04.04",
+    "script": "V6.0_2016.04.04__DS-3086-OAI-Performance-fix.sql",
+    "checksum": 445863295
+  },
+  {
+    "version": "6.0.2016.04.14",
+    "script": "V6.0_2016.04.14__DS-3125-fix-bundle-bitstream-delete-rights.sql",
+    "checksum": -699277527
+  },
+  {
+    "version": "6.0.2016.05.10",
+    "script": "V6.0_2016.05.10__DS-3168-fix-requestitem_item_id_column.sql",
+    "checksum": -1122969100
+  },
+  {
+    "version": "6.0.2016.07.21",
+    "script": "V6.0_2016.07.21__DS-2775.sql",
+    "checksum": -126635374
+  },
+  {
+    "version": "6.0.2016.07.26",
+    "script": "V6.0_2016.07.26__DS-3277_fix_handle_assignment.sql",
+    "checksum": -284088754
+  },
+  {
+    "version": "6.0.2016.08.23",
+    "script": "V6.0_2016.08.23__DS-3097.sql",
+    "checksum": -1986377895
+  },
+  {
+    "version": "6.1.2017.01.03",
+    "script": "org.dspace.storage.rdbms.migration.V6_1_2017_01_03__DS_3431_Add_Policies_for_BasicWorkflow",
+    "checksum": -1
+  },
+  {
+    "version": "7.0.2017.10.12",
+    "script": "V7.0_2017.10.12__DS-3542-stateless-sessions.sql",
+    "checksum": 1096514101
+  },
+  {
+    "version": "7.0.2018.04.03",
+    "script": "org.dspace.storage.rdbms.migration.V7_0_2018_04_03__Upgrade_Workflow_Policy",
+    "checksum": -1
+  },
+  {
+    "version": "7.0.2018.04.16",
+    "script": "V7.0_2018.04.16__dspace-entities.sql",
+    "checksum": 48698215
+  },
+  {
+    "version": "7.0.2018.06.07",
+    "script": "V7.0_2018.06.07__DS-3851-permission.sql",
+    "checksum": -483449368
+  },
+  {
+    "version": "7.0.2019.05.02",
+    "script": "V7.0_2019.05.02__DS-4239-workflow-xml-migration.sql",
+    "checksum": 552982806
+  },
+  {
+    "version": "7.0.2019.06.14",
+    "script": "V7.0_2019_06_14__scripts-and-process.sql",
+    "checksum": 461424151
+  },
+  {
+    "version": "7.0.2019.07.31",
+    "script": "V7.0_2019.07.31__Retrieval_of_name_variant.sql",
+    "checksum": 1983541373
+  },
+  {
+    "version": "7.0.2019.11.13",
+    "script": "V7.0_2019.11.13__relationship_type_copy_left_right.sql",
+    "checksum": -1354960066
+  },
+  {
+    "version": "7.0.2020.01.08",
+    "script": "V7.0_2020.01.08__DS-626-statistics-tracker.sql",
+    "checksum": -333238642
+  },
+  {
+    "version": "7.0.2020.10.31",
+    "script": "org.dspace.storage.rdbms.migration.V7_0_2020_10_31__CollectionCommunity_Metadata_Handle",
+    "checksum": -1
+  },
+  {
+    "version": "7.0.2021.01.22",
+    "script": "V7.0_2021.01.22__Remove_basic_workflow.sql",
+    "checksum": 2057390209
+  },
+  {
+    "version": "7.0.2021.02.08",
+    "script": "V7.0_2021.02.08__tilted_rels.sql",
+    "checksum": -766574489
+  },
+  {
+    "version": "7.0.2021.03.18",
+    "script": "V7.0_2021.03.18__Move_entity_type_to_dspace_schema.sql",
+    "checksum": -1728009386
+  },
+  {
+    "version": "7.0.2021.09.24",
+    "script": "V7.0_2021.09.24__Move_entity_type_from_item_template_to_collection.sql",
+    "checksum": 1218117924
+  },
+  {
+    "version": "7.0.2021.10.04",
+    "script": "V7.0_2021.10.04__alter_collection_table_drop_workflow_stem_columns.sql",
+    "checksum": -1110355606
+  },
+  {
+    "version": "7.1.2021.10.18",
+    "script": "V7.1_2021.10.18__Fix_MDV_place_after_migrating_from_DSpace_5.sql",
+    "checksum": 1472833040
+  },
+  {
+    "version": "7.3.2022.04.29",
+    "script": "V7.3_2022.04.29__orcid_queue_and_history.sql",
+    "checksum": 1236173569
+  },
+  {
+    "version": "7.3.2022.05.16",
+    "script": "V7.3_2022.05.16__Orcid_token_table.sql",
+    "checksum": -1774799511
+  },
+  {
+    "version": "7.3.2022.06.16",
+    "script": "V7.3_2022.06.16__process_to_group.sql",
+    "checksum": 1355367717
+  },
+  {
+    "version": "7.3.2022.06.20",
+    "script": "V7.3_2022.06.20__add_last_version_status_column_to_relationship_table.sql",
+    "checksum": 1737818971
+  },
+  {
+    "version": "7.5.2022.12.01",
+    "script": "V7.5_2022.12.01__add_table_subscriptionparamter_change_columns_subscription_table.sql",
+    "checksum": -721211506
+  },
+  {
+    "version": "7.5.2022.12.06",
+    "script": "V7.5_2022.12.06__index_action_resource_policy.sql",
+    "checksum": -1946362859
+  },
+  {
+    "version": "7.5.2022.12.09",
+    "script": "V7.5_2022.12.09__Supervision_Orders_table.sql",
+    "checksum": -189440977
+  },
+  {
+    "version": "7.5.2022.12.15",
+    "script": "V7.5_2022.12.15__system_wide_alerts.sql",
+    "checksum": -544844344
+  },
+  {
+    "version": "7.6.2023.03.17",
+    "script": "V7.6_2023.03.17__Remove_unused_sequence.sql",
+    "checksum": -1998166894
+  },
+  {
+    "version": "7.6.2023.03.24",
+    "script": "V7.6_2023.03.24__Update_PNG_in_bitstream_format_registry.sql",
+    "checksum": -2089109672
+  },
+  {
+    "version": "7.6.2023.03.29",
+    "script": "V7.6_2023.03.29__orcid_queue_and_history_descriptions_to_text_type.sql",
+    "checksum": -1132643521
+  },
+  {
+    "version": "7.6.2023.04.19",
+    "script": "V7.6_2023.04.19__process_parameters_to_text_type.sql",
+    "checksum": 199599750
+  },
+  {
+    "version": "7.6.2023.09.28",
+    "script": "V7.6_2023.09.28__enforce_group_or_eperson_for_resourcepolicy.sql",
+    "checksum": -1476787363
+  },
+  {
+    "version": "7.6.2023.10.12",
+    "script": "V7.6_2023.10.12__Fix-deleted-primary-bitstreams.sql",
+    "checksum": 1024959027
+  },
+  {
+    "version": "7.6.2024.03.07",
+    "script": "V7.6_2024.03.07__set_eperson_process_nullable.sql",
+    "checksum": -1718815514
+  },
+  {
+    "version": "7.6.2024.05.07",
+    "script": "V7.6_2024.05.07__process_eperson_constraint.sql",
+    "checksum": 160958489
+  },
+  {
+    "version": "7.6.2024.12.17",
+    "script": "V7.6_2024.12.17__workspaceitem_add_item_id_unique_constraint.sql",
+    "checksum": 1404983590
+  },
+  {
+    "version": "7.6.2025.10.29",
+    "script": "V7.6_2025.10.29__Fix-request-items-with-deleted-bitstreams.sql",
+    "checksum": 1345003161
+  },
+  {
+    "version": "7.6.2026.03.25",
+    "script": "V7.6_2026.03.25__entity_types_caching.sql",
+    "checksum": 49525523
+  },
+  {
+    "version": "8.0.2023.08.07",
+    "script": "V8.0_2023.08.07__qaevent_processed.sql",
+    "checksum": 1930444577
+  },
+  {
+    "version": "8.0.2024.02.14",
+    "script": "V8.0_2024.02.14__ldn_tables.sql",
+    "checksum": -48491652
+  },
+  {
+    "version": "8.4.2026.03.28",
+    "script": "V8.4_2026.03.28__Fix-bundle2bitstream-with-deleted-bitstreams.sql",
+    "checksum": 1475396902
+  },
+  {
+    "version": "9.0.2024.11.09",
+    "script": "V9.0_2024.11.09__ldn_service_external_actor.sql",
+    "checksum": 1079230327
+  },
+  {
+    "version": "9.0.2025.02.13",
+    "script": "V9.0_2025.02.13__add_access_colums_to_requestitem_table.sql",
+    "checksum": 344132906
+  },
+  {
+    "version": "9.0.2025.03.12",
+    "script": "V9.0_2025.03.12__registration_data.sql",
+    "checksum": 1460967640
+  },
+  {
+    "version": "9.4.2026.08.05",
+    "script": "V9.4_2026.08.05__make_site_private.sql",
+    "checksum": -785922019
+  },
+  {
+    "version": "9.4.2026.08.14",
+    "script": "V9.4_2026.08.14__pcirn_mvp_access.sql",
+    "checksum": -1944160775
+  },
+  {
+    "version": "9.4.2026.08.15",
+    "script": "V9.4_2026.08.15__pcirn_sector_access.sql",
+    "checksum": -1602061458
+  },
+  {
+    "version": "9.4.2026.08.16",
+    "script": "V9.4_2026.08.16__pcirn_sector_membership_reconcile.sql",
+    "checksum": -992734351
+  },
+  {
+    "version": "9.4.2026.08.17",
+    "script": "V9.4_2026.08.17__pcirn_portarias_collections.sql",
+    "checksum": 82054682
+  },
+  {
+    "version": "9.4.2026.08.18",
+    "script": "V9.4_2026.08.18__pcirn_public_portarias.sql",
+    "checksum": 965178672
+  },
+  {
+    "version": "9.4.2026.08.24",
+    "script": "V9.4_2026.08.24__pcirn_sector_submission_and_shared_read.sql",
+    "checksum": 692309353
+  },
+  {
+    "version": "9.4.2026.09.15",
+    "script": "V9.4_2026.09.15__pcirn_public_items.sql",
+    "checksum": 108228169
+  },
+  {
+    "version": "9.4.2026.09.17",
+    "script": "V9.4_2026.09.17__pcirn_access_reconcile.sql",
+    "checksum": -272307095
+  },
+  {
+    "version": "9.4.2026.09.23",
+    "script": "V9.4_2026.09.23__pcirn_memoria_institucional_collection.sql",
+    "checksum": 20958078
+  }
+]

@@ -102,6 +102,50 @@ jobs:
           fi
           echo "Submodule commit is reachable from a remote branch."
 
+      - name: Confirm applied migrations are still present
+        run: |
+          set -euo pipefail
+          # scripts/flyway-history.json becomes database.migrations in the
+          # release manifest. The installer compares it row by row against
+          # schema_version and refuses to run when they disagree, and every
+          # migration listed there has already been applied to the
+          # institutional database. So each one must still exist in this
+          # revision: deleting or renaming an applied migration would make the
+          # next install refuse, and the failure would only appear in
+          # production.
+          missing=0
+          checked_sql=0
+          checked_java=0
+          while IFS=$'\t' read -r version script; do
+            case "${script}" in
+              "<< Flyway Baseline >>") continue ;;
+            esac
+            if [[ "${script}" == *.sql ]]; then
+              checked_sql=$((checked_sql + 1))
+              if ! find dspace-api/src/main/resources/org/dspace/storage/rdbms/sqlmigration/postgres \
+                   -name "${script}" 2>/dev/null | grep -q .; then
+                echo "::error::migration aplicada ausente: ${version} ${script}"
+                missing=$((missing + 1))
+              fi
+            else
+              # Java migrations are recorded by fully qualified class name.
+              checked_java=$((checked_java + 1))
+              leaf="${script##*.}"
+              if ! find dspace-api/src/main/java/org/dspace/storage/rdbms \
+                   -name "${leaf}.java" 2>/dev/null | grep -q .; then
+                echo "::error::migration Java aplicada ausente: ${version} ${leaf}.java"
+                missing=$((missing + 1))
+              fi
+            fi
+          done < <(jq -r '.[] | [.version, .script] | @tsv' scripts/flyway-history.json)
+
+          if [ "${missing}" -gt 0 ]; then
+            echo "Regenere scripts/flyway-history.json com scripts/flyway-history.sh"
+            echo "contra um banco migrado antes de publicar."
+            exit 1
+          fi
+          echo "${checked_sql} migrations SQL e ${checked_java} Java conferidas."
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -375,6 +419,8 @@ jobs:
             --backend-digest "$(awk '{print $2}' /tmp/published/backend.txt)" \
             --angular-digest "$(awk '{print $2}' /tmp/published/angular.txt)" \
             --solr-digest "$(awk '{print $2}' /tmp/published/solr.txt)" \
+            --migrations scripts/flyway-history.json \
+            --repository-owner "${{ github.repository_owner }}" \
             --output release-manifest.json
           cat release-manifest.json
 
