@@ -1603,7 +1603,7 @@
                 <artifactId>commons-lang3</artifactId>
                 <version>3.20.0</version>
             </dependency>
-            <!-- NOTE: We don't use commons-logging, commons-compress or commons-csv directly,
+            <!-- NOTE: We don't use commons-logging or commons-csv directly,
                  but many dependencies rely on them. Only here specified to avoid dependency convergence issues. -->
             <dependency>
                 <groupId>commons-logging</groupId>

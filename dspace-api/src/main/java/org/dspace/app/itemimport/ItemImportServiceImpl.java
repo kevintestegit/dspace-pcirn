@@ -29,7 +29,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -37,7 +39,6 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -47,7 +48,6 @@ import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
@@ -58,6 +58,8 @@ import javax.xml.xpath.XPathFactory;
 
 import jakarta.mail.MessagingException;
 import org.apache.commons.collections4.ComparatorUtils;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.FileDeleteStrategy;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -1963,98 +1965,103 @@ public class ItemImportServiceImpl implements ItemImportService, InitializingBea
 
     @Override
     public String unzip(File zipfile, String destDir) throws IOException {
-        // 2
-        // does the zip file exist and can we write to the temp directory
-        if (!zipfile.canRead()) {
-            logError("Zip file '" + zipfile.getAbsolutePath() + "' does not exist, or is not readable.");
+        String prefix = "org.dspace.app.batchitemimport.zip.";
+        int maxEntries = configurationService.getIntProperty(prefix + "max-entries", 10000);
+        long maxEntryBytes = configurationService.getLongProperty(prefix + "max-entry-bytes", 1073741824L);
+        long maxTotalBytes = configurationService.getLongProperty(prefix + "max-total-bytes", 10737418240L);
+        int maxRatio = configurationService.getIntProperty(prefix + "max-expansion-ratio", 100);
+        if (maxEntries <= 0 || maxEntryBytes <= 0 || maxTotalBytes <= 0 || maxRatio <= 0) {
+            throw new IOException("SAF ZIP limits must be positive");
         }
-
-        String destinationDir = destDir;
-        if (destinationDir == null) {
-            destinationDir = tempWorkDir;
+        Path destination = Path.of(destDir == null ? tempWorkDir : destDir).toAbsolutePath().normalize();
+        Files.createDirectories(destination);
+        if (!Files.isDirectory(destination)) {
+            throw new IOException("Invalid SAF extraction directory: " + destination);
         }
-
-        File tempdir = new File(destinationDir);
-        if (!tempdir.isDirectory()) {
-            logError("'" + configurationService.getProperty("org.dspace.app.batchitemimport.work.dir") +
-                          "' as defined by the key 'org.dspace.app.batchitemimport.work.dir' in dspace.cfg " +
-                          "is not a valid directory");
-        }
-
-        if (!tempdir.exists() && !tempdir.mkdirs()) {
-            logError("Unable to create temporary directory: " + tempdir.getAbsolutePath());
-        }
-        String sourcedir = destinationDir + System.getProperty("file.separator") + zipfile.getName();
-        String zipDir = destinationDir + System.getProperty("file.separator") + zipfile.getName() + System
-            .getProperty("file.separator");
-
-
-        // 3
+        Path root = destination.resolve(zipfile.getName());
+        Files.createDirectory(root);
+        String sourcedir = root.toString();
         String sourceDirForZip = sourcedir;
-        ZipFile zf = new ZipFile(zipfile);
-        ZipEntry entry;
-        Enumeration<? extends ZipEntry> entries = zf.entries();
-        try {
-            while (entries.hasMoreElements()) {
-                entry = entries.nextElement();
-                String entryName = entry.getName();
-                File outFile = new File(zipDir + entryName);
-                // Verify that this file/directory will be extracted into our zipDir (and not somewhere else!)
-                if (!outFile.toPath().normalize().startsWith(zipDir)) {
-                    throw new IOException("Bad zip entry: '" + entryName
-                                              + "' in file '" + zipfile.getAbsolutePath() + "'!"
-                                              + " Cannot process this file or directory.");
-                }
-                if (entry.isDirectory()) {
-                    if (!outFile.mkdirs()) {
-                        logError("Unable to create contents directory: " + zipDir + entry.getName());
+        long totalBytes = 0;
+        int entryCount = 0;
+        long createdPaths = 0;
+        long maxCreatedPaths = 2L * maxEntries;
+        byte[] buffer = new byte[8192];
+        try (BufferedInputStream archiveInput = new BufferedInputStream(Files.newInputStream(zipfile.toPath()))) {
+            archiveInput.mark(4);
+            byte[] signature = archiveInput.readNBytes(4);
+            archiveInput.reset();
+            if (!ZipArchiveInputStream.matches(signature, signature.length)) {
+                throw new IOException("Invalid SAF ZIP signature");
+            }
+            try (ZipArchiveInputStream input = new ZipArchiveInputStream(archiveInput)) {
+                ZipArchiveEntry entry;
+                while ((entry = input.getNextEntry()) != null) {
+                    if (entryCount >= maxEntries) {
+                        throw new IOException("SAF ZIP exceeds maximum entry count: " + maxEntries);
                     }
-                } else {
-                    logInfo("Extracting file: " + entryName);
-
-                    int index = entryName.lastIndexOf('/');
-                    if (index == -1) {
-                        // Was it created on Windows instead?
-                        index = entryName.lastIndexOf('\\');
+                    entryCount++;
+                    String entryName = entry.getName();
+                    Path outputPath = root.resolve(entryName.replace('\\', '/')).normalize();
+                    if (!outputPath.startsWith(root) || outputPath.equals(root)) {
+                        throw new IOException("Bad zip entry: " + entryName);
                     }
-                    if (index > 0) {
-                        File dir = new File(zipDir + entryName.substring(0, index));
-                        if (!dir.exists() && !dir.mkdirs()) {
-                            logError("Unable to create directory: " + dir.getAbsolutePath());
-                        }
-
-                        //Entries could have too many directories, and we need to adjust the sourcedir
-                        // file1.zip (SimpleArchiveFormat / item1 / contents|dublin_core|...
-                        //            SimpleArchiveFormat / item2 / contents|dublin_core|...
-                        // or
-                        // file2.zip (item1 / contents|dublin_core|...
-                        //            item2 / contents|dublin_core|...
-
-                        //regex supports either windows or *nix file paths
-                        String[] entryChunks = entryName.split("/|\\\\");
-                        if (entryChunks.length > 2) {
-                            if (StringUtils.equals(sourceDirForZip, sourcedir)) {
-                                sourceDirForZip = sourcedir + "/" + entryChunks[0];
+                    if (entry.getMethod() != ZipEntry.STORED && entry.getMethod() != ZipEntry.DEFLATED
+                        || !input.canReadEntryData(entry)) {
+                        throw new IOException("Unsupported SAF ZIP entry: " + entryName);
+                    }
+                    Path parent = entry.isDirectory() ? outputPath : outputPath.getParent();
+                    Path directory = root;
+                    for (Path component : root.relativize(parent)) {
+                        directory = directory.resolve(component);
+                        if (!Files.exists(directory)) {
+                            if (createdPaths >= maxCreatedPaths) {
+                                throw new IOException("SAF ZIP exceeds maximum created path count");
                             }
+                            Files.createDirectory(directory);
+                            createdPaths++;
                         }
                     }
-                    byte[] buffer = new byte[1024];
-                    int len;
-                    InputStream in = zf.getInputStream(entry);
-                    BufferedOutputStream out = new BufferedOutputStream(
-                        new FileOutputStream(outFile));
-                    while ((len = in.read(buffer)) >= 0) {
-                        out.write(buffer, 0, len);
+                    if (!entry.isDirectory()) {
+                        if (createdPaths >= maxCreatedPaths) {
+                            throw new IOException("SAF ZIP exceeds maximum created path count");
+                        }
+                        createdPaths++;
+                        String[] entryChunks = entryName.split("/|\\\\");
+                        if (entryChunks.length > 2 && StringUtils.equals(sourceDirForZip, sourcedir)) {
+                            sourceDirForZip = root.resolve(entryChunks[0]).toString();
+                        }
+                        logInfo("Extracting file: " + entryName);
                     }
-                    in.close();
-                    out.close();
+                    long entryBytes = 0;
+                    try (OutputStream output = entry.isDirectory() ? OutputStream.nullOutputStream()
+                            : new BufferedOutputStream(Files.newOutputStream(outputPath,
+                                StandardOpenOption.CREATE_NEW))) {
+                        int length;
+                        while ((length = input.read(buffer)) != -1) {
+                            if (length > maxEntryBytes - entryBytes || length > maxTotalBytes - totalBytes) {
+                                throw new IOException("SAF ZIP exceeds expanded byte limits at entry: " + entryName);
+                            }
+                            entryBytes += length;
+                            totalBytes += length;
+                            long compressedBytes = input.getCompressedCount();
+                            if (entryBytes > 0 && (compressedBytes <= 0
+                                || (double) entryBytes / compressedBytes > maxRatio)) {
+                                throw new IOException("SAF ZIP exceeds expansion ratio at entry: " + entryName);
+                            }
+                            output.write(buffer, 0, length);
+                        }
+                    }
                 }
             }
-        } finally {
-            //Close zip file
-            zf.close();
+        } catch (IOException | RuntimeException e) {
+            try {
+                FileUtils.deleteDirectory(root.toFile());
+            } catch (IOException cleanupFailure) {
+                e.addSuppressed(cleanupFailure);
+            }
+            throw e;
         }
-
         if (!StringUtils.equals(sourceDirForZip, sourcedir)) {
             sourcedir = sourceDirForZip;
             logInfo("Set sourceDir using path inside of Zip: " + sourcedir);
