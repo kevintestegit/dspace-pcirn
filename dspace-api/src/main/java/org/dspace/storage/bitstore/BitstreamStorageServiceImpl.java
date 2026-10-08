@@ -9,8 +9,10 @@ package org.dspace.storage.bitstore;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -398,19 +400,42 @@ public class BitstreamStorageServiceImpl implements BitstreamStorageService, Ini
     /**
      * Migrates all assets off of one assetstore to another
      *
+     * @param context              current DSpace context
      * @param assetstoreSource      source assetstore
      * @param assetstoreDestination destination assetstore
+     * @param deleteOld            remove source files after committing their destination metadata
+     * @param batchCommitSize      number of bitstreams per commit
      * @throws IOException        A general class of exceptions produced by failed or interrupted I/O operations.
      * @throws SQLException       An exception that provides information on a database access error or other errors.
      * @throws AuthorizeException Exception indicating the current user of the context does not have permission
      *                            to perform a particular action.
+     * @throws IllegalArgumentException if stores coincide or the batch size is not positive
      */
     @Override
     public void migrate(Context context, Integer assetstoreSource, Integer assetstoreDestination, boolean deleteOld,
                         Integer batchCommitSize) throws IOException, SQLException, AuthorizeException {
-        //Find all the bitstreams on the old source, copy it to new destination, update store_number, save, remove old
+        if (assetstoreSource == null || assetstoreDestination == null || batchCommitSize == null
+            || batchCommitSize <= 0 || assetstoreSource.equals(assetstoreDestination)
+            || stores.get(assetstoreSource) == null || stores.get(assetstoreDestination) == null) {
+            throw new IllegalArgumentException("Migration requires distinct stores and a positive batch size");
+        }
+        BitStoreService source = getStore(assetstoreSource);
+        BitStoreService destination = getStore(assetstoreDestination);
+        if (source == destination) {
+            throw new IllegalArgumentException("Migration requires distinct configured stores");
+        }
+        if (source instanceof DSBitStoreService && destination instanceof DSBitStoreService) {
+            var sourceDirectory = ((DSBitStoreService) source).getBaseDir().getCanonicalFile().toPath();
+            var destinationDirectory = ((DSBitStoreService) destination).getBaseDir().getCanonicalFile().toPath();
+            if (sourceDirectory.equals(destinationDirectory)
+                || Files.exists(sourceDirectory) && Files.exists(destinationDirectory)
+                && Files.isSameFile(sourceDirectory, destinationDirectory)) {
+                throw new IllegalArgumentException("Migration source and destination use the same directory");
+            }
+        }
         Iterator<Bitstream> allBitstreamsInSource = bitstreamService.findByStoreNumber(context, assetstoreSource);
         int processedCounter = 0;
+        List<Bitstream> pendingDeletes = new ArrayList<>();
 
         while (allBitstreamsInSource.hasNext()) {
             Bitstream bitstream = allBitstreamsInSource.next();
@@ -419,29 +444,50 @@ public class BitstreamStorageServiceImpl implements BitstreamStorageService, Ini
                          "Name:" + bitstream
                 .getName() + ", SizeBytes:" + bitstream.getSizeBytes());
 
-            InputStream inputStream = retrieve(context, bitstream);
-            this.getStore(assetstoreDestination).put(bitstream, inputStream);
+            if (source instanceof DSBitStoreService && destination instanceof DSBitStoreService) {
+                var sourceFile = ((DSBitStoreService) source).getFile(bitstream).toPath();
+                var destinationFile = ((DSBitStoreService) destination).getFile(bitstream).toPath();
+                if (Files.exists(destinationFile) && Files.isSameFile(sourceFile, destinationFile)) {
+                    throw new IllegalArgumentException("Migration source and destination use the same file");
+                }
+            }
+            try (InputStream inputStream = retrieve(context, bitstream)) {
+                destination.put(bitstream, inputStream);
+            }
             bitstream.setStoreNumber(assetstoreDestination);
             bitstreamService.update(context, bitstream);
 
             if (deleteOld) {
-                log.info("Removing bitstream:" + bitstream.getID() + " from assetstore[" + assetstoreSource + "]");
-                this.getStore(assetstoreSource).remove(bitstream);
+                pendingDeletes.add(bitstream);
             }
 
             processedCounter++;
             context.uncacheEntity(bitstream);
 
-            //modulo
             if ((processedCounter % batchCommitSize) == 0) {
                 log.info("Migration Commit Checkpoint: " + processedCounter);
-                context.commit();
+                commitMigrationBatch(context, source, pendingDeletes);
             }
+        }
+        if (!pendingDeletes.isEmpty()) {
+            commitMigrationBatch(context, source, pendingDeletes);
         }
 
         log.info(
             "Assetstore Migration from assetstore[" + assetstoreSource + "] to assetstore[" + assetstoreDestination +
                 "] completed. " + processedCounter + " objects were transferred.");
+    }
+
+    private void commitMigrationBatch(Context context, BitStoreService source, List<Bitstream> pendingDeletes)
+        throws SQLException, IOException {
+        if (!context.isValid()) {
+            throw new SQLException("Cannot commit an assetstore migration with a closed context");
+        }
+        context.commit();
+        for (Bitstream bitstream : pendingDeletes) {
+            source.remove(bitstream);
+        }
+        pendingDeletes.clear();
     }
 
     @Override
