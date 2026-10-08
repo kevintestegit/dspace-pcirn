@@ -10,17 +10,18 @@ that gap:
   compares against ``schema_version``;
 * a PostgreSQL that was already restored (the schema_version matches the
   manifest row for row) must install without running a migration and without
-  the migration authorization;
-* the Compose file the installer writes must interpolate with exactly the
-  variables the installer supplies.
+  the migration authorization.
 
-Nothing here touches Docker or PostgreSQL: the Compose check only renders.
+The Compose file the installer writes is covered by test_production_operations,
+which renders the installer's own output instead of a copy of it.
+
+Nothing here touches Docker or PostgreSQL: every check is text or a subprocess
+against fake executables.
 """
 import importlib.util
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,9 +38,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 spec = importlib.util.spec_from_file_location('pcirn', MODULE)
 pcirn = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pcirn)
-
-ZERO = '0' * 64
-
 
 def pipeline_manifest(directory, version, migrations, digests=None):
     """Run the pipeline's generator, exactly as the release workflow does."""
@@ -211,68 +209,6 @@ class RestoredDatabaseTests(unittest.TestCase):
         process = self.cli('install', '--root', self.root, '--config', self.config,
                            '--manifest', target, success=False)
         self.assertIn('divergente', process.stderr)
-
-
-class GeneratedComposeTests(unittest.TestCase):
-    """The Compose file the installer writes must actually interpolate."""
-
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='pcirn-compose-')
-        self.root = Path(self.temp.name) / 'deployment'
-        (self.root / 'dspace/config').mkdir(parents=True)
-        (self.root / 'dspace/config/local.cfg').write_text('db.schema = public\n')
-        for name in ('data/assetstore', 'data/solr'):
-            (self.root / name).mkdir(parents=True, exist_ok=True)
-        source = (REPO / 'docker-compose.yml').read_text()
-        compose = source.replace('- solr_data:/var/solr/data',
-                                 '- ${SOLR_DATA_PATH}:/var/solr/data')
-        compose = compose.replace('db__P__username:',
-                                  'db__P__schema: public\n      db__P__username:')
-        (self.root / 'compose.yml').write_text(compose)
-
-    def tearDown(self):
-        self.temp.cleanup()
-
-    def environment(self):
-        digest = 'sha256:' + ZERO
-        return dict(os.environ,
-                    DB_URL='jdbc:postgresql://nti.invalid:5432/pcirn?sslmode=require',
-                    DB_USERNAME='nti', DB_PASSWORD='x',
-                    PUBLIC_UI_URL='https://repo.invalid',
-                    PUBLIC_REST_URL='https://repo.invalid/server',
-                    PUBLIC_REST_HOST='repo.invalid',
-                    DSPACE_IMAGE='ghcr.io/nti/backend@' + digest,
-                    SOLR_IMAGE='ghcr.io/nti/solr@' + digest,
-                    ANGULAR_IMAGE='ghcr.io/nti/frontend@' + digest,
-                    ASSETSTORE_PATH=str(self.root / 'data/assetstore'),
-                    SOLR_DATA_PATH=str(self.root / 'data/solr'))
-
-    @unittest.skipUnless(shutil.which('docker'), 'docker not available')
-    def test_generated_compose_interpolates_with_installer_variables(self):
-        envfile = Path(self.temp.name) / 'empty.env'
-        envfile.write_text('')
-        process = subprocess.run(
-            ['docker', 'compose', '--project-name', 'pcirn-integration',
-             '--project-directory', str(self.root), '--env-file', str(envfile),
-             '-f', str(self.root / 'compose.yml'), 'config'],
-            env=self.environment(), text=True, capture_output=True)
-        self.assertEqual(
-            process.returncode, 0,
-            'the installer supplies every variable the Compose file requires, '
-            'otherwise `up` fails before any container starts:\n' + process.stderr)
-
-    @unittest.skipUnless(shutil.which('docker'), 'docker not available')
-    def test_local_cfg_mount_points_at_the_file_the_installer_writes(self):
-        envfile = Path(self.temp.name) / 'empty.env'
-        envfile.write_text('')
-        process = subprocess.run(
-            ['docker', 'compose', '--project-name', 'pcirn-integration',
-             '--project-directory', str(self.root), '--env-file', str(envfile),
-             '-f', str(self.root / 'compose.yml'), 'config'],
-            env=self.environment(), text=True, capture_output=True, check=True)
-        self.assertIn(str(self.root / 'dspace/config/local.cfg'), process.stdout)
-        # The Solr data directory must be redirected out of the Docker volume.
-        self.assertIn(str(self.root / 'data/solr'), process.stdout)
 
 
 class ReleaseArtifactTests(unittest.TestCase):
