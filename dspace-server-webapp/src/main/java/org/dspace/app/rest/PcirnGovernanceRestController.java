@@ -113,8 +113,8 @@ public class PcirnGovernanceRestController {
 
     /**
      * Switches a community between public and restricted access. Restricted replaces the
-     * Anonymous READ policies with the sector group on the community, its collections, all
-     * items and bitstreams, and the collection read defaults; publication (ADD) is ensured for
+     * Anonymous READ policies with the sector group on the community, its collections, archived
+     * non-withdrawn items and their undeleted bitstreams, and the collection read defaults; ADD is ensured for
      * the sector group. Public reverses the READ rewrite and leaves ADD untouched.
      *
      * @param uuid    community identifier
@@ -244,11 +244,18 @@ public class PcirnGovernanceRestController {
         replacePolicies(context, collection, Constants.DEFAULT_BITSTREAM_READ, from, to);
         Iterator<Item> items = itemService.findAllByCollection(context, collection);
         while (items.hasNext()) {
-            replacePolicies(context, items.next(), Constants.READ, from, to);
-        }
-        Iterator<Bitstream> bitstreams = bitstreamService.getCollectionBitstreams(context, collection);
-        while (bitstreams.hasNext()) {
-            replacePolicies(context, bitstreams.next(), Constants.READ, from, to);
+            Item item = items.next();
+            if (!item.isArchived() || item.isWithdrawn()) {
+                continue;
+            }
+            replacePolicies(context, item, Constants.READ, from, to);
+            Iterator<Bitstream> bitstreams = bitstreamService.getItemBitstreams(context, item);
+            while (bitstreams.hasNext()) {
+                Bitstream bitstream = bitstreams.next();
+                if (!bitstream.isDeleted()) {
+                    replacePolicies(context, bitstream, Constants.READ, from, to);
+                }
+            }
         }
     }
 

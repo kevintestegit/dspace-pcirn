@@ -151,8 +151,12 @@ public class HibernateDBConnection implements DBConnection<Session> {
      */
     @Override
     public void commit() throws SQLException {
-        if (isTransActionAlive() && !getTransaction().getStatus().isOneOf(TransactionStatus.MARKED_ROLLBACK,
-                                                                          TransactionStatus.ROLLING_BACK)) {
+        Transaction transaction = getTransaction();
+        if (transaction != null && transaction.getStatus().isOneOf(TransactionStatus.MARKED_ROLLBACK,
+                                                                   TransactionStatus.ROLLING_BACK)) {
+            throw new SQLException("Cannot commit a transaction marked for rollback");
+        }
+        if (isTransActionAlive()) {
             // Flush synchronizes the database with in-memory objects in Session (and frees up that memory)
             getSession().flush();
             // Commit those results to the database & ends the Transaction
