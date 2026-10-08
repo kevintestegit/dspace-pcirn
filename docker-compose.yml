@@ -78,9 +78,10 @@ services:
       # The assetstore is state and must outlive every image. In production it
       # is a bind mount so it can be inspected, backed up and moved with rsync.
       - ${ASSETSTORE_PATH:?Defina ASSETSTORE_PATH em .env.production}:/dspace/assetstore
-      # DSpace reads its configuration from the image. local.cfg is layered on
-      # top from the host so operators can change settings without rebuilding.
-      - ./dspace/config/local.cfg:/dspace/config/local.cfg:ro
+      # DSpace reads its configuration from the image. The operator's local.cfg
+      # is layered on top from outside the image, so settings can change
+      # without rebuilding and no local configuration is ever baked in.
+      - ${LOCAL_CFG_PATH:?Defina LOCAL_CFG_PATH em .env.production}:/dspace/config/local.cfg:ro
     # No database wait and no migration: the entrypoint only starts the
     # application. A failed connection or a pending migration surfaces as a
     # startup error instead of an endless loop.
