@@ -409,15 +409,25 @@ def provision(args):
     compose_source = Path(__file__).with_name('compose.template.yml')
     if not compose_source.exists():
         compose_source = SOURCE / 'docker-compose.yml'
+    # The generated Compose file loads <root>/smtp.env, so the file has to exist
+    # before the first `up`. It is seeded from the repository template, which
+    # leaves mail explicitly disabled; mail settings are the NTI's to fill in.
+    smtp_source = Path(__file__).with_name('smtp.env.example')
+    if not smtp_source.exists():
+        smtp_source = SOURCE / 'smtp.env.example'
     compose = compose_source.read_text().replace('- solr_data:/var/solr/data',
                                                 '- ${SOLR_DATA_PATH}:/var/solr/data')
     compose = compose.replace('db__P__username:', 'db__P__schema: public\n      db__P__username:')
     files = {root / 'compose.yml': compose,
+             root / 'smtp.env': smtp_source.read_text(),
              root / 'dspace/config/local.cfg': 'db.schema = public\n',
              root / 'bin/pcirn.py': Path(__file__).read_text(),
              root / 'bin/preflight.py': Path(__file__).with_name('preflight.py').read_text(),
              root / 'bin/dspacepcirn': Path(__file__).with_name('dspacepcirn').read_text(),
-             root / 'bin/compose.template.yml': compose_source.read_text()}
+             root / 'bin/compose.template.yml': compose_source.read_text(),
+             # Kept so a later provision from the installed copy can still seed
+             # smtp.env, exactly like the Compose template above.
+             root / 'bin/smtp.env.example': smtp_source.read_text()}
     for path, content in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
@@ -455,10 +465,12 @@ def main(argv=None):
         raise Error('Use um diretório dedicado sem links simbólicos')
     if args.command == 'install':
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    for relative in ('config.json', '.lock', 'compose.yml', 'release.json', 'operation.json',
-                     'installed.json', 'previous.json', 'bin', 'bin/dspacepcirn',
-                     'bin/pcirn.py', 'bin/preflight.py', 'bin/compose.template.yml', 'data', 'data/assetstore',
-                     'data/solr', 'backups', 'dspace', 'dspace/config', 'dspace/config/local.cfg'):
+    for relative in ('config.json', '.lock', 'compose.yml', 'smtp.env', 'release.json',
+                     'operation.json', 'installed.json', 'previous.json', 'bin',
+                     'bin/dspacepcirn', 'bin/pcirn.py', 'bin/preflight.py',
+                     'bin/compose.template.yml', 'bin/smtp.env.example', 'data',
+                     'data/assetstore', 'data/solr', 'backups', 'dspace', 'dspace/config',
+                     'dspace/config/local.cfg'):
         path = root / relative
         if path.resolve() != path:
             raise Error('Arquivos/diretórios administrativos não podem ser links simbólicos')
