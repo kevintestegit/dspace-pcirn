@@ -116,16 +116,18 @@ def pg_environment(config):
 
 
 class Deployment:
-    def __init__(self, root):
+    def __init__(self, root, config=None):
         self.root = Path(root).absolute()
         if self.root.is_symlink() or self.root.resolve() != self.root:
             raise Error('Diretório de instalação não pode conter links simbólicos')
-        self.config = configuration(self.root / 'config.json')
+        self.config = config if config is not None else configuration(self.root / 'config.json')
         self.env = {k: v for k, v in os.environ.items()
                     if not k.startswith(('COMPOSE_', 'DOCKER_', 'PG', 'DSPACE_', 'DB_'))}
         self.env.update(pg_environment(self.config))
 
-    def run(self, args, capture=True, pg=False):
+    def run(self, args, capture=True, pg=False, timeout=None):
+        if args[0] == 'docker':
+            args = ['docker', '--context', 'default', *args[1:]]
         env = self.env.copy()
         if not pg:
             env = {k: v for k, v in env.items() if not k.startswith('PG')}
@@ -133,7 +135,11 @@ class Deployment:
                                    stdout=subprocess.PIPE if capture else None,
                                    stderr=subprocess.PIPE if capture else None)
         try:
-            output, _ = process.communicate()
+            output, _ = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise Error(f'{Path(args[0]).name}: tempo limite excedido')
         except KeyboardInterrupt:
             process.terminate()
             try:
@@ -176,21 +182,21 @@ class Deployment:
             raise Error('Docker Compose >= 2.20 obrigatório')
         self.run(['docker', 'info'])
         server = int(self.sql('SHOW server_version_num;')) // 10000
-        client = re.search(r'(\d+)\.', self.run(['pg_dump', '--version']))
-        if not client or int(client[1]) < server:
-            raise Error('pg_dump deve ter versão major >= PostgreSQL externo')
+        for tool in ('pg_dump', 'pg_restore'):
+            client = re.search(r'(\d+)\.', self.run([tool, '--version']))
+            if not client or int(client[1]) != server:
+                raise Error('pg_dump/pg_restore devem ter o mesmo major do PostgreSQL externo')
         self.compose(self.current(), 'config', '--quiet')
         print('doctor: Docker, Compose, PostgreSQL TLS e configuração OK')
 
     def sql(self, query):
         return self.run(['psql', '-X', '-q', '--no-password', '-At', '-v', 'ON_ERROR_STOP=1',
-                         '-c', 'BEGIN READ ONLY; ' + query + ' COMMIT;'], pg=True).strip()
+                         '-c', 'BEGIN READ ONLY; ' + query + ' COMMIT;'], pg=True, timeout=30).strip()
 
     def pending(self, release):
         table = self.sql("SELECT to_regclass('public.schema_version') IS NOT NULL;")
         if table == 'f':
-            if self.sql("SELECT count(*) FROM information_schema.tables "
-                        "WHERE table_schema='public';") != '0':
+            if self.user_objects() != 0:
                 raise Error('Banco sem histórico Flyway deve estar vazio; avaliação NTI necessária')
             return True
         if table != 't':
@@ -208,6 +214,18 @@ class Deployment:
                 raise Error('Histórico Flyway divergente do manifesto; nenhuma migration executada')
             applied.add(row['version'])
         return bool(set(expected) - applied)
+
+    def user_objects(self):
+        """Count user schemas and objects; an empty database may contain only system objects."""
+        return int(self.sql("WITH namespaces AS (SELECT oid, nspname FROM pg_namespace "
+                            "WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'), "
+                            "objects AS (SELECT oid AS namespace FROM namespaces WHERE nspname <> 'public' "
+                            "UNION ALL SELECT relnamespace FROM pg_class "
+                            "UNION ALL SELECT pronamespace FROM pg_proc "
+                            "UNION ALL SELECT typnamespace FROM pg_type "
+                            "UNION ALL SELECT extnamespace FROM pg_extension) "
+                            "SELECT count(*) AS user_object_count FROM objects "
+                            "JOIN namespaces ON namespaces.oid=objects.namespace;"))
 
     def healthy(self, release):
         output = self.compose(release, 'ps', '--all', '--format', 'json').strip()
@@ -397,6 +415,7 @@ def provision(args):
     files = {root / 'compose.yml': compose,
              root / 'dspace/config/local.cfg': 'db.schema = public\n',
              root / 'bin/pcirn.py': Path(__file__).read_text(),
+             root / 'bin/preflight.py': Path(__file__).with_name('preflight.py').read_text(),
              root / 'bin/dspacepcirn': Path(__file__).with_name('dspacepcirn').read_text(),
              root / 'bin/compose.template.yml': compose_source.read_text()}
     for path, content in files.items():
@@ -438,7 +457,7 @@ def main(argv=None):
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     for relative in ('config.json', '.lock', 'compose.yml', 'release.json', 'operation.json',
                      'installed.json', 'previous.json', 'bin', 'bin/dspacepcirn',
-                     'bin/pcirn.py', 'bin/compose.template.yml', 'data', 'data/assetstore',
+                     'bin/pcirn.py', 'bin/preflight.py', 'bin/compose.template.yml', 'data', 'data/assetstore',
                      'data/solr', 'backups', 'dspace', 'dspace/config', 'dspace/config/local.cfg'):
         path = root / relative
         if path.resolve() != path:

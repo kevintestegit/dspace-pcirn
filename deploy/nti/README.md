@@ -3,7 +3,7 @@
 `install.sh` instala uma stack dedicada; `dspacepcirn` administra essa instalação.
 O instalador não instala pacotes do sistema. Pré-requisitos: Linux, Bash, Python
 3.9+, Docker Engine, Compose >= 2.20 e `psql`, `pg_dump`, `pg_restore` (cliente
-PostgreSQL da mesma versão major do servidor ou mais novo). Execute como usuário
+PostgreSQL da mesma versão major do servidor). Execute como usuário
 administrativo com acesso ao Docker e leitura/escrita dos dados do Solr, incluindo
 arquivos pertencentes ao UID do container; normalmente root no servidor dedicado.
 O NTI fornece banco **dedicado**, credenciais, certificados TLS e os privilégios
@@ -183,3 +183,9 @@ backup, autorização, concorrência, proteção de credenciais e travessia de a
 Referências técnicas: [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
 [interpolação Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
 e [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).
+
+## Homologação numa VM limpa
+
+O [roteiro de homologação](HOMOLOGACAO.md) inclui preflight automático no install.sh,
+executor E2E opt-in e critérios de aprovação/recuperação. O contrato GHCR acima
+permanece inalterado. Testes locais são simulados e não iniciam containers.

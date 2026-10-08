@@ -20,15 +20,19 @@ root = pathlib.Path(os.environ['PCIRN_TEST'])
 state_file = root / 'fake-state.json'
 state = json.loads(state_file.read_text()) if state_file.exists() else {'rows': [], 'running': False}
 args = sys.argv[1:]
+if args[:2] == ['--context', 'default']: args = args[2:]
 name = pathlib.Path(sys.argv[0]).name
 with (root / 'calls.jsonl').open('a') as log:
     log.write(json.dumps([name, args]) + '\n')
+db_name = os.environ.get('PGDATABASE', os.environ.get('DB_URL', '').split('/')[-1].split('?')[0])
+db = state if db_name in ('', 'pcirn') else state.setdefault('databases', {}).setdefault(db_name, {'rows': []})
 failure = (root / 'fail').read_text() if (root / 'fail').exists() else ''
 def save(): state_file.write_text(json.dumps(state))
 def fail(key):
     if failure == key:
         print('SECRET-should-not-leak', file=sys.stderr)
         sys.exit(7)
+if '--version' in args and name != 'docker': print('PostgreSQL 17.1'); sys.exit()
 if name == 'docker':
     if args == ['info']: fail('docker'); sys.exit()
     if args[:2] == ['compose', 'version']: print('2.24.0'); sys.exit()
@@ -36,36 +40,56 @@ if name == 'docker':
     if 'stop' in args: state['running'] = False; save()
     if 'up' in args:
         fail('health')
-        state['running'] = True; save()
+        state['running'] = True
+        state['images'] = dict(zip(('dspace', 'dspacesolr', 'dspace-angular'), (os.environ.get(k, '') for k in ('DSPACE_IMAGE', 'SOLR_IMAGE', 'ANGULAR_IMAGE'))))
+        save()
     if 'run' in args:
         state['migration_called'] = True; save()
         fail('migrate')
-        state['rows'] = json.loads((root / 'wanted.json').read_text())
+        db['rows'] = json.loads((root / 'wanted.json').read_text())
+        if (root / 'image-rows.json').exists():
+            db['rows'] = json.loads((root / 'image-rows.json').read_text())[os.environ['DSPACE_IMAGE']]
         save()
+    if args[:1] == ['inspect']: print(state['images'][args[-1]])
     if 'ps' in args:
-        if 'json' in args:
+        if '-q' in args: print('dspace\ndspacesolr\ndspace-angular' if state['running'] else '')
+        elif 'json' in args:
             print(json.dumps([{'Service': s, 'State': 'running' if state['running'] else 'exited',
                                'Health': 'healthy' if state['running'] else ''}
                               for s in ('dspace', 'dspacesolr', 'dspace-angular')]))
         else: print('fake dedicated project')
 elif name == 'psql':
     if '-f' in args:
-        fail('restore'); state['restored'] = True; save(); sys.exit()
+        fail('restore')
+        path = pathlib.Path(args[-1])
+        if path.name == 'probe.sql': db['probe'] = 'documento-ficticio-001'
+        else: db.update(json.loads(path.read_text()))
+        state['restored'] = True; save(); sys.exit()
     fail('db')
     query = args[args.index('-c') + 1]
-    if 'server_version_num' in query: print('170000')
-    elif 'to_regclass' in query: print('t' if state['rows'] else 'f')
-    elif 'information_schema.tables' in query: print('0')
-    elif 'json_agg' in query: print(json.dumps(state['rows']))
+    if 'UPDATE public.pcirn_homolog_probe' in query:
+        db['probe'] = 'apos-backup' if 'apos-backup' in query else 'apos-update'
+        if 'CREATE TABLE' in query: db['later'] = True
+        save()
+    elif 'SELECT marker' in query: print(db.get('probe', ''))
+    elif 'pcirn_homolog_later' in query: print('f' if db.get('later') else 't')
+    elif 'server_version_num' in query: print('170000')
+    elif 'to_regclass' in query: print('t' if db['rows'] else 'f')
+    elif 'user_object_count' in query:
+        print('10' if db['rows'] else str(db.get('extra_objects', 0)))
+    elif 'information_schema.tables' in query: print('10' if db['rows'] else '0')
+    elif 'json_agg' in query: print(json.dumps(db['rows']))
     else: print('1')
 elif name == 'pg_dump':
     if '--version' in args: print('pg_dump (PostgreSQL) 17.1'); sys.exit()
-    fail('dump'); pathlib.Path(args[args.index('--file') + 1]).write_text('valid fake dump')
+    fail('dump'); pathlib.Path(args[args.index('--file') + 1]).write_text(json.dumps({'rows': db['rows'], 'probe': db.get('probe'), 'later': db.get('later', False)}))
 elif name == 'pg_restore':
-    if '--list' in args: fail('verify')
+    if '--list' in args:
+        fail('verify'); print('; Dumped from database version: 17.1\n; Dumped by pg_dump version: 17.1')
     elif '--file' in args:
-        pathlib.Path(args[args.index('--file') + 1]).write_text('-- fake restoration SQL\n')
-    else: fail('restore')
+        pathlib.Path(args[args.index('--file') + 1]).write_text(pathlib.Path(args[-1]).read_text())
+    else:
+        fail('restore'); db.update(json.loads(pathlib.Path(args[-1]).read_text())); save()
 '''
 
 
@@ -346,6 +370,21 @@ class InstallerTests(unittest.TestCase):
             dep.run = inspect
             dep.env['DSPACE_IMAGE'] = 'untrusted:latest'
             dep.compose(release(), 'config', '--quiet')
+
+    def test_empty_database_with_extra_objects_blocks_migrations(self):
+        (self.base / 'fake-state.json').write_text(json.dumps({'rows': [], 'running': False, 'extra_objects': 1}))
+        self.cli('install', '--config', self.config, '--manifest', self.target,
+                 '--authorize-migrations', success=False)
+        self.assertFalse(any('migrate' in a or 'pull' in a for _, a in self.calls()))
+
+    def test_readonly_tool_timeout_kills_child(self):
+        process = mock.Mock()
+        process.communicate.side_effect = [subprocess.TimeoutExpired('docker', 30), ('', '')]
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(pcirn.subprocess, 'Popen', return_value=process):
+            dep = pcirn.Deployment(self.root, config=pcirn.configuration(self.config))
+            with self.assertRaisesRegex(pcirn.Error, 'tempo limite'):
+                dep.run(['docker', 'info'], timeout=30)
+        process.kill.assert_called_once()
 
     def test_concurrent_operation_rejected(self):
         self.install()
