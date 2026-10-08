@@ -11,6 +11,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mockStatic;
 
@@ -33,46 +34,64 @@ public class HarvestHttpClientTest {
     public void parsesOaiErrorsAndPaginationButRejectsExternalXmlEntities() throws Exception {
         try (MockWebServer server = new MockWebServer();
              MockedStatic<HarvestHttpClient> policy = mockStatic(HarvestHttpClient.class, CALLS_REAL_METHODS)) {
-            server.start(80);
+            server.start(0);
+            String origin = "http://provider.example:" + server.getPort();
+            allowLoopbackPort(policy, server.getPort());
             policy.when(() -> HarvestHttpClient.resolvePublicAddresses("provider.example"))
                 .thenReturn(new InetAddress[] {InetAddress.getByName("127.0.0.1")});
             server.enqueue(new MockResponse().setBody("<OAI-PMH xmlns='http://www.openarchives.org/OAI/2.0/'>"
                 + "<ListRecords><record><metadata><resumptionToken>ignore</resumptionToken></metadata></record>"
                 + "<resumptionToken>next &amp; page</resumptionToken></ListRecords></OAI-PMH>"));
-            OaiResponse response = OaiResponse.request("http://provider.example/oai", "ListRecords",
+            OaiResponse response = OaiResponse.request(origin + "/oai", "ListRecords",
                 "metadataPrefix", "oai_dc", "set", "set & value");
             assertEquals("next & page", response.getResumptionToken());
             assertEquals(0, response.getErrors().getLength());
             assertTrue(server.takeRequest().getPath().contains("set=set+%26+value"));
             server.enqueue(new MockResponse().setBody("<OAI-PMH xmlns='http://www.openarchives.org/OAI/2.0/'>"
                 + "<error code='noRecordsMatch'>none</error></OAI-PMH>"));
-            assertEquals(1, OaiResponse.request("http://provider.example/oai", "ListRecords").getErrors().getLength());
+            assertEquals(1, OaiResponse.request(origin + "/oai", "ListRecords").getErrors().getLength());
             server.enqueue(new MockResponse().setBody("<!DOCTYPE x [<!ENTITY secret SYSTEM 'file:///etc/passwd'>]>"
                 + "<x>&secret;</x>"));
-            assertThrows(SAXException.class, () -> OaiResponse.request("http://provider.example/oai", "Identify"));
+            assertThrows(SAXException.class, () -> OaiResponse.request(origin + "/oai", "Identify"));
         }
     }
     @Test(timeout = 10000)
     public void followsPublicRedirectsButRejectsPrivateRedirectsAndOversizedBodies() throws Exception {
         try (MockWebServer server = new MockWebServer();
              MockedStatic<HarvestHttpClient> policy = mockStatic(HarvestHttpClient.class, CALLS_REAL_METHODS)) {
-            server.start(80);
+            server.start(0);
+            String origin = "http://provider.example:" + server.getPort();
+            allowLoopbackPort(policy, server.getPort());
             // Only the synthetic public provider is routed to the isolated loopback test server.
             policy.when(() -> HarvestHttpClient.resolvePublicAddresses("provider.example"))
                 .thenReturn(new InetAddress[] {InetAddress.getByName("127.0.0.1")});
-            server.enqueue(new MockResponse().setResponseCode(302).addHeader("Location", "http://provider.example/next"));
+            server.enqueue(new MockResponse().setResponseCode(302).addHeader("Location", origin + "/next"));
             server.enqueue(new MockResponse().setBody("valid"));
-            try (InputStream response = HarvestHttpClient.open(URI.create("http://provider.example/oai"), 10)) {
+            try (InputStream response = HarvestHttpClient.open(URI.create(origin + "/oai"), 10)) {
                 assertEquals("valid", new String(response.readAllBytes(), StandardCharsets.UTF_8));
             }
             server.enqueue(new MockResponse().setResponseCode(302).addHeader("Location", "http://127.0.0.1/private"));
-            assertThrows(IOException.class, () -> HarvestHttpClient.open(URI.create("http://provider.example/oai"), 10));
+            assertThrows(IOException.class, () -> HarvestHttpClient.open(URI.create(origin + "/oai"), 10));
             assertEquals(3, server.getRequestCount());
             server.enqueue(new MockResponse().setBody("x".repeat(100000)).throttleBody(1024, 1, TimeUnit.SECONDS));
-            try (InputStream response = HarvestHttpClient.open(URI.create("http://provider.example/resource"), 3)) {
+            try (InputStream response = HarvestHttpClient.open(URI.create(origin + "/resource"), 3)) {
                 assertThrows(IOException.class, response::readAllBytes);
             }
         }
+    }
+
+    /**
+     * The transport accepts only the standard ports, so the loopback provider is
+     * reached through an ephemeral one. Only that port is exempted from the URI
+     * policy; every other destination still runs the real validation, and the
+     * port rule keeps its own assertions in
+     * {@link #rejectsUnsafeSchemesPortsAndCredentials()}.
+     * @param policy static mock of the transport
+     * @param port ephemeral port the loopback server listens on
+     */
+    private static void allowLoopbackPort(MockedStatic<HarvestHttpClient> policy, int port) {
+        policy.when(() -> HarvestHttpClient.validateUri(argThat(uri -> uri != null && uri.getPort() == port)))
+            .thenAnswer(invocation -> null);
     }
     @Test
     public void rejectsNonPublicIpv4AndIpv6() throws Exception {
