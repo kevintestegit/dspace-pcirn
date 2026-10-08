@@ -97,10 +97,16 @@ services:
     # migrations run as an explicit step and a failure is visible instead of
     # turning into a restart loop. Development is the exception: the schema is
     # bootstrapped here so a fresh pgdata volume becomes usable in one command.
+    #
+    # A command handed to the service runs instead of the application, with its
+    # arguments: `docker compose -f docker-compose.dev.yml run --rm dspace
+    # /dspace/bin/dspace user --add ...`. With `bash -c` the first argument
+    # after the script becomes $0 and the rest become "$@".
     entrypoint:
       - /bin/bash
       - '-c'
       - |
+        if [ "$#" -gt 0 ]; then exec "$0" "$@"; fi
         while (!</dev/tcp/dspacedb/5432) > /dev/null 2>&1; do sleep 1; done
         /dspace/bin/dspace database migrate
         exec java -jar /dspace/webapps/server-boot.jar

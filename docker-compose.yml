@@ -32,6 +32,13 @@ services:
   dspace:
     image: "${DSPACE_IMAGE:?Set DSPACE_IMAGE to the versioned backend image}"
     restart: unless-stopped
+    # Mail settings from smtp.env, exactly as the development stack loads them.
+    # The DSpace names (mail.server, mail.server.password, ...) are written with
+    # the Compose environment mapping: __P__ becomes "." and __D__ becomes "-".
+    # The file is required: PRODUCTION.md tells the operator to create it, and a
+    # missing file must fail here instead of silently leaving mail unconfigured.
+    env_file:
+      - ./smtp.env
     environment:
       # dspace.cfg is overridden through environment variables. The mapping is
       # documented in dspace/config/config-definition.xml:
@@ -99,9 +106,19 @@ services:
     # No database wait and no migration: the entrypoint only starts the
     # application. A failed connection or a pending migration surfaces as a
     # startup error instead of an endless loop.
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
+    #
+    # A command handed to the service is executed instead of the application, so
+    # the administrative commands in docs/operations/PRODUCTION.md work:
+    #   docker compose -f docker-compose.yml --env-file .env.production \
+    #     run --rm dspace /dspace/bin/dspace database migrate
+    # With `sh -c`, the first argument after the script becomes $0 and the rest
+    # become "$@". Without the forwarding below the shell would run
+    # /dspace/bin/dspace alone and discard `database migrate`.
+    entrypoint:
+      - /bin/sh
+      - -ec
       - |
+        if [ "$#" -gt 0 ]; then exec "$0" "$@"; fi
         case "$${dspace__P__server__P__url}" in
           https://*) ;;
           *) echo "PUBLIC_REST_URL must use HTTPS" >&2; exit 1 ;;
