@@ -7,7 +7,9 @@ DSpace, UUIDs, handles, grupos, metadados e histórico Flyway sem renumeração.
 Os clientes PostgreSQL devem ter o mesmo major do servidor. Configure os seis
 campos de config.json conforme [README.md](README.md), com diretório 700 e arquivo
 600. Certificados e chaves privadas ficam fora do pacote; a CLI monta os caminhos
-TLS explicitamente configurados no backend somente leitura.
+TLS explicitamente configurados no backend somente leitura, exigindo arquivos
+absolutos e legíveis (não diretórios) para que psql e o driver JDBC usem o mesmo
+material.
 
 ## Exportar na origem
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Administrative operations for a dedicated NTI deployment (Linux, Python 3.9+)."""
 import argparse
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import pwd
 import re
 import shutil
 import signal
@@ -109,10 +111,45 @@ def pg_environment(config):
         raise Error('Parâmetro JDBC não suportado pelos clientes PostgreSQL')
     if params.get('sslmode') not in ('require', 'verify-ca', 'verify-full'):
         raise Error('DB_URL deve especificar sslmode=require, verify-ca ou verify-full')
+    # The certificate is read by the host clients and, through a read-only bind
+    # mount at the same path, by the JDBC driver inside the backend. libpq would
+    # also accept a directory of CAs; the JDBC driver reads one PEM file, so a
+    # directory would work for psql and break the application.
+    if params.get('sslmode') in ('verify-ca', 'verify-full') and 'sslrootcert' not in params:
+        raise Error('DB_URL deve informar sslrootcert para verificar o servidor')
+    for key in ('sslrootcert', 'sslcert', 'sslkey'):
+        if key in params:
+            path = Path(params[key])
+            if not path.is_absolute() or not path.is_file() or not os.access(path, os.R_OK):
+                raise Error(f'DB_URL: {key} deve ser arquivo absoluto e legível')
     return dict(PGHOST=url.hostname, PGPORT=str(url.port or 5432), PGDATABASE=url.path[1:],
                 PGUSER=config['DB_USERNAME'], PGPASSWORD=config['DB_PASSWORD'],
                 PGSSLMODE=params.get('sslmode', 'verify-full'), PGCONNECT_TIMEOUT='10',
                 **{mapping[k]: v for k, v in params.items() if k != 'sslmode'})
+
+
+def docker_config():
+    """Registry credentials to hand to Docker, including under sudo.
+
+    ``sudo`` resets HOME to /root, so a ``docker login ghcr.io`` performed by the
+    operator is not found and the pull fails as unauthenticated. An explicit
+    DOCKER_CONFIG always wins; otherwise the invoking user's directory is used
+    when it actually holds a login.
+    """
+    explicit = os.environ.get('DOCKER_CONFIG')
+    if explicit:
+        return explicit
+    if os.geteuid() == 0:
+        owner = os.environ.get('SUDO_USER')
+        if owner and owner != 'root':
+            try:
+                home = Path(pwd.getpwnam(owner).pw_dir)
+            except KeyError:
+                return None
+            candidate = home / '.docker'
+            if (candidate / 'config.json').is_file():
+                return str(candidate)
+    return None
 
 
 class Deployment:
@@ -123,7 +160,13 @@ class Deployment:
         self.config = config if config is not None else configuration(self.root / 'config.json')
         self.env = {k: v for k, v in os.environ.items()
                     if not k.startswith(('COMPOSE_', 'DOCKER_', 'PG', 'DSPACE_', 'DB_'))}
-        self.env.update(pg_environment(self.config))
+        registry = docker_config()
+        if registry is not None:
+            self.env['DOCKER_CONFIG'] = registry
+        environment = pg_environment(self.config)
+        self.tls_paths = sorted({environment[key] for key in ('PGSSLROOTCERT', 'PGSSLCERT', 'PGSSLKEY')
+                                 if key in environment})
+        self.env.update(environment)
 
     def run(self, args, capture=True, pg=False, timeout=None, stdout_file=None):
         if args[0] == 'docker':
@@ -157,20 +200,46 @@ class Deployment:
     def current(self):
         return manifest(self.root / 'release.json')
 
+    @contextmanager
+    def tls_override(self):
+        """Lay the configured PostgreSQL TLS material into the backend service.
+
+        The host clients and JDBC share the same absolute paths, so each file is
+        mounted read-only at its own path. Mounting is unconditional on trust:
+        Compose must not create an empty placeholder where a certificate was
+        expected, so ``create_host_path`` stays disabled.
+        """
+        if not self.tls_paths:
+            yield None
+            return
+        volumes = [{'type': 'bind', 'source': path.replace('$', '$$'),
+                    'target': path.replace('$', '$$'), 'read_only': True,
+                    'bind': {'create_host_path': False}}
+                   for path in self.tls_paths]
+        with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.tls-',
+                                         suffix='.json') as override:
+            json.dump({'services': {'dspace': {'volumes': volumes}}}, override)
+            override.flush()
+            yield override.name
+
     def compose(self, release, *args, capture=True):
         values = self.config | dict(zip(('DSPACE_IMAGE', 'SOLR_IMAGE', 'ANGULAR_IMAGE'),
                                         (release['images'][k] for k in IMAGE_KEYS)))
         values.update(ASSETSTORE_PATH=str(self.root / 'data/assetstore'),
                       SOLR_DATA_PATH=str(self.root / 'data/solr'))
-        with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.env-') as envfile:
+        with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.env-') as envfile, \
+                self.tls_override() as override:
             saved_env = self.env
             # An empty env-file prevents implicit .env loading; process env preserves secrets literally.
             self.env = self.env | values
             project = 'dspacepcirn-' + hashlib.sha256(str(self.root).encode()).hexdigest()[:12]
+            files = ['-f', str(self.root / 'compose.yml')]
+            if override is not None:
+                files += ['-f', override]
             try:
                 return self.run(['docker', 'compose', '--project-name', project,
                                  '--project-directory', str(self.root), '--env-file', envfile.name,
-                                 '-f', str(self.root / 'compose.yml'), *args], capture=capture)
+                                 *files, *args], capture=capture)
             finally:
                 self.env = saved_env
 

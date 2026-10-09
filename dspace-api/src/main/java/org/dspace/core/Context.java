@@ -18,7 +18,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.logging.log4j.Logger;
 import org.dspace.authorize.ResourcePolicy;
@@ -31,7 +30,6 @@ import org.dspace.event.Event;
 import org.dspace.event.factory.EventServiceFactory;
 import org.dspace.event.service.EventService;
 import org.dspace.storage.rdbms.DatabaseConfigVO;
-import org.dspace.storage.rdbms.DatabaseUtils;
 import org.dspace.utils.DSpace;
 import org.springframework.util.CollectionUtils;
 
@@ -48,10 +46,13 @@ import org.springframework.util.CollectionUtils;
  * changes and free up the resources.
  * <P>
  * The context object is also used as a cache for CM API objects.
+ * <P>
+ * Schema migrations are never run implicitly. They are applied by an explicit
+ * {@code dspace database migrate} before this class is used, so that a database
+ * cannot be changed as a side effect of opening a context.
  */
 public class Context implements AutoCloseable {
     private static final Logger log = org.apache.logging.log4j.LogManager.getLogger(Context.class);
-    protected static final AtomicBoolean databaseUpdated = new AtomicBoolean(false);
 
     /**
      * Current user - null means anonymous access
@@ -169,8 +170,6 @@ public class Context implements AutoCloseable {
      * Initializes a new context object.
      */
     protected void init() {
-        updateDatabase();
-
         if (eventService == null) {
             eventService = EventServiceFactory.getInstance().getEventService();
         }
@@ -198,32 +197,6 @@ public class Context implements AutoCloseable {
             setMode(this.mode);
         }
 
-    }
-
-    /**
-     * Update the DSpace database, ensuring that any necessary migrations are run prior to initializing
-     * Hibernate.
-     * <P>
-     * This is synchronized as it only needs to be run successfully *once* (for the first Context initialized).
-     *
-     * @return true/false, based on whether database was successfully updated
-     */
-    public static synchronized boolean updateDatabase() {
-        //If the database has not been updated yet, update it and remember that.
-        if (databaseUpdated.compareAndSet(false, true)) {
-
-            // Before initializing a Context object, we need to ensure the database
-            // is up-to-date. This ensures any outstanding Flyway migrations are run
-            // PRIOR to Hibernate initializing (occurs when DBConnection is loaded in calling init() method).
-            try {
-                DatabaseUtils.updateDatabase();
-            } catch (SQLException sqle) {
-                log.fatal("Cannot update or initialize database via Flyway!", sqle);
-                databaseUpdated.set(false);
-            }
-        }
-
-        return databaseUpdated.get();
     }
 
     /**

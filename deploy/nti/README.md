@@ -26,13 +26,19 @@ Crie `/etc/dspacepcirn/nti.json`, com permissão 600 (diretório 700):
 
 Os seis campos são obrigatórios. Não há interpolação nem execução de shell.
 `sslmode` explícito aceita require, verify-ca ou verify-full; os parâmetros JDBC
-adicionais aceitos são sslrootcert, sslcert e sslkey. Certificados precisam existir
-no host **e no backend** com os mesmos caminhos: o pipeline deve empacotar a CA
-institucional ou o NTI deve configurar mounts no Compose antes do primeiro start.
+adicionais aceitos são sslrootcert, sslcert e sslkey. Com verify-ca ou verify-full
+o `sslrootcert` é obrigatório. Cada caminho precisa ser um **arquivo absoluto e
+legível no host**: a CLI o monta somente leitura no backend, no mesmo caminho, de
+modo que psql, pg_dump, pg_restore e o driver JDBC leiam o mesmo material. Um
+diretório de CAs é recusado de propósito — o driver JDBC lê um único arquivo PEM,
+então aceitá-lo funcionaria para o psql e quebraria a aplicação.
 Nunca empacote chaves privadas nas imagens. Use require apenas quando autorizado
 pelo NTI; verify-full verifica também a identidade do servidor.
 
-Faça login no GHCR previamente com Docker, quando as imagens forem privadas.
+Faça login no GHCR previamente com Docker, quando as imagens forem privadas. Sob
+`sudo`, o login do usuário que invocou é usado automaticamente (`DOCKER_CONFIG`
+explícito tem precedência; caso contrário `~/.docker` do `SUDO_USER`); sem login o
+pull falha como não autenticado.
 Obtenha e revise o manifesto publicado pelo pipeline; não execute curl | bash.
 
 ```bash
@@ -102,7 +108,9 @@ dspacepcirn rollback --authorize-restore
 com o manifesto e só executa `/dspace/bin/dspace database migrate` se há versões
 faltando. Histórico divergente, falho, repetível ou banco não vazio sem histórico
 exige avaliação do NTI; não há repair/force automáticos. Nenhuma migration acontece
-no startup. A flag não substitui a aprovação administrativa do NTI.
+no startup, e `Context` não executa Flyway: abrir um contexto jamais altera o
+schema, então nem a CLI nem a aplicação migram o banco fora deste comando. A flag
+não substitui a aprovação administrativa do NTI.
 
 ## Backup e recuperação
 
