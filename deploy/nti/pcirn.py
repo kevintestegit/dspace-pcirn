@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Administrative operations for a dedicated NTI deployment (Linux, Python 3.9+)."""
+"""Administrative operations for a dedicated deployment (Linux, Python 3.9+)."""
 import argparse
 from contextlib import contextmanager
 import fcntl
@@ -80,10 +80,11 @@ def configuration(path):
     if path.stat().st_mode & 0o077:
         raise Error('Configuração contém credenciais: execute chmod 600')
     data = read_json(path)
+    optional = {'PG_MODE', 'PG_IMAGE', 'DSPACE_NAME', 'DSPACE_SHORTNAME'}
     required = {'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'PUBLIC_UI_URL',
                 'PUBLIC_REST_URL', 'PUBLIC_REST_HOST'}
-    if set(data) - required or not required <= set(data):
-        raise Error('Configuração: informe apenas DB_* e PUBLIC_* documentados')
+    if set(data) - required - optional or not required <= set(data):
+        raise Error('Configuração: informe somente os campos documentados')
     if any(not isinstance(v, str) or not v or any(c in v for c in '\n\r\x00')
            for v in data.values()):
         raise Error('Configuração: valores devem ser strings não vazias em uma linha')
@@ -94,6 +95,11 @@ def configuration(path):
     if (urlsplit(data['PUBLIC_REST_URL']).hostname != data['PUBLIC_REST_HOST']
             or urlsplit(data['PUBLIC_REST_URL']).path != '/server'):
         raise Error('PUBLIC_REST_HOST deve corresponder à URL REST terminada em /server')
+    if data.get('PG_MODE', 'external') not in ('docker', 'external'):
+        raise Error('PG_MODE deve ser docker ou external')
+    if data.get('PG_MODE') == 'docker':
+        from wizard import validate_docker_config
+        validate_docker_config(data)
     pg_environment(data)
     return data
 
@@ -120,12 +126,16 @@ def pg_environment(config):
     for key in ('sslrootcert', 'sslcert', 'sslkey'):
         if key in params:
             path = Path(params[key])
-            if not path.is_absolute() or not path.is_file() or not os.access(path, os.R_OK):
+            managed_ca = (config.get('PG_MODE') == 'docker' and key == 'sslrootcert'
+                          and path.name == 'server.crt' and path.parent.name == 'postgres-tls')
+            if not path.is_absolute() or (not managed_ca and
+                    (not path.is_file() or not os.access(path, os.R_OK))):
                 raise Error(f'DB_URL: {key} deve ser arquivo absoluto e legível')
     return dict(PGHOST=url.hostname, PGPORT=str(url.port or 5432), PGDATABASE=url.path[1:],
                 PGUSER=config['DB_USERNAME'], PGPASSWORD=config['DB_PASSWORD'],
                 PGSSLMODE=params.get('sslmode', 'verify-full'), PGCONNECT_TIMEOUT='10',
                 **{mapping[k]: v for k, v in params.items() if k != 'sslmode'})
+
 
 
 def docker_config():
@@ -168,18 +178,19 @@ class Deployment:
                                  if key in environment})
         self.env.update(environment)
 
-    def run(self, args, capture=True, pg=False, timeout=None, stdout_file=None):
+    def run(self, args, capture=True, pg=False, timeout=None, stdout_file=None, input_text=None):
         if args[0] == 'docker':
             args = ['docker', '--context', 'default', *args[1:]]
         env = self.env.copy()
         if not pg:
             env = {k: v for k, v in env.items() if not k.startswith('PG')}
         process = subprocess.Popen(args, env=env, text=True,
+                                   stdin=subprocess.PIPE if input_text is not None else None,
                                    stdout=stdout_file if stdout_file is not None else
                                    subprocess.PIPE if capture else None,
                                    stderr=subprocess.PIPE if capture else None)
         try:
-            output, _ = process.communicate(timeout=timeout)
+            output, _ = process.communicate(input=input_text, timeout=timeout)
         except subprocess.TimeoutExpired:
             process.kill()
             process.communicate()
@@ -231,12 +242,18 @@ class Deployment:
                 self.tls_override() as override:
             saved_env = self.env
             # An empty env-file prevents implicit .env loading; process env preserves secrets literally.
-            self.env = self.env | values
             project = 'dspacepcirn-' + hashlib.sha256(str(self.root).encode()).hexdigest()[:12]
+            if self.config.get('PG_MODE') == 'docker':
+                from wizard import postgres_compose
+                postgres_compose(self)
+                values['DB_URL'] = 'jdbc:postgresql://postgres:5432/' + self.config['DB_URL'].split('/', 3)[-1]
             files = ['-f', str(self.root / 'compose.yml')]
+            if self.config.get('PG_MODE') == 'docker':
+                files += ['-f', str(self.root / 'postgres-compose.json')]
             if override is not None:
                 files += ['-f', override]
             try:
+                self.env = self.env | values
                 return self.run(['docker', 'compose', '--project-name', project,
                                  '--project-directory', str(self.root), '--env-file', envfile.name,
                                  *files, *args], capture=capture)
@@ -255,7 +272,7 @@ class Deployment:
         for tool in ('pg_dump', 'pg_restore'):
             client = re.search(r'(\d+)\.', self.run([tool, '--version']))
             if not client or int(client[1]) != server:
-                raise Error('pg_dump/pg_restore devem ter o mesmo major do PostgreSQL externo')
+                raise Error('pg_dump/pg_restore devem ter o mesmo major do PostgreSQL')
         self.compose(self.current(), 'config', '--quiet')
         print('doctor: Docker, Compose, PostgreSQL TLS e configuração OK')
 
@@ -267,7 +284,7 @@ class Deployment:
         table = self.sql("SELECT to_regclass('public.schema_version') IS NOT NULL;")
         if table == 'f':
             if self.user_objects() != 0:
-                raise Error('Banco sem histórico Flyway deve estar vazio; avaliação NTI necessária')
+                raise Error('Banco sem histórico Flyway deve estar vazio; revisão administrativa necessária')
             return True
         if table != 't':
             raise Error('Resposta inesperada ao consultar histórico Flyway')
@@ -278,7 +295,7 @@ class Deployment:
         applied = set()
         for row in rows:
             if row['version'] is None or not row['success']:
-                raise Error('Histórico repetível/falho requer avaliação NTI')
+                raise Error('Histórico repetível/falho requer revisão administrativa')
             wanted = expected.get(row['version'])
             if not wanted or any(row[k] != wanted[k] for k in ('script', 'checksum')):
                 raise Error('Histórico Flyway divergente do manifesto; nenhuma migration executada')
@@ -316,11 +333,11 @@ class Deployment:
         print('health: aplicação, Solr, frontend e PostgreSQL OK')
 
     def up(self, release):
-        self.compose(release, 'up', '-d', '--wait', '--wait-timeout', '600')
+        self.compose(release, 'up', '-d', '--wait', '--wait-timeout', '600', *SERVICES)
         self.healthy(release)
 
     def stop(self, release):
-        self.compose(release, 'stop', '--timeout', '60')
+        self.compose(release, 'stop', '--timeout', '60', *SERVICES)
 
     def backup(self, release, restart=True):
         try:
@@ -477,7 +494,7 @@ def provision(args):
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     if not (root / 'config.json').exists():
         if config is None:
-            raise Error('Primeira instalação exige --config fornecido pelo NTI')
+            raise Error('Primeira instalação exige --config com credenciais protegidas')
         write_json(root / 'config.json', config)
     elif config is not None and config != configuration(root / 'config.json'):
         raise Error('Configuração existente diverge; nada sobrescrito')
@@ -486,7 +503,7 @@ def provision(args):
         compose_source = SOURCE / 'docker-compose.yml'
     # The generated Compose file loads <root>/smtp.env, so the file has to exist
     # before the first `up`. It is seeded from the repository template, which
-    # leaves mail explicitly disabled; mail settings are the NTI's to fill in.
+    # leaves mail explicitly disabled; mail settings are the administrator to fill in.
     smtp_source = Path(__file__).with_name('smtp.env.example')
     if not smtp_source.exists():
         smtp_source = SOURCE / 'smtp.env.example'
@@ -498,6 +515,7 @@ def provision(args):
              root / 'dspace/config/local.cfg': 'db.schema = public\n',
              root / 'bin/pcirn.py': Path(__file__).read_text(),
              root / 'bin/data_migration.py': Path(__file__).with_name('data_migration.py').read_text(),
+             root / 'bin/wizard.py': Path(__file__).with_name('wizard.py').read_text(),
              root / 'bin/preflight.py': Path(__file__).with_name('preflight.py').read_text(),
              root / 'bin/dspacepcirn': Path(__file__).with_name('dspacepcirn').read_text(),
              root / 'bin/compose.template.yml': compose_source.read_text(),
@@ -521,10 +539,11 @@ def provision(args):
 
 def main(argv=None):
     os.umask(0o077)
-    parser = argparse.ArgumentParser(description='Administração PCIRN / NTI')
-    parser.add_argument('command', choices=('install', 'update', 'status', 'version', 'doctor',
+    parser = argparse.ArgumentParser(description='DSPACEPCIRN — instalação e administração')
+    parser.add_argument('command', nargs='?', choices=('install', 'update', 'status', 'version', 'doctor',
                                           'health', 'logs', 'backup', 'restore', 'rollback',
                                           'export-data', 'migrate-data', 'verify-data'))
+    parser.add_argument('--wizard', action='store_true')
     parser.add_argument('--root', default='/srv/dspacepcirn')
     parser.add_argument('--manifest')
     parser.add_argument('--config')
@@ -536,6 +555,12 @@ def main(argv=None):
     parser.add_argument('--expected', type=Path)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args(argv)
+    if args.command is None:
+        from wizard import menu
+        return menu(args)
+    if args.command == 'install' and (args.wizard or not args.config):
+        from wizard import install
+        return install(args)
     if args.command in ('install', 'update') and not args.manifest:
         parser.error('install/update exige --manifest')
     if args.command == 'restore' and not args.backup:
@@ -557,7 +582,8 @@ def main(argv=None):
                      'bin/data_migration.py', 'data-verification.json', 'data-import.json',
                      'bin/compose.template.yml', 'bin/smtp.env.example', 'data',
                      'data/assetstore', 'data/solr', 'backups', 'dspace', 'dspace/config',
-                     'dspace/config/local.cfg'):
+                     'dspace/config/local.cfg', 'wizard.json', 'report.json', 'bin/wizard.py',
+                     'postgres-compose.json', 'postgres.json', 'postgres-tls', 'postgres-password'):
         path = root / relative
         if path.resolve() != path:
             raise Error('Arquivos/diretórios administrativos não podem ser links simbólicos')
@@ -586,6 +612,9 @@ def main(argv=None):
             dep.compose(release, 'logs', '--tail', '200', *(['--follow'] if args.follow else []),
                         capture=False)
         elif args.command in ('install', 'update'):
+            if dep.config.get('PG_MODE') == 'docker':
+                from wizard import provision_postgres
+                provision_postgres(dep)
             dep.doctor()
             if args.data_package:
                 from data_migration import migrate_data

@@ -1,30 +1,135 @@
-# Instalação e administração pelo NTI
+# DSPACEPCIRN
 
 `install.sh` instala uma stack dedicada; `dspacepcirn` administra essa instalação.
 O instalador não instala pacotes do sistema. Pré-requisitos: Linux, Bash, Python
 3.9+, Docker Engine, Compose >= 2.20 e `psql`, `pg_dump`, `pg_restore` (cliente
-PostgreSQL da mesma versão major do servidor). Execute como usuário
+PostgreSQL da mesma versão major do servidor), OpenSSL para PostgreSQL em Docker. Execute como usuário
 administrativo com acesso ao Docker e leitura/escrita dos dados do Solr, incluindo
 arquivos pertencentes ao UID do container; normalmente root no servidor dedicado.
-O NTI fornece banco **dedicado**, credenciais, certificados TLS e os privilégios
-necessários para Flyway e restore. Não há serviço PostgreSQL nesta stack.
+O administrador fornece banco **dedicado**, credenciais, certificados TLS e os privilégios
+necessários para Flyway e restore. O banco pode ser externo ou provisionado em Docker pelo wizard.
+
+## Menu e instalação interativa
+
+Prepare uma cópia revisada do código em um diretório administrativo. Para disponibilizar
+`sudo dspacepcirn` antes da primeira instalação, crie um link para essa cópia (use o
+caminho absoluto real; não substitua um comando existente):
+
+```bash
+sudo ln -s /CAMINHO/ABSOLUTO/deploy/nti/dspacepcirn /usr/local/bin/dspacepcirn
+sudo dspacepcirn
+```
+
+`./install.sh` sem argumentos abre o mesmo menu. O menu oferece instalação/retomada,
+status, diagnóstico, validação dos serviços, backup, exportação e verificação de dados.
+Os subcomandos abaixo continuam disponíveis sem interação. Para outra raiz, use
+`sudo dspacepcirn --root /srv/outra-instalacao`.
+
+O wizard contém sete etapas, com validação antes de cada avanço:
+
+1. **Diagnóstico do servidor:** Ubuntu, ferramentas, Docker local, Compose, recursos,
+   imagens da arquitetura correta, portas livres e conflitos de rede.
+2. **Escolha do PostgreSQL:** somente **PostgreSQL em Docker** e **PostgreSQL externo**.
+   O modo externo solicita host, porta, banco dedicado vazio, usuário, senha e TLS,
+   e verifica conexão, ownership, permissões e versões dos clientes.
+3. **Importação de dados:** seleciona um pacote criado por `export-data`, verifica
+   SHA-256, relatório de origem e igualdade entre a release do pacote e a instalação.
+   A restauração efetiva ocorre na etapa 5, com o backend parado.
+4. **Configuração institucional:** nome, sigla, URLs HTTPS da interface e do REST,
+   seguida da validação completa de recursos e PostgreSQL.
+5. **Instalação:** chama `migrate-data` somente no destino vazio; chama `verify-data`
+   antes do deploy existente. O wizard não autoriza Flyway, mesmo se receber
+   `--authorize-migrations`: o pacote deve conter o histórico completo da release.
+6. **Validação dos serviços:** backend, Solr e interface precisam estar saudáveis,
+   e PostgreSQL precisa responder.
+7. **Relatório final:** `ROOT/report.json` registra release, modo do PostgreSQL,
+   URLs e conclusão das etapas, sem credenciais.
+
+O wizard exige um pacote de dados. Para inicialização de uma base nova sem acervo,
+use o comando direto `install --config ... --manifest ... --authorize-migrations`
+após revisar e autorizar a inicialização; esse comando permanece disponível para
+automação. Para um pacote de release antiga, instale primeiro essa mesma release,
+e só depois execute `update` com autorização explícita das migrations necessárias.
+
+### PostgreSQL em Docker
+
+Informe uma imagem oficial `postgres@sha256:DIGEST_REAL_64_HEX`, PostgreSQL 15, 16
+ou 17, com o mesmo major dos clientes locais. O instalador confirma a versão antes
+de criar o volume. PostgreSQL 18+ usa outro layout de dados e é recusado neste fluxo.
+O volume externo persistente e o container têm nome derivado da raiz da instalação.
+Um recurso preexistente é recusado; recursos criados pelo wizard só são reutilizados
+quando o diário e os rótulos de propriedade coincidem. Nenhum volume é excluído.
+
+A porta escolhida é publicada somente em `127.0.0.1` (padrão 55432). O backend usa
+`postgres:5432` na rede privada do Compose. Todas as conexões TCP exigem TLS e SCRAM;
+o certificado local é verificado por `verify-ca`. A senha administrativa é aleatória,
+lida de arquivo protegido, e o usuário da aplicação não recebe superuser, createdb
+ou createrole. O certificado e a chave ficam em `ROOT/postgres-tls`; a chave tem
+permissão 600 e pertence ao usuário PostgreSQL da imagem. O certificado tem validade
+de dez anos; sua substituição exige manutenção planejada antes de expirar.
+
+### Retomada e correção de erros
+
+`ROOT/wizard.json` guarda entradas e etapas concluídas; ele contém credenciais e
+recebe permissão 600, dentro de uma raiz 700. A senha é digitada sem eco. Configurações,
+credenciais temporárias e relatórios também usam 600. A CLI não retransmite stderr
+de ferramentas, que poderia revelar senhas. Mantenha todos esses arquivos privados.
+
+Em erro recuperável, corrija o problema e escolha tentar novamente, ou saia e execute
+`sudo dspacepcirn` para retomar na etapa pendente. Em automação, repita o mesmo comando,
+com a mesma configuração, manifesto e pacote. Antes do provisionamento do banco,
+é possível corrigir as credenciais em `--config`; após essa etapa, mudanças de
+configuração são recusadas para proteger o destino. Uma importação já verificada não é
+executada de novo; manifesto ou pacote alterados bloqueiam a retomada.
+
+Se houver `operation.json` (restauração/deploy interrompido) ou `postgres.json` com
+estado `creating`, a retomada fica bloqueada para revisão manual. Não remova o diário
+para forçar nova importação, não limpe a base e não execute `down -v`. Examine o diário,
+o staging e os backups, preserve os recursos e determine quais operações concluíram.
+Para falha durante a primeira restauração, use uma nova raiz e um novo banco vazio
+após preservar o destino interrompido; o wizard não reinicializa esse destino.
+Recuperação de instalação já existente continua pelos comandos explícitos de
+restore/rollback documentados abaixo, com autorização própria.
+
+As portas HTTP internas não validam a publicação HTTPS. Configure o proxy reverso
+conforme [exemplo existente](../nginx/pcirn.conf.example), certificados e SMTP antes
+de liberar acesso aos usuários. O relatório confirma os serviços internos.
+
+### Automação das sete etapas
+
+```bash
+sudo dspacepcirn install --wizard --root /srv/dspacepcirn \
+  --config /etc/dspacepcirn/config.json --manifest /backup/release.json \
+  --data-package /backup/pacote
+# Equivalente:
+sudo ./install.sh --root /srv/dspacepcirn \
+  --config /etc/dspacepcirn/config.json --manifest /backup/release.json \
+  --data-package /backup/pacote
+```
+
+Para Docker, acrescente `PG_MODE: "docker"` e `PG_IMAGE` à configuração abaixo,
+e use `DB_URL` com host `127.0.0.1`, porta explícita, `sslmode=verify-ca` e
+`sslrootcert=/srv/dspacepcirn/postgres-tls/server.crt` (ajuste à raiz escolhida).
+Esse certificado é criado pelo wizard. Para externo, `PG_MODE: "external"` é opcional.
+`DSPACE_NAME` e `DSPACE_SHORTNAME` são opcionais na automação. Nenhuma senha deve
+ser passada na linha de comando.
 
 ## Configuração inicial
 
-Crie `/etc/dspacepcirn/nti.json`, com permissão 600 (diretório 700):
+Crie `/etc/dspacepcirn/config.json`, com permissão 600 (diretório 700):
 
 ```json
 {
-  "DB_URL": "jdbc:postgresql://postgres.nti.example:5432/pcirn?sslmode=verify-full&sslrootcert=/etc/ssl/nti-ca.pem",
+  "DB_URL": "jdbc:postgresql://postgres.example:5432/pcirn?sslmode=verify-full&sslrootcert=/etc/ssl/repository-ca.pem",
   "DB_USERNAME": "pcirn",
-  "DB_PASSWORD": "FORNECIDO_PELO_NTI",
+  "DB_PASSWORD": "SUBSTITUA_PELA_SENHA",
   "PUBLIC_UI_URL": "https://repositorio.example",
   "PUBLIC_REST_URL": "https://repositorio.example/server",
   "PUBLIC_REST_HOST": "repositorio.example"
 }
 ```
 
-Os seis campos são obrigatórios. Não há interpolação nem execução de shell.
+Os seis campos abaixo são obrigatórios; os campos opcionais são documentados acima. Não há interpolação nem execução de shell.
 `sslmode` explícito aceita require, verify-ca ou verify-full; os parâmetros JDBC
 adicionais aceitos são sslrootcert, sslcert e sslkey. Com verify-ca ou verify-full
 o `sslrootcert` é obrigatório. Cada caminho precisa ser um **arquivo absoluto e
@@ -33,7 +138,7 @@ modo que psql, pg_dump, pg_restore e o driver JDBC leiam o mesmo material. Um
 diretório de CAs é recusado de propósito — o driver JDBC lê um único arquivo PEM,
 então aceitá-lo funcionaria para o psql e quebraria a aplicação.
 Nunca empacote chaves privadas nas imagens. Use require apenas quando autorizado
-pelo NTI; verify-full verifica também a identidade do servidor.
+pelo administrador; verify-full verifica também a identidade do servidor.
 
 Faça login no GHCR previamente com Docker, quando as imagens forem privadas. Sob
 `sudo`, o login do usuário que invocou é usado automaticamente (`DOCKER_CONFIG`
@@ -42,8 +147,8 @@ pull falha como não autenticado.
 Obtenha e revise o manifesto publicado pelo pipeline; não execute curl | bash.
 
 ```bash
-./install.sh --root /srv/dspacepcirn --config /etc/dspacepcirn/nti.json \
-  --manifest /tmp/release.json --authorize-migrations
+./install.sh --root /srv/dspacepcirn --config /etc/dspacepcirn/config.json \
+  --manifest /tmp/release.json --data-package /backup/pacote
 export PATH="/srv/dspacepcirn/bin:$PATH"
 dspacepcirn status --root /srv/dspacepcirn
 ```
@@ -53,7 +158,7 @@ em `ROOT/compose.yml`, a configuração complementar em `ROOT/dspace/config/loca
 o e-mail em `ROOT/smtp.env` e os dados em `ROOT/data/{assetstore,solr}`. O
 projeto Compose deriva do hash do caminho absoluto, isolando instalações em
 diretórios diferentes. As portas padrão são 127.0.0.1:8501 e 127.0.0.1:4000; o
-NTI configura o proxy TLS conforme
+administrador configura o proxy TLS conforme
 [exemplo existente](../nginx/pcirn.conf.example). Em hosts com outra stack usando
 essas portas, use outro host ou ajuste o Compose dedicado antes do start,
 incluindo portas, subnet e trusted proxy range juntos para evitar sobreposição
@@ -64,7 +169,7 @@ partir de `smtp.env.example` — com o envio desabilitado — e nunca o sobrescr
 preencha o SMTP institucional e remova `mail__P__server__P__disabled` para
 habilitar as notificações. O arquivo precisa existir para o Compose subir.
 
-Arquivos existentes nunca são sobrescritos por install. Configuração fornecida
+Bancos e volumes existentes nunca são substituídos durante a instalação. A configuração provisória criada pelo próprio wizard é atualizada na etapa institucional; os demais arquivos existentes são preservados. Configuração fornecida
 que divergir da existente causa erro. A segunda instalação da mesma release apenas
 verifica os pré-requisitos e a saúde, sem backup, migration ou restart. Para outra
 release, use update. O diretório deve ser dedicado e não conter links nos caminhos
@@ -74,7 +179,8 @@ administrativos. Não aponte a CLI para o checkout, mounts ou banco da stack atu
 
 | Comando | Operação |
 |---|---|
-| `install --config ARQUIVO --manifest ARQUIVO` | Provisiona e inicia; autoriza migrations separadamente |
+| `install --wizard --config ARQUIVO --manifest ARQUIVO --data-package DIRETÓRIO` | Executa as sete etapas sem prompts |
+| `install --config ARQUIVO --manifest ARQUIVO` | Provisionamento direto para automação; migrations exigem autorização explícita |
 | `update --manifest ARQUIVO` | Consulta histórico, baixa digests, para stack, faz backup e atualiza |
 | `status` | Estado de todos os containers e aviso de operação interrompida |
 | `version` | Release registrada (status informa operações ainda pendentes) |
@@ -107,17 +213,17 @@ dspacepcirn rollback --authorize-restore
 `public.schema_version` em transação READ ONLY, compara versões/scripts/checksums
 com o manifesto e só executa `/dspace/bin/dspace database migrate` se há versões
 faltando. Histórico divergente, falho, repetível ou banco não vazio sem histórico
-exige avaliação do NTI; não há repair/force automáticos. Nenhuma migration acontece
+exige avaliação do administrador; não há repair/force automáticos. Nenhuma migration acontece
 no startup, e `Context` não executa Flyway: abrir um contexto jamais altera o
 schema, então nem a CLI nem a aplicação migram o banco fora deste comando. A flag
-não substitui a aprovação administrativa do NTI.
+não substitui a aprovação administrativa do administrador.
 
 ## Backup e recuperação
 
 Toda atualização efetiva e instalação inicial gera backup **antes** de migrations
 ou start das novas imagens. A stack inteira fica parada para que banco, assetstore
 e Solr sejam consistentes; outros escritores no banco dedicado devem estar
-suspensos pelo NTI. O backup contém dump custom PostgreSQL, dois arquivos tar,
+suspensos pelo administrador. O backup contém dump custom PostgreSQL, dois arquivos tar,
 manifesto, identificação de origem e SHA-256 de cada arquivo. Dump é validado com
 pg_restore --list; archives rejeitam travessia de diretórios, links e dispositivos.
 Só backups completos são publicados em `ROOT/backups/backup-*`; `.incomplete-*`
@@ -130,8 +236,8 @@ faz um novo backup, extrai os dados em staging e reconstrói o schema public num
 única transação PostgreSQL. DROP SCHEMA CASCADE remove também objetos criados por
 migrations posteriores; simples pg_restore --clean não garante esse resultado.
 Banco dedicado é obrigatório. Ownership/ACLs originais não são transportados; os
-objetos restaurados pertencem ao usuário NTI configurado. Configuração existente,
-credenciais e local.cfg são preservados; role grants/certificados continuam sob NTI.
+objetos restaurados pertencem ao usuário administrador configurado. Configuração existente,
+credenciais e local.cfg são preservados; role grants/certificados continuam sob administração local.
 Dados anteriores e SQL ficam em `.restore-*` (permissões privadas) para recuperação;
 a CLI não os exclui. Restore/rollback descartam logicamente alterações posteriores
 ao backup selecionado, que ficam no backup de segurança criado antes do restore.
@@ -201,17 +307,19 @@ bash -n install.sh deploy/nti/dspacepcirn
 ```
 
 Executáveis simulados verificam a CLI por subprocessos, sem daemon Docker ou banco.
-Incluem falhas em pull, dump, migration, conexão, health e restore, corrupção de
+Incluem os dois tipos de PostgreSQL, falhas nas sete etapas, retomada sem reimportação,
+recusa de volumes existentes, TLS/SCRAM, falhas em pull, dump, migration, conexão, health e restore, corrupção de
 backup, autorização, concorrência, proteção de credenciais e travessia de archives.
 `test_production_operations.py` cobre a superfície fora da CLI — entrypoint do
 Compose, `scripts/backup-dspace.sh`, publicação manual e SMTP — e usa o Docker
 apenas para renderizar configurações; sem o CLI do Docker esses casos são pulados.
-Referências técnicas: [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
+Referências técnicas: [imagem oficial PostgreSQL](https://hub.docker.com/_/postgres),
+[TLS PostgreSQL](https://www.postgresql.org/docs/17/ssl-tcp.html), [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
 [interpolação Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
 e [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).
 
 ## Homologação numa VM limpa
 
-O [roteiro de homologação](HOMOLOGACAO.md) inclui preflight automático no install.sh,
+O [roteiro de homologação](HOMOLOGACAO.md) inclui preflight automático no wizard,
 executor E2E opt-in e critérios de aprovação/recuperação. O contrato GHCR acima
 permanece inalterado. Testes locais são simulados e não iniciam containers.

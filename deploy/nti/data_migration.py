@@ -9,7 +9,7 @@ import tarfile
 import tempfile
 from uuid import UUID
 
-from pcirn import Error, checksum, manifest, read_json, write_json
+from pcirn import SERVICES, Error, checksum, manifest, read_json, write_json
 
 REQUIRED_TABLES = {'item', 'bitstream', 'eperson', 'community', 'collection', 'handle',
                    'schema_version', 'resourcepolicy', 'metadatavalue', 'epersongroup'}
@@ -102,11 +102,11 @@ def tree_fingerprint(root):
 
 
 def quiescent(dep):
-    if dep.compose(dep.current(), 'ps', '--status', 'running', '-q').strip():
+    if dep.compose(dep.current(), 'ps', '--status', 'running', '-q', *SERVICES).strip():
         raise Error('Migração exige aplicação parada')
     if dep.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
                "AND pid <> pg_backend_pid();") != '0':
-        raise Error('NTI deve suspender todas as outras conexões ao banco dedicado')
+        raise Error('O administrador deve suspender todas as outras conexões ao banco dedicado')
 
 
 def export_data(dep, output):
@@ -179,7 +179,7 @@ def migrate_data(dep, package):
     server = int(dep.sql('SHOW server_version_num;')) // 10000
     version = re.search(r'(\d+)\.', dep.run(['pg_restore', '--version']))
     if not version or int(version[1]) != server:
-        raise Error('pg_restore deve ter o mesmo major do PostgreSQL externo')
+        raise Error('pg_restore deve ter o mesmo major do PostgreSQL')
     journal = {'operation': 'migrate-data', 'status': 'started', 'checksums': hashes}
     write_json(dep.root / 'operation.json', journal)
     try:
