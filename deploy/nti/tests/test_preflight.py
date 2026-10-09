@@ -52,6 +52,11 @@ class PreflightTests(unittest.TestCase):
         self.assertFalse(self.root.exists())
         self.assertFalse(any('pull' in c.args[0] or 'up' in c.args[0] for c in self.dep.run.call_args_list))
 
+    def test_server_stage_never_connects_to_postgresql(self):
+        preflight.check(self.dep, self.release, server_only=True)
+        self.dep.sql.assert_not_called()
+        self.assertFalse(any('pull' in c.args[0] or 'up' in c.args[0] for c in self.dep.run.call_args_list))
+
     def test_low_memory_blocks(self):
         self.info['MemTotal'] = 2 * 1024 ** 3
         with self.assertRaisesRegex(preflight.Error, 'memória'): preflight.check(self.dep, self.release)

@@ -16,6 +16,7 @@ spec.loader.exec_module(pcirn)
 
 FAKE = r'''#!/usr/bin/env python3
 import json, os, pathlib, sys
+from urllib.parse import urlsplit
 root = pathlib.Path(os.environ['PCIRN_TEST'])
 state_file = root / 'fake-state.json'
 state = json.loads(state_file.read_text()) if state_file.exists() else {'rows': [], 'running': False}
@@ -24,7 +25,7 @@ if args[:2] == ['--context', 'default']: args = args[2:]
 name = pathlib.Path(sys.argv[0]).name
 with (root / 'calls.jsonl').open('a') as log:
     log.write(json.dumps([name, args]) + '\n')
-db_name = os.environ.get('PGDATABASE', os.environ.get('DB_URL', '').split('/')[-1].split('?')[0])
+db_name = os.environ.get('PGDATABASE', urlsplit(os.environ.get('DB_URL', '').removeprefix('jdbc:')).path.lstrip('/'))
 db = state if db_name in ('', 'pcirn') else state.setdefault('databases', {}).setdefault(db_name, {'rows': []})
 failure = (root / 'fail').read_text() if (root / 'fail').exists() else ''
 def save(): state_file.write_text(json.dumps(state))

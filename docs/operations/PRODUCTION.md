@@ -56,6 +56,9 @@ O REST só honra `X-Forwarded-*` vindo dessa faixa.
 
 O schema **não** é migrado na inicialização do container. Uma migração que falha
 deve aparecer como erro legível, não como um container reiniciando em loop.
+`Context` também não executa Flyway: abrir um contexto jamais altera o schema, de
+modo que nenhum comando nem start de aplicação migra o banco sem pedido explícito.
+A única via é o comando abaixo.
 Depois de publicar uma versão que altera o schema:
 
 ```bash

@@ -41,7 +41,7 @@ def ports_available():
             handle.close()
 
 
-def check(dep, release):
+def check(dep, release, server_only=False):
     if not ubuntu():
         raise Error('preflight: VM Ubuntu obrigatória para esta homologação')
     for tool in ('docker', 'psql', 'pg_dump', 'pg_restore'):
@@ -88,6 +88,41 @@ def check(dep, release):
                     raise Error('preflight: dados ilegíveis ou links não aceitos pelo backup')
             if path.stat().st_dev != ancestor.stat().st_dev:
                 raise Error('preflight: dados e staging precisam estar no mesmo filesystem')
+    project = 'dspacepcirn-' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
+    ids = dep.run(['docker', 'network', 'ls', '-q'], timeout=30).split()
+    if ids:
+        networks = json.loads(dep.run(['docker', 'network', 'inspect', *ids], timeout=30))
+        for network in networks:
+            if network['Name'] == project + '_dspacenet':
+                continue
+            for subnet in network.get('IPAM', {}).get('Config') or []:
+                value = ipaddress.ip_network(subnet.get('Subnet', '0.0.0.0/32'), strict=False)
+                if value.version == 4 and value.overlaps(SUBNET):
+                    raise Error('preflight: subnet 10.250.50.0/24 sobrepõe rede Docker existente')
+    if server_only:
+        if shutil.disk_usage(ancestor).free < 30 * GIB:
+            raise Error("preflight: mínimo 30 GiB livres")
+        if not ports_available():
+            raise Error("preflight: portas da aplicação ocupadas")
+        return
+    pg = database(dep)
+    data_size = sum(p.stat().st_size for p in (root / 'data').rglob('*') if p.is_file())
+    required = 30 * GIB + 3 * (pg['size'] + data_size)
+    for path in (ancestor, Path(info['DockerRootDir'])):
+        if shutil.disk_usage(path).free < required:
+            raise Error('preflight: disco livre insuficiente (30 GiB + 3x banco/dados)')
+    installed = (root / 'installed.json').exists()
+    if not installed and not ports_available():
+        raise Error('preflight: portas 127.0.0.1:8501/4000 ocupadas')
+    for key in ('PGSSLROOTCERT', 'PGSSLCERT', 'PGSSLKEY'):
+        certificate = dep.env.get(key)
+        if certificate and not os.access(certificate, os.R_OK):
+            raise Error('preflight: certificado PostgreSQL ilegível no host')
+    print(f'preflight: OK — Ubuntu, Linux/{arch}, recursos, GHCR, rede, TLS e permissões')
+
+
+def database(dep):
+    """Validate TLS, ownership and client versions without writing database objects."""
     pg = json.loads(dep.sql("SELECT json_build_object("
                            "'ssl', (SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()),"
                            "'connect', has_database_privilege(current_database(),'CONNECT'),"
@@ -107,30 +142,7 @@ def check(dep, release):
         client = re.search(r'(\d+)\.', dep.run([tool, '--version'], timeout=30))
         if not client or int(client[1]) != pg['server'] // 10000:
             raise Error('preflight: clientes PostgreSQL devem ter major igual ao servidor')
-    data_size = sum(p.stat().st_size for p in (root / 'data').rglob('*') if p.is_file())
-    required = 30 * GIB + 3 * (pg['size'] + data_size)
-    for path in (ancestor, Path(info['DockerRootDir'])):
-        if shutil.disk_usage(path).free < required:
-            raise Error('preflight: disco livre insuficiente (30 GiB + 3x banco/dados)')
-    installed = (root / 'installed.json').exists()
-    if not installed and not ports_available():
-        raise Error('preflight: portas 127.0.0.1:8501/4000 ocupadas')
-    project = 'dspacepcirn-' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
-    ids = dep.run(['docker', 'network', 'ls', '-q'], timeout=30).split()
-    if ids:
-        networks = json.loads(dep.run(['docker', 'network', 'inspect', *ids], timeout=30))
-        for network in networks:
-            if network['Name'] == project + '_dspacenet':
-                continue
-            for subnet in network.get('IPAM', {}).get('Config') or []:
-                value = ipaddress.ip_network(subnet.get('Subnet', '0.0.0.0/32'), strict=False)
-                if value.version == 4 and value.overlaps(SUBNET):
-                    raise Error('preflight: subnet 10.250.50.0/24 sobrepõe rede Docker existente')
-    for key in ('PGSSLROOTCERT', 'PGSSLCERT', 'PGSSLKEY'):
-        certificate = dep.env.get(key)
-        if certificate and not os.access(certificate, os.R_OK):
-            raise Error('preflight: certificado PostgreSQL ilegível no host')
-    print(f'preflight: OK — Ubuntu, Linux/{arch}, recursos, GHCR, rede, TLS e permissões')
+    return pg
 
 
 def main(argv=None):
@@ -139,6 +151,8 @@ def main(argv=None):
     parser.add_argument('--config')
     parser.add_argument('--manifest', required=True)
     parser.add_argument('--authorize-migrations', action='store_true')
+    parser.add_argument('--data-package', type=Path)
+    parser.add_argument('--authorize-restore', action='store_true')
     args = parser.parse_args(argv)
     root = Path(args.root).absolute()
     config = configuration(args.config or root / 'config.json')

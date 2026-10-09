@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Administrative operations for a dedicated NTI deployment (Linux, Python 3.9+)."""
+"""Administrative operations for a dedicated deployment (Linux, Python 3.9+)."""
 import argparse
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import pwd
 import re
 import shutil
 import signal
@@ -78,10 +80,11 @@ def configuration(path):
     if path.stat().st_mode & 0o077:
         raise Error('Configuração contém credenciais: execute chmod 600')
     data = read_json(path)
+    optional = {'PG_MODE', 'PG_IMAGE', 'DSPACE_NAME', 'DSPACE_SHORTNAME'}
     required = {'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'PUBLIC_UI_URL',
                 'PUBLIC_REST_URL', 'PUBLIC_REST_HOST'}
-    if set(data) - required or not required <= set(data):
-        raise Error('Configuração: informe apenas DB_* e PUBLIC_* documentados')
+    if set(data) - required - optional or not required <= set(data):
+        raise Error('Configuração: informe somente os campos documentados')
     if any(not isinstance(v, str) or not v or any(c in v for c in '\n\r\x00')
            for v in data.values()):
         raise Error('Configuração: valores devem ser strings não vazias em uma linha')
@@ -92,6 +95,11 @@ def configuration(path):
     if (urlsplit(data['PUBLIC_REST_URL']).hostname != data['PUBLIC_REST_HOST']
             or urlsplit(data['PUBLIC_REST_URL']).path != '/server'):
         raise Error('PUBLIC_REST_HOST deve corresponder à URL REST terminada em /server')
+    if data.get('PG_MODE', 'external') not in ('docker', 'external'):
+        raise Error('PG_MODE deve ser docker ou external')
+    if data.get('PG_MODE') == 'docker':
+        from wizard import validate_docker_config
+        validate_docker_config(data)
     pg_environment(data)
     return data
 
@@ -109,10 +117,49 @@ def pg_environment(config):
         raise Error('Parâmetro JDBC não suportado pelos clientes PostgreSQL')
     if params.get('sslmode') not in ('require', 'verify-ca', 'verify-full'):
         raise Error('DB_URL deve especificar sslmode=require, verify-ca ou verify-full')
+    # The certificate is read by the host clients and, through a read-only bind
+    # mount at the same path, by the JDBC driver inside the backend. libpq would
+    # also accept a directory of CAs; the JDBC driver reads one PEM file, so a
+    # directory would work for psql and break the application.
+    if params.get('sslmode') in ('verify-ca', 'verify-full') and 'sslrootcert' not in params:
+        raise Error('DB_URL deve informar sslrootcert para verificar o servidor')
+    for key in ('sslrootcert', 'sslcert', 'sslkey'):
+        if key in params:
+            path = Path(params[key])
+            managed_ca = (config.get('PG_MODE') == 'docker' and key == 'sslrootcert'
+                          and path.name == 'server.crt' and path.parent.name == 'postgres-tls')
+            if not path.is_absolute() or (not managed_ca and
+                    (not path.is_file() or not os.access(path, os.R_OK))):
+                raise Error(f'DB_URL: {key} deve ser arquivo absoluto e legível')
     return dict(PGHOST=url.hostname, PGPORT=str(url.port or 5432), PGDATABASE=url.path[1:],
                 PGUSER=config['DB_USERNAME'], PGPASSWORD=config['DB_PASSWORD'],
                 PGSSLMODE=params.get('sslmode', 'verify-full'), PGCONNECT_TIMEOUT='10',
                 **{mapping[k]: v for k, v in params.items() if k != 'sslmode'})
+
+
+
+def docker_config():
+    """Registry credentials to hand to Docker, including under sudo.
+
+    ``sudo`` resets HOME to /root, so a ``docker login ghcr.io`` performed by the
+    operator is not found and the pull fails as unauthenticated. An explicit
+    DOCKER_CONFIG always wins; otherwise the invoking user's directory is used
+    when it actually holds a login.
+    """
+    explicit = os.environ.get('DOCKER_CONFIG')
+    if explicit:
+        return explicit
+    if os.geteuid() == 0:
+        owner = os.environ.get('SUDO_USER')
+        if owner and owner != 'root':
+            try:
+                home = Path(pwd.getpwnam(owner).pw_dir)
+            except KeyError:
+                return None
+            candidate = home / '.docker'
+            if (candidate / 'config.json').is_file():
+                return str(candidate)
+    return None
 
 
 class Deployment:
@@ -123,19 +170,27 @@ class Deployment:
         self.config = config if config is not None else configuration(self.root / 'config.json')
         self.env = {k: v for k, v in os.environ.items()
                     if not k.startswith(('COMPOSE_', 'DOCKER_', 'PG', 'DSPACE_', 'DB_'))}
-        self.env.update(pg_environment(self.config))
+        registry = docker_config()
+        if registry is not None:
+            self.env['DOCKER_CONFIG'] = registry
+        environment = pg_environment(self.config)
+        self.tls_paths = sorted({environment[key] for key in ('PGSSLROOTCERT', 'PGSSLCERT', 'PGSSLKEY')
+                                 if key in environment})
+        self.env.update(environment)
 
-    def run(self, args, capture=True, pg=False, timeout=None):
+    def run(self, args, capture=True, pg=False, timeout=None, stdout_file=None, input_text=None):
         if args[0] == 'docker':
             args = ['docker', '--context', 'default', *args[1:]]
         env = self.env.copy()
         if not pg:
             env = {k: v for k, v in env.items() if not k.startswith('PG')}
         process = subprocess.Popen(args, env=env, text=True,
-                                   stdout=subprocess.PIPE if capture else None,
+                                   stdin=subprocess.PIPE if input_text is not None else None,
+                                   stdout=stdout_file if stdout_file is not None else
+                                   subprocess.PIPE if capture else None,
                                    stderr=subprocess.PIPE if capture else None)
         try:
-            output, _ = process.communicate(timeout=timeout)
+            output, _ = process.communicate(input=input_text, timeout=timeout)
         except subprocess.TimeoutExpired:
             process.kill()
             process.communicate()
@@ -156,20 +211,52 @@ class Deployment:
     def current(self):
         return manifest(self.root / 'release.json')
 
+    @contextmanager
+    def tls_override(self):
+        """Lay the configured PostgreSQL TLS material into the backend service.
+
+        The host clients and JDBC share the same absolute paths, so each file is
+        mounted read-only at its own path. Mounting is unconditional on trust:
+        Compose must not create an empty placeholder where a certificate was
+        expected, so ``create_host_path`` stays disabled.
+        """
+        if not self.tls_paths:
+            yield None
+            return
+        volumes = [{'type': 'bind', 'source': path.replace('$', '$$'),
+                    'target': path.replace('$', '$$'), 'read_only': True,
+                    'bind': {'create_host_path': False}}
+                   for path in self.tls_paths]
+        with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.tls-',
+                                         suffix='.json') as override:
+            json.dump({'services': {'dspace': {'volumes': volumes}}}, override)
+            override.flush()
+            yield override.name
+
     def compose(self, release, *args, capture=True):
         values = self.config | dict(zip(('DSPACE_IMAGE', 'SOLR_IMAGE', 'ANGULAR_IMAGE'),
                                         (release['images'][k] for k in IMAGE_KEYS)))
         values.update(ASSETSTORE_PATH=str(self.root / 'data/assetstore'),
                       SOLR_DATA_PATH=str(self.root / 'data/solr'))
-        with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.env-') as envfile:
+        with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.env-') as envfile, \
+                self.tls_override() as override:
             saved_env = self.env
             # An empty env-file prevents implicit .env loading; process env preserves secrets literally.
-            self.env = self.env | values
             project = 'dspacepcirn-' + hashlib.sha256(str(self.root).encode()).hexdigest()[:12]
+            if self.config.get('PG_MODE') == 'docker':
+                from wizard import postgres_compose
+                postgres_compose(self)
+                values['DB_URL'] = 'jdbc:postgresql://postgres:5432/' + self.config['DB_URL'].split('/', 3)[-1]
+            files = ['-f', str(self.root / 'compose.yml')]
+            if self.config.get('PG_MODE') == 'docker':
+                files += ['-f', str(self.root / 'postgres-compose.json')]
+            if override is not None:
+                files += ['-f', override]
             try:
+                self.env = self.env | values
                 return self.run(['docker', 'compose', '--project-name', project,
                                  '--project-directory', str(self.root), '--env-file', envfile.name,
-                                 '-f', str(self.root / 'compose.yml'), *args], capture=capture)
+                                 *files, *args], capture=capture)
             finally:
                 self.env = saved_env
 
@@ -181,13 +268,17 @@ class Deployment:
         if tuple(int(n) for n in compose_version.split('.')[:2]) < (2, 20):
             raise Error('Docker Compose >= 2.20 obrigatório')
         self.run(['docker', 'info'])
-        server = int(self.sql('SHOW server_version_num;')) // 10000
-        for tool in ('pg_dump', 'pg_restore'):
-            client = re.search(r'(\d+)\.', self.run([tool, '--version']))
-            if not client or int(client[1]) != server:
-                raise Error('pg_dump/pg_restore devem ter o mesmo major do PostgreSQL externo')
+        self.database_clients()
         self.compose(self.current(), 'config', '--quiet')
         print('doctor: Docker, Compose, PostgreSQL TLS e configuração OK')
+
+    def database_clients(self):
+        """Reject incompatible host tools before stopping services or restoring data."""
+        server = int(self.sql('SHOW server_version_num;')) // 10000
+        for tool in ('psql', 'pg_dump', 'pg_restore'):
+            client = re.search(r'(\d+)\.', self.run([tool, '--version']))
+            if not client or int(client[1]) != server:
+                raise Error('psql/pg_dump/pg_restore devem ter o mesmo major do PostgreSQL')
 
     def sql(self, query):
         return self.run(['psql', '-X', '-q', '--no-password', '-At', '-v', 'ON_ERROR_STOP=1',
@@ -197,7 +288,7 @@ class Deployment:
         table = self.sql("SELECT to_regclass('public.schema_version') IS NOT NULL;")
         if table == 'f':
             if self.user_objects() != 0:
-                raise Error('Banco sem histórico Flyway deve estar vazio; avaliação NTI necessária')
+                raise Error('Banco sem histórico Flyway deve estar vazio; revisão administrativa necessária')
             return True
         if table != 't':
             raise Error('Resposta inesperada ao consultar histórico Flyway')
@@ -208,10 +299,12 @@ class Deployment:
         applied = set()
         for row in rows:
             if row['version'] is None or not row['success']:
-                raise Error('Histórico repetível/falho requer avaliação NTI')
+                raise Error('Histórico repetível/falho requer revisão administrativa')
             wanted = expected.get(row['version'])
             if not wanted or any(row[k] != wanted[k] for k in ('script', 'checksum')):
                 raise Error('Histórico Flyway divergente do manifesto; nenhuma migration executada')
+            if row['version'] in applied:
+                raise Error('Histórico Flyway contém versão duplicada')
             applied.add(row['version'])
         return bool(set(expected) - applied)
 
@@ -244,13 +337,14 @@ class Deployment:
         print('health: aplicação, Solr, frontend e PostgreSQL OK')
 
     def up(self, release):
-        self.compose(release, 'up', '-d', '--wait', '--wait-timeout', '600')
+        self.compose(release, 'up', '-d', '--wait', '--wait-timeout', '600', *SERVICES)
         self.healthy(release)
 
     def stop(self, release):
-        self.compose(release, 'stop', '--timeout', '60')
+        self.compose(release, 'stop', '--timeout', '60', *SERVICES)
 
     def backup(self, release, restart=True):
+        self.database_clients()
         try:
             self.stop(release)
             directory = Path(tempfile.mkdtemp(prefix='.incomplete-', dir=self.root / 'backups'))
@@ -303,7 +397,10 @@ class Deployment:
             (self.root / 'operation.json').unlink()
             print(f"{'install' if initial else 'update'}: {target['version']}")
         except (Error, OSError, KeyboardInterrupt, ValueError, tarfile.TarError):
-            if not journal['migration_started']:
+            if initial:
+                (self.root / 'installed.json').unlink(missing_ok=True)
+                self.stop(target)
+            elif not journal['migration_started']:
                 try:
                     write_json(self.root / 'release.json', old)
                     if (self.root / 'installed.json').exists():
@@ -321,6 +418,7 @@ class Deployment:
     def restore(self, directory, authorize):
         if not authorize:
             raise Error('Restore substitui banco/dados: --authorize-restore obrigatório')
+        self.database_clients()
         release = verified_backup(directory, self)
         self.compose(release, 'pull')
         journal_file = self.root / 'operation.json'
@@ -402,7 +500,7 @@ def provision(args):
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     if not (root / 'config.json').exists():
         if config is None:
-            raise Error('Primeira instalação exige --config fornecido pelo NTI')
+            raise Error('Primeira instalação exige --config com credenciais protegidas')
         write_json(root / 'config.json', config)
     elif config is not None and config != configuration(root / 'config.json'):
         raise Error('Configuração existente diverge; nada sobrescrito')
@@ -411,7 +509,7 @@ def provision(args):
         compose_source = SOURCE / 'docker-compose.yml'
     # The generated Compose file loads <root>/smtp.env, so the file has to exist
     # before the first `up`. It is seeded from the repository template, which
-    # leaves mail explicitly disabled; mail settings are the NTI's to fill in.
+    # leaves mail explicitly disabled; mail settings are the administrator to fill in.
     smtp_source = Path(__file__).with_name('smtp.env.example')
     if not smtp_source.exists():
         smtp_source = SOURCE / 'smtp.env.example'
@@ -422,6 +520,8 @@ def provision(args):
              root / 'smtp.env': smtp_source.read_text(),
              root / 'dspace/config/local.cfg': 'db.schema = public\n',
              root / 'bin/pcirn.py': Path(__file__).read_text(),
+             root / 'bin/data_migration.py': Path(__file__).with_name('data_migration.py').read_text(),
+             root / 'bin/wizard.py': Path(__file__).with_name('wizard.py').read_text(),
              root / 'bin/preflight.py': Path(__file__).with_name('preflight.py').read_text(),
              root / 'bin/dspacepcirn': Path(__file__).with_name('dspacepcirn').read_text(),
              root / 'bin/compose.template.yml': compose_source.read_text(),
@@ -445,9 +545,11 @@ def provision(args):
 
 def main(argv=None):
     os.umask(0o077)
-    parser = argparse.ArgumentParser(description='Administração PCIRN / NTI')
-    parser.add_argument('command', choices=('install', 'update', 'status', 'version', 'doctor',
-                                          'health', 'logs', 'backup', 'restore', 'rollback'))
+    parser = argparse.ArgumentParser(description='DSPACEPCIRN — instalação e administração')
+    parser.add_argument('command', nargs='?', choices=('install', 'update', 'status', 'version', 'doctor',
+                                          'health', 'logs', 'backup', 'restore', 'rollback',
+                                          'export-data', 'migrate-data', 'verify-data'))
+    parser.add_argument('--wizard', action='store_true')
     parser.add_argument('--root', default='/srv/dspacepcirn')
     parser.add_argument('--manifest')
     parser.add_argument('--config')
@@ -455,22 +557,39 @@ def main(argv=None):
     parser.add_argument('--authorize-migrations', action='store_true')
     parser.add_argument('--authorize-restore', action='store_true')
     parser.add_argument('--follow', action='store_true')
+    parser.add_argument('--data-package', type=Path)
+    parser.add_argument('--expected', type=Path)
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args(argv)
+    if args.command is None:
+        from wizard import menu
+        return menu(args)
+    if args.command == 'install' and (args.wizard or not args.config):
+        from wizard import install
+        return install(args)
     if args.command in ('install', 'update') and not args.manifest:
         parser.error('install/update exige --manifest')
     if args.command == 'restore' and not args.backup:
         parser.error('restore exige --backup')
+    if args.command == 'export-data' and not args.output:
+        parser.error('export-data exige --output')
+    if args.command == 'migrate-data' and not args.data_package:
+        parser.error('migrate-data exige --data-package')
+    if args.data_package and args.command not in ('install', 'migrate-data'):
+        parser.error('--data-package vale apenas para install/migrate-data')
     root = Path(args.root).absolute()
     if root == Path('/') or root.resolve() != root:
         raise Error('Use um diretório dedicado sem links simbólicos')
-    if args.command == 'install':
+    if args.command == 'install' or (args.command == 'migrate-data' and args.manifest):
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     for relative in ('config.json', '.lock', 'compose.yml', 'smtp.env', 'release.json',
                      'operation.json', 'installed.json', 'previous.json', 'bin',
                      'bin/dspacepcirn', 'bin/pcirn.py', 'bin/preflight.py',
+                     'bin/data_migration.py', 'data-verification.json', 'data-import.json',
                      'bin/compose.template.yml', 'bin/smtp.env.example', 'data',
                      'data/assetstore', 'data/solr', 'backups', 'dspace', 'dspace/config',
-                     'dspace/config/local.cfg'):
+                     'dspace/config/local.cfg', 'wizard.json', 'report.json', 'bin/wizard.py',
+                     'postgres-compose.json', 'postgres.json', 'postgres-tls', 'postgres-password'):
         path = root / relative
         if path.resolve() != path:
             raise Error('Arquivos/diretórios administrativos não podem ser links simbólicos')
@@ -479,8 +598,10 @@ def main(argv=None):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise Error('Outra operação administrativa está em execução') from exc
-        dep = provision(args) if args.command == 'install' else Deployment(root)
-        if (root / 'operation.json').exists() and args.command in ('install', 'update', 'backup'):
+        dep = provision(args) if (args.command == 'install' or
+                                  (args.command == 'migrate-data' and args.manifest)) else Deployment(root)
+        if (root / 'operation.json').exists() and args.command in ('install', 'update', 'backup',
+                                                                 'export-data', 'migrate-data', 'health'):
             raise Error('Operação interrompida: examine operation.json e execute restore/rollback')
         release = dep.current()
         if args.command == 'version':
@@ -497,10 +618,26 @@ def main(argv=None):
             dep.compose(release, 'logs', '--tail', '200', *(['--follow'] if args.follow else []),
                         capture=False)
         elif args.command in ('install', 'update'):
+            if dep.config.get('PG_MODE') == 'docker':
+                from wizard import provision_postgres
+                provision_postgres(dep)
             dep.doctor()
+            if args.data_package:
+                from data_migration import migrate_data
+                migrate_data(dep, args.data_package)
             dep.deploy(manifest(args.manifest), args.authorize_migrations,
                        initial=args.command == 'install')
+        elif args.command == 'export-data':
+            from data_migration import export_data
+            export_data(dep, args.output)
+        elif args.command == 'migrate-data':
+            from data_migration import migrate_data
+            migrate_data(dep, args.data_package)
+        elif args.command == 'verify-data':
+            from data_migration import verify_data
+            verify_data(dep, args.expected, args.output)
         elif args.command == 'backup':
+            dep.database_clients()
             write_json(root / 'operation.json', {'previous': release, 'backup': None,
                                                'migration_started': False})
             dep.backup(release)
@@ -523,6 +660,7 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
+    sys.modules['pcirn'] = sys.modules[__name__]
     def interrupted(signum, frame):
         raise KeyboardInterrupt
 
