@@ -73,6 +73,9 @@ administrativos. Não aponte a CLI para o checkout, mounts ou banco da stack atu
 | `status` | Estado de todos os containers e aviso de operação interrompida |
 | `version` | Release registrada (status informa operações ainda pendentes) |
 | `doctor` | Ferramentas, daemon, Compose, TLS PostgreSQL e validade da configuração |
+| `export-data --output DIRETÓRIO` | Para a stack e exporta dump, assetstore, Solr e checksums; mantém a aplicação parada |
+| `migrate-data --data-package DIRETÓRIO` | Restaura dump, assetstore e Solr em banco vazio, sem start ou Flyway |
+| `verify-data [--expected RELATÓRIO] [--output ARQUIVO]` | Confere registros, Flyway e integridade dos arquivos |
 | `health` | Exige três serviços running/healthy e conexão PostgreSQL |
 | `logs [--follow]` | Últimas 200 linhas; saída pode conter dados pessoais da aplicação |
 | `backup` | Para stack, cria backup validado, reinicia com healthcheck |
@@ -81,6 +84,12 @@ administrativos. Não aponte a CLI para o checkout, mounts ou banco da stack atu
 
 Todos aceitam `--root` (padrão `/srv/dspacepcirn`). Operações concorrentes são
 bloqueadas. Erros retornam 1, argumentos inválidos 2 e interrupção 130.
+
+Para migrar o acervo na instalação inicial, use `install.sh --data-package DIRETÓRIO`.
+O [roteiro de migração](MIGRACAO.md) descreve preparação do pacote, configuração TLS,
+SQL de provisionamento para o DBA, recusa de banco ocupado e
+recuperação de falhas. Nenhuma importação bem-sucedida é marcada como instalação
+concluída antes do deploy e healthcheck.
 
 ```bash
 dspacepcirn update --manifest /tmp/release-nova.json --authorize-migrations

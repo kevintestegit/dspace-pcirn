@@ -125,14 +125,15 @@ class Deployment:
                     if not k.startswith(('COMPOSE_', 'DOCKER_', 'PG', 'DSPACE_', 'DB_'))}
         self.env.update(pg_environment(self.config))
 
-    def run(self, args, capture=True, pg=False, timeout=None):
+    def run(self, args, capture=True, pg=False, timeout=None, stdout_file=None):
         if args[0] == 'docker':
             args = ['docker', '--context', 'default', *args[1:]]
         env = self.env.copy()
         if not pg:
             env = {k: v for k, v in env.items() if not k.startswith('PG')}
         process = subprocess.Popen(args, env=env, text=True,
-                                   stdout=subprocess.PIPE if capture else None,
+                                   stdout=stdout_file if stdout_file is not None else
+                                   subprocess.PIPE if capture else None,
                                    stderr=subprocess.PIPE if capture else None)
         try:
             output, _ = process.communicate(timeout=timeout)
@@ -212,6 +213,8 @@ class Deployment:
             wanted = expected.get(row['version'])
             if not wanted or any(row[k] != wanted[k] for k in ('script', 'checksum')):
                 raise Error('Histórico Flyway divergente do manifesto; nenhuma migration executada')
+            if row['version'] in applied:
+                raise Error('Histórico Flyway contém versão duplicada')
             applied.add(row['version'])
         return bool(set(expected) - applied)
 
@@ -303,7 +306,10 @@ class Deployment:
             (self.root / 'operation.json').unlink()
             print(f"{'install' if initial else 'update'}: {target['version']}")
         except (Error, OSError, KeyboardInterrupt, ValueError, tarfile.TarError):
-            if not journal['migration_started']:
+            if initial:
+                (self.root / 'installed.json').unlink(missing_ok=True)
+                self.stop(target)
+            elif not journal['migration_started']:
                 try:
                     write_json(self.root / 'release.json', old)
                     if (self.root / 'installed.json').exists():
@@ -422,6 +428,7 @@ def provision(args):
              root / 'smtp.env': smtp_source.read_text(),
              root / 'dspace/config/local.cfg': 'db.schema = public\n',
              root / 'bin/pcirn.py': Path(__file__).read_text(),
+             root / 'bin/data_migration.py': Path(__file__).with_name('data_migration.py').read_text(),
              root / 'bin/preflight.py': Path(__file__).with_name('preflight.py').read_text(),
              root / 'bin/dspacepcirn': Path(__file__).with_name('dspacepcirn').read_text(),
              root / 'bin/compose.template.yml': compose_source.read_text(),
@@ -447,7 +454,8 @@ def main(argv=None):
     os.umask(0o077)
     parser = argparse.ArgumentParser(description='Administração PCIRN / NTI')
     parser.add_argument('command', choices=('install', 'update', 'status', 'version', 'doctor',
-                                          'health', 'logs', 'backup', 'restore', 'rollback'))
+                                          'health', 'logs', 'backup', 'restore', 'rollback',
+                                          'export-data', 'migrate-data', 'verify-data'))
     parser.add_argument('--root', default='/srv/dspacepcirn')
     parser.add_argument('--manifest')
     parser.add_argument('--config')
@@ -455,19 +463,29 @@ def main(argv=None):
     parser.add_argument('--authorize-migrations', action='store_true')
     parser.add_argument('--authorize-restore', action='store_true')
     parser.add_argument('--follow', action='store_true')
+    parser.add_argument('--data-package', type=Path)
+    parser.add_argument('--expected', type=Path)
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args(argv)
     if args.command in ('install', 'update') and not args.manifest:
         parser.error('install/update exige --manifest')
     if args.command == 'restore' and not args.backup:
         parser.error('restore exige --backup')
+    if args.command == 'export-data' and not args.output:
+        parser.error('export-data exige --output')
+    if args.command == 'migrate-data' and not args.data_package:
+        parser.error('migrate-data exige --data-package')
+    if args.data_package and args.command not in ('install', 'migrate-data'):
+        parser.error('--data-package vale apenas para install/migrate-data')
     root = Path(args.root).absolute()
     if root == Path('/') or root.resolve() != root:
         raise Error('Use um diretório dedicado sem links simbólicos')
-    if args.command == 'install':
+    if args.command == 'install' or (args.command == 'migrate-data' and args.manifest):
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     for relative in ('config.json', '.lock', 'compose.yml', 'smtp.env', 'release.json',
                      'operation.json', 'installed.json', 'previous.json', 'bin',
                      'bin/dspacepcirn', 'bin/pcirn.py', 'bin/preflight.py',
+                     'bin/data_migration.py', 'data-verification.json', 'data-import.json',
                      'bin/compose.template.yml', 'bin/smtp.env.example', 'data',
                      'data/assetstore', 'data/solr', 'backups', 'dspace', 'dspace/config',
                      'dspace/config/local.cfg'):
@@ -479,8 +497,10 @@ def main(argv=None):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise Error('Outra operação administrativa está em execução') from exc
-        dep = provision(args) if args.command == 'install' else Deployment(root)
-        if (root / 'operation.json').exists() and args.command in ('install', 'update', 'backup'):
+        dep = provision(args) if (args.command == 'install' or
+                                  (args.command == 'migrate-data' and args.manifest)) else Deployment(root)
+        if (root / 'operation.json').exists() and args.command in ('install', 'update', 'backup',
+                                                                 'export-data', 'migrate-data', 'health'):
             raise Error('Operação interrompida: examine operation.json e execute restore/rollback')
         release = dep.current()
         if args.command == 'version':
@@ -498,8 +518,20 @@ def main(argv=None):
                         capture=False)
         elif args.command in ('install', 'update'):
             dep.doctor()
+            if args.data_package:
+                from data_migration import migrate_data
+                migrate_data(dep, args.data_package)
             dep.deploy(manifest(args.manifest), args.authorize_migrations,
                        initial=args.command == 'install')
+        elif args.command == 'export-data':
+            from data_migration import export_data
+            export_data(dep, args.output)
+        elif args.command == 'migrate-data':
+            from data_migration import migrate_data
+            migrate_data(dep, args.data_package)
+        elif args.command == 'verify-data':
+            from data_migration import verify_data
+            verify_data(dep, args.expected, args.output)
         elif args.command == 'backup':
             write_json(root / 'operation.json', {'previous': release, 'backup': None,
                                                'migration_started': False})
@@ -523,6 +555,7 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
+    sys.modules['pcirn'] = sys.modules[__name__]
     def interrupted(signum, frame):
         raise KeyboardInterrupt
 

@@ -139,6 +139,8 @@ def main(argv=None):
     parser.add_argument('--config')
     parser.add_argument('--manifest', required=True)
     parser.add_argument('--authorize-migrations', action='store_true')
+    parser.add_argument('--data-package', type=Path)
+    parser.add_argument('--authorize-restore', action='store_true')
     args = parser.parse_args(argv)
     root = Path(args.root).absolute()
     config = configuration(args.config or root / 'config.json')

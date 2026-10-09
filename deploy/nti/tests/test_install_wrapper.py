@@ -35,5 +35,23 @@ class InstallWrapperTests(unittest.TestCase):
         self.assertTrue(calls[0].endswith('/preflight.py'))
         self.assertTrue(calls[1].endswith('/pcirn.py'))
 
+    def test_initial_data_options_reach_preflight_and_install(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shim = root / 'python3'
+            shim.write_text('#!/bin/bash\nprintf "%s\\n" "$@" >> "$WRAPPER_LOG"\n')
+            shim.chmod(0o700)
+            log = root / 'calls'
+            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
+                       WRAPPER_LOG=str(log))
+            result = subprocess.run(['bash', str(WRAPPER), '--manifest', 'fictional.json',
+                                     '--data-package', 'fictional-package', '--authorize-restore'],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            lines = log.read_text().splitlines()
+            self.assertEqual(lines.count('--data-package'), 2)
+            self.assertEqual(lines.count('fictional-package'), 2)
+            self.assertEqual(lines.count('--authorize-restore'), 2)
+
 
 if __name__ == '__main__': unittest.main()
