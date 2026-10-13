@@ -7,5 +7,8 @@ Keep explicit local packages and noninteractive commands. The descriptor is sepa
 from release-manifest.json, avoiding a circular archive/manifest checksum.
 
 Use concise English prompts/errors. Record internal progress in a private log.
-No VPS, source database, push or release changes. Tests cover corrupt downloads,
+Initial scope excluded VPS, source database, push or release changes. On completion,
+the user authorized branch push and RC publication, then a brief local application
+pause for a private complete source export with restart. No main merge, VPS deploy
+or source data publication is authorized. Tests cover corrupt downloads,
 unsafe archives/redirects, retries, both database selections and unchanged data guards.

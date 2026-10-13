@@ -60,3 +60,27 @@ disk space and incompatible release/profile are refused before restoration.
 Public hosting is suitable for fictitious demonstration data. Institutional exports
 contain user and repository data; publish them only with explicit authorization.
 No data package or public URL is bundled with this implementation yet.
+
+## Existing local Docker installation
+
+For an existing installation that predates the manager, the maintainer can use:
+
+```bash
+python3 scripts/export-docker-data.py \
+  --manifest /private/release-manifest.json \
+  --output /private/new-export
+```
+
+This explicitly selected source uses the local default Docker Unix endpoint.
+It checks the complete institutional Flyway history against the manifest before
+stopping the selected backend, frontend and Solr. PostgreSQL stays running.
+Queries and the dump use PostgreSQL clients inside its container over a verified
+Unix socket; no host server, TLS settings or database credentials are changed.
+The helper copies documents and statistics, fingerprints every table and file,
+validates the dump, and always attempts to restart all stopped source services.
+The operator must confirm application health afterward. Partial exports and
+private working copies are retained for inspection; existing outputs are refused.
+
+The export is private and does not publish data. Its manifest identifies the
+intended import release, whose entire history must match the source exactly.
+Use that release when importing; do not manually replace the export's manifest.

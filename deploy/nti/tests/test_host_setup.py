@@ -25,6 +25,7 @@ class HostSetupTests(unittest.TestCase):
         self.patches = [mock.patch.object(host, 'detect', return_value=self.info.copy()),
                         mock.patch.object(host, 'resources', return_value={'ports': {}}),
                         mock.patch.object(host, 'network'),
+                        mock.patch.object(host, 'client_path', return_value=None),
                         mock.patch.object(host.os, 'geteuid', return_value=0),
                         mock.patch.object(host.shutil, 'which', side_effect=lambda tool:
                                           '/usr/bin/' + tool if tool in self.tools else None),
@@ -42,8 +43,8 @@ class HostSetupTests(unittest.TestCase):
             if self.compose is None:
                 raise host.Error('absent')
             return self.compose
-        if args[0] in ('psql', 'pg_dump', 'pg_restore'):
-            return f'{args[0]} (PostgreSQL) {self.major}.2'
+        if Path(args[0]).name in ('psql', 'pg_dump', 'pg_restore'):
+            return f'{Path(args[0]).name} (PostgreSQL) {self.major}.2'
         if args[:2] == ['systemctl', 'is-active']:
             return 'active' if self.active else 'inactive'
         if args[:2] == ['systemctl', 'is-enabled']:
@@ -103,6 +104,13 @@ class HostSetupTests(unittest.TestCase):
         self.confirm.assert_not_called()
         self.assertFalse(any(c[0] == 'apt-get' or c[:2] in
                              (['systemctl', 'start'], ['systemctl', 'enable']) for c in self.commands))
+
+    def test_clients_use_exact_major_directory_when_present(self):
+        with mock.patch.object(host, 'client_path', return_value='/usr/lib/postgresql/16/bin'):
+            host.ensure_clients(self.run, self.confirm, 16)
+        self.assertEqual([c[0] for c in self.commands],
+                         ['/usr/lib/postgresql/16/bin/' + tool for tool in ('psql', 'pg_dump', 'pg_restore')])
+        self.confirm.assert_not_called()
 
     def test_missing_dependencies_one_confirmation_no_server_package(self):
         self.tools.clear()

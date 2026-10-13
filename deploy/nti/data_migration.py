@@ -48,10 +48,12 @@ def check_file(root, row):
     return True
 
 
-def snapshot(dep, assetstore, solr):
+def snapshot(dep, assetstore, solr, *, local_socket=False):
     """Fingerprint all public table rows, including identifiers, metadata and policies."""
-    if dep.sql('SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid();') != 't':
-        raise Error('PostgreSQL connection without TLS')
+    transport = ('SELECT inet_client_addr() IS NULL;' if local_socket else
+                 'SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid();')
+    if dep.sql(transport) != 't':
+        raise Error('PostgreSQL requires TLS or a verified local socket')
     dep.pending(dep.current())
     names = json.loads(dep.sql("SELECT COALESCE(json_agg(tablename ORDER BY tablename), '[]') "
                                "FROM pg_tables WHERE schemaname='public';"))

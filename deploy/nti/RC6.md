@@ -1,4 +1,4 @@
-# RC5 delivery
+# RC6 delivery
 
 This candidate adds automatic Ubuntu dependencies, release discovery, managed or
 external PostgreSQL, verified empty bootstrap, optional HTTPS data import and a
@@ -19,6 +19,14 @@ Local validation: 229 installer tests passed, including the PostgreSQL 15
 export/restore test. The public test certificate has explicit read permission so
 the test also works after other tests set umask 077; its private key stays private.
 Log: `/tmp/pcirn-rc5-final-installer.log`.
+
+The RC5 publication gate found six fixture errors on GitHub: simulated PostgreSQL
+commands were accidentally combined with real client directories from the runner.
+No RC5 images or release were published. The fixture now isolates that lookup and
+explicitly tests selection of the exact-major directory. RC6 keeps the gate enabled.
+After this fix and the private source export helper, 236 tests passed, followed by
+seven focused export tests after pinning its local Docker endpoint.
+Log: `/tmp/pcirn-rc6-installer.log`.
 
 Remaining acceptance checks: native CI results, installation from a clean Ubuntu
 24.04 VM with systemd, complete backend/Angular/Solr health, and a hosted data
