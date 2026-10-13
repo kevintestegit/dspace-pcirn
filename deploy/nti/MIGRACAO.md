@@ -111,3 +111,13 @@ vida da aplicação simulado. Remove apenas o container criado pelo próprio tes
 Confere identidades, handles, políticas, histórico, sequências, arquivos, recusa de
 banco ocupado e detecção de corrupção. Não comprova consultas de estatísticas em
 Solr real ou execução do backend; esses pontos ficam para homologação do produto.
+
+## Perfil de banco em instalações novas
+
+Uma instalação inicializada com `DB_PROFILE: "fresh"` exporta esse perfil no
+`source-report.json`, protegido pelos checksums do pacote. O wizard configura o
+mesmo perfil no destino antes da restauração; `migrate-data` não interativo exige
+que `DB_PROFILE` corresponda à origem. Um perfil divergente é recusado antes de
+importar o dump. Backups também registram o perfil e recusam restauração em uma
+configuração diferente. O histórico institucional existente permanece no perfil
+padrão. Consulte [bootstrap](BOOTSTRAP.md) e [relatório de validação](AUTOMACAO.md).

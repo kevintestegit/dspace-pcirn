@@ -168,6 +168,17 @@ class DataMigrationTests(unittest.TestCase):
                 (self.base / 'fake-state.json').unlink()
                 self.tables[table] = old
 
+    def test_fresh_profile_mismatch_refused_before_restore(self):
+        path = self.package / 'source-report.json'
+        report = json.loads(path.read_text())
+        report['database_profile'] = 'fresh'
+        path.write_text(json.dumps(report))
+        self.hashes()
+        result = self.cli(success=False)
+        self.assertIn('Perfil do banco diverge', result.stderr)
+        self.assertFalse(any('--dbname' in args for _, args in self.fixture.calls()))
+        self.assertFalse((self.root / 'operation.json').exists())
+
     def test_corrupt_package_rejected_before_restore(self):
         with (self.package / 'database.dump').open('ab') as stream:
             stream.write(b'corrupt')

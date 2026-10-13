@@ -26,10 +26,10 @@ def available_memory():
     return int(values['MemAvailable'].split()[0]) * 1024
 
 
-def ports_available():
+def ports_available(ports=(8501, 4000)):
     sockets = []
     try:
-        for port in (8501, 4000):
+        for port in ports:
             handle = socket.socket()
             sockets.append(handle)
             handle.bind(('127.0.0.1', port))
@@ -39,6 +39,58 @@ def ports_available():
     finally:
         for handle in sockets:
             handle.close()
+
+
+def select_resources(run, root):
+    """Choose free loopback ports and a nonoverlapping private Docker subnet."""
+    ports = []
+    for preferred in (8501, 4000):
+        with socket.socket() as listener:
+            try:
+                listener.bind(('127.0.0.1', preferred))
+            except OSError:
+                listener.bind(('127.0.0.1', 0))
+            ports.append(str(listener.getsockname()[1]))
+    ids = run(['docker', 'network', 'ls', '-q'], timeout=30).split()
+    networks = json.loads(run(['docker', 'network', 'inspect', *ids], timeout=30)) if ids else []
+    occupied = [ipaddress.ip_network(c['Subnet'], strict=False) for n in networks
+                for c in n.get('IPAM', {}).get('Config') or [] if c.get('Subnet')]
+    for index in range(50, 250):
+        subnet = ipaddress.ip_network(f'10.250.{index}.0/24')
+        if not any(n.version == 4 and n.overlaps(subnet) for n in occupied):
+            return {'REST_BIND_PORT': ports[0], 'UI_BIND_PORT': ports[1],
+                    'DSPACE_NETWORK_SUBNET': str(subnet), 'TRUSTED_PROXY_NETWORK': f'10.250.{index}'}
+    raise Error('Nenhuma rede Docker dedicada disponível')
+
+
+def owns_application_ports(dep, release, ports):
+    """Accept occupied ports only from the journal's running, pinned application."""
+    path = dep.root / 'operation.json'
+    if not path.exists():
+        return False
+    journal = json.loads(path.read_text())
+    if journal.get('kind') != 'fresh-install' or journal.get('target') != release:
+        return False
+    project = 'dspacepcirn-' + hashlib.sha256(str(dep.root).encode()).hexdigest()[:12]
+    ids = dep.run(['docker', 'ps', '-q', '--filter', 'label=com.docker.compose.project=' + project],
+                  timeout=30).split()
+    if not ids:
+        return False
+    rows = json.loads(dep.run(['docker', 'inspect', *ids], timeout=30))
+    owned = set()
+    images = {'dspace': release['images']['backend'], 'dspace-angular': release['images']['frontend']}
+    for row in rows:
+        labels = row.get('Config', {}).get('Labels') or {}
+        service = labels.get('com.docker.compose.service')
+        if (service not in images or labels.get('com.docker.compose.project') != project
+                or row['Config'].get('Image') != images[service]
+                or not row.get('State', {}).get('Running')):
+            continue
+        for bindings in (row.get('NetworkSettings', {}).get('Ports') or {}).values():
+            for binding in bindings or []:
+                if binding.get('HostIp') == '127.0.0.1':
+                    owned.add(int(binding['HostPort']))
+    return all(port in owned or ports_available((port,)) for port in ports)
 
 
 def check(dep, release, server_only=False):
@@ -61,7 +113,10 @@ def check(dep, release, server_only=False):
     if info['NCPU'] < 2 or info['MemTotal'] < 8 * GIB or available_memory() < 4 * GIB:
         raise Error('preflight: mínimo 2 vCPU, memória total 8 GiB e disponível 4 GiB')
     for image in release['images'].values():
-        descriptors = json.loads(dep.run(['docker', 'manifest', 'inspect', '--verbose', image], timeout=30))
+        try:
+            descriptors = json.loads(dep.run(['docker', 'manifest', 'inspect', '--verbose', image], timeout=30))
+        except Error as exc:
+            raise Error('Imagem GHCR indisponível: verifique rede e autenticação no menu avançado') from exc
         if isinstance(descriptors, dict):
             descriptors = [descriptors]
         platforms = [entry.get('Descriptor', {}).get('platform', {}) for entry in descriptors]
@@ -89,20 +144,29 @@ def check(dep, release, server_only=False):
             if path.stat().st_dev != ancestor.stat().st_dev:
                 raise Error('preflight: dados e staging precisam estar no mesmo filesystem')
     project = 'dspacepcirn-' + hashlib.sha256(str(root).encode()).hexdigest()[:12]
+    config = getattr(dep, 'config', {})
+    subnet_selected = ipaddress.ip_network(config.get('DSPACE_NETWORK_SUBNET', str(SUBNET)))
+    ports = tuple(int(config.get(k, default)) for k, default in
+                  (('REST_BIND_PORT', 8501), ('UI_BIND_PORT', 4000)))
     ids = dep.run(['docker', 'network', 'ls', '-q'], timeout=30).split()
     if ids:
         networks = json.loads(dep.run(['docker', 'network', 'inspect', *ids], timeout=30))
         for network in networks:
             if network['Name'] == project + '_dspacenet':
+                labels = network.get('Labels') or {}
+                owned_subnets = {c.get('Subnet') for c in network.get('IPAM', {}).get('Config') or []}
+                if (labels.get('com.docker.compose.project') != project
+                        or str(subnet_selected) not in owned_subnets):
+                    raise Error('preflight: propriedade/integridade da rede existente não comprovada')
                 continue
             for subnet in network.get('IPAM', {}).get('Config') or []:
                 value = ipaddress.ip_network(subnet.get('Subnet', '0.0.0.0/32'), strict=False)
-                if value.version == 4 and value.overlaps(SUBNET):
+                if value.version == 4 and value.overlaps(subnet_selected):
                     raise Error('preflight: subnet 10.250.50.0/24 sobrepõe rede Docker existente')
     if server_only:
         if shutil.disk_usage(ancestor).free < 30 * GIB:
             raise Error("preflight: mínimo 30 GiB livres")
-        if not ports_available():
+        if not (root / 'installed.json').exists() and not ports_available(ports):
             raise Error("preflight: portas da aplicação ocupadas")
         return
     pg = database(dep)
@@ -112,7 +176,7 @@ def check(dep, release, server_only=False):
         if shutil.disk_usage(path).free < required:
             raise Error('preflight: disco livre insuficiente (30 GiB + 3x banco/dados)')
     installed = (root / 'installed.json').exists()
-    if not installed and not ports_available():
+    if not installed and not ports_available(ports) and not owns_application_ports(dep, release, ports):
         raise Error('preflight: portas 127.0.0.1:8501/4000 ocupadas')
     for key in ('PGSSLROOTCERT', 'PGSSLCERT', 'PGSSLKEY'):
         certificate = dep.env.get(key)

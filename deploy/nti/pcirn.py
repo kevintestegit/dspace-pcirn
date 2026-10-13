@@ -28,6 +28,20 @@ class Error(Exception):
     """An operation could not safely finish."""
 
 
+def secure_ancestors(path):
+    """Reject administrative paths replaceable by another unprivileged user."""
+    path = Path(path).absolute()
+    for ancestor in (path, *path.parents):
+        if not ancestor.exists():
+            continue
+        metadata = ancestor.stat()
+        sticky_root = metadata.st_uid == 0 and metadata.st_mode & 0o1000
+        if (ancestor.is_symlink() or not ancestor.is_dir()
+                or metadata.st_uid not in (0, os.geteuid())
+                or (metadata.st_mode & 0o022 and not sticky_root)):
+            raise Error('Diretório administrativo pertence a outro usuário ou permite alterações externas')
+
+
 def read_json(path):
     with Path(path).open() as stream:
         return json.load(stream)
@@ -54,24 +68,33 @@ def write_json(path, value):
 
 def manifest(path):
     data = read_json(path)
-    if data.get('schema_version') != 1 or not VERSION.fullmatch(data.get('version', '')):
+    if (not isinstance(data, dict) or data.get('schema_version') != 1
+            or not isinstance(data.get('version'), str) or not VERSION.fullmatch(data['version'])):
         raise Error('Manifesto: schema_version=1 e version SemVer obrigatórios')
-    if set(data.get('images', {})) != set(IMAGE_KEYS):
+    if not isinstance(data.get('images'), dict) or set(data['images']) != set(IMAGE_KEYS):
         raise Error('Manifesto: imagens backend, solr e frontend obrigatórias')
-    if any(not DIGEST.fullmatch(data['images'][key]) for key in IMAGE_KEYS):
+    if any(not isinstance(data['images'][key], str) or not DIGEST.fullmatch(data['images'][key]) for key in IMAGE_KEYS):
         raise Error('Imagens devem usar ghcr.io/repository@sha256:<64 hex>, sem tags')
-    migrations = data.get('database', {}).get('migrations')
-    if not isinstance(migrations, list) or not migrations:
-        raise Error('Manifesto: database.migrations deve listar o histórico Flyway esperado')
-    versions = set()
-    for item in migrations:
-        if (set(item) != {'version', 'script', 'checksum'}
-                or not re.fullmatch(r'\d+(?:\.\d+)*', item['version'])
-                or not isinstance(item['script'], str)
-                or (item['checksum'] is not None and type(item['checksum']) is not int)
-                or item['version'] in versions):
-            raise Error('Manifesto: migration inválida/duplicada')
-        versions.add(item['version'])
+    database = data.get('database', {})
+    if not isinstance(database, dict):
+        raise Error('Manifesto: database deve descrever o histórico Flyway')
+    if 'fresh_migrations' in database or 'fresh_bootstrap' in database:
+        if database.get('fresh_bootstrap') != 'pcirn-fresh-v1' or not database.get('fresh_migrations'):
+            raise Error('Manifesto: capacidade e histórico de inicialização vazia obrigatórios')
+    for history in ('migrations', 'fresh_migrations') if 'fresh_migrations' in database else ('migrations',):
+        migrations = database.get(history)
+        if not isinstance(migrations, list) or not migrations:
+            raise Error('Manifesto: database.migrations deve listar o histórico Flyway esperado')
+        versions = set()
+        for item in migrations:
+            if (not isinstance(item, dict) or set(item) != {'version', 'script', 'checksum'}
+                    or not isinstance(item.get('version'), str)
+                    or not re.fullmatch(r'\d+(?:\.\d+)*', item['version'])
+                    or not isinstance(item['script'], str)
+                    or (item['checksum'] is not None and type(item['checksum']) is not int)
+                    or item['version'] in versions):
+                raise Error('Manifesto: migration inválida/duplicada')
+            versions.add(item['version'])
     return data
 
 
@@ -80,7 +103,8 @@ def configuration(path):
     if path.stat().st_mode & 0o077:
         raise Error('Configuração contém credenciais: execute chmod 600')
     data = read_json(path)
-    optional = {'PG_MODE', 'PG_IMAGE', 'DSPACE_NAME', 'DSPACE_SHORTNAME'}
+    optional = {'PG_MODE', 'PG_IMAGE', 'DSPACE_NAME', 'DSPACE_SHORTNAME', 'PG_MAJOR', 'DB_PROFILE'}
+    optional |= {'REST_BIND_PORT', 'UI_BIND_PORT', 'DSPACE_NETWORK_SUBNET', 'TRUSTED_PROXY_NETWORK'}
     required = {'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'PUBLIC_UI_URL',
                 'PUBLIC_REST_URL', 'PUBLIC_REST_HOST'}
     if set(data) - required - optional or not required <= set(data):
@@ -97,6 +121,19 @@ def configuration(path):
         raise Error('PUBLIC_REST_HOST deve corresponder à URL REST terminada em /server')
     if data.get('PG_MODE', 'external') not in ('docker', 'external'):
         raise Error('PG_MODE deve ser docker ou external')
+    if data.get('DB_PROFILE', 'institutional') not in ('fresh', 'institutional'):
+        raise Error('DB_PROFILE deve ser fresh ou institutional')
+    if 'PG_MAJOR' in data and data['PG_MAJOR'] not in ('13', '14', '15', '16', '17'):
+        raise Error('PG_MAJOR incompatível')
+    for key in ('REST_BIND_PORT', 'UI_BIND_PORT'):
+        if key in data and (not data[key].isdigit() or not 1024 <= int(data[key]) <= 65535):
+            raise Error('Porta de aplicação inválida')
+    if 'DSPACE_NETWORK_SUBNET' in data:
+        import ipaddress
+        subnet = ipaddress.ip_network(data['DSPACE_NETWORK_SUBNET'])
+        if (subnet.version != 4 or subnet.prefixlen != 24 or not subnet.is_private
+                or data.get('TRUSTED_PROXY_NETWORK') != str(subnet.network_address).rsplit('.', 1)[0]):
+            raise Error('Rede Docker e proxies confiáveis divergentes')
     if data.get('PG_MODE') == 'docker':
         from wizard import validate_docker_config
         validate_docker_config(data)
@@ -165,6 +202,7 @@ def docker_config():
 class Deployment:
     def __init__(self, root, config=None):
         self.root = Path(root).absolute()
+        secure_ancestors(self.root)
         if self.root.is_symlink() or self.root.resolve() != self.root:
             raise Error('Diretório de instalação não pode conter links simbólicos')
         self.config = config if config is not None else configuration(self.root / 'config.json')
@@ -179,6 +217,10 @@ class Deployment:
         self.env.update(environment)
 
     def run(self, args, capture=True, pg=False, timeout=None, stdout_file=None, input_text=None):
+        if args[0] in ('psql', 'pg_dump', 'pg_restore') and getattr(self, 'config', {}).get('PG_MAJOR'):
+            client = Path('/usr/lib/postgresql') / self.config['PG_MAJOR'] / 'bin' / args[0]
+            if client.is_file():
+                args = [str(client), *args[1:]]
         if args[0] == 'docker':
             args = ['docker', '--context', 'default', *args[1:]]
         env = self.env.copy()
@@ -187,10 +229,28 @@ class Deployment:
         process = subprocess.Popen(args, env=env, text=True,
                                    stdin=subprocess.PIPE if input_text is not None else None,
                                    stdout=stdout_file if stdout_file is not None else
-                                   subprocess.PIPE if capture else None,
-                                   stderr=subprocess.PIPE if capture else None)
+                                   subprocess.PIPE,
+                                   stderr=subprocess.STDOUT if not capture and stdout_file is None else subprocess.PIPE)
         try:
-            output, _ = process.communicate(input=input_text, timeout=timeout)
+            if not capture and stdout_file is None:
+                if input_text is not None:
+                    process.stdin.write(input_text)
+                    process.stdin.close()
+                    process.stdin = None
+                secrets = {value for name, value in
+                           (getattr(self, 'config', {}) | self.env).items()
+                           if value and re.search(r'password|token|secret|api_key$', name, re.IGNORECASE)}
+                for line in process.stdout:
+                    for secret in secrets:
+                        if secret:
+                            line = line.replace(secret, '[credencial omitida]')
+                    print(line, end='', flush=True)
+                process.stdout.close()
+                process.stdout = None
+                process.wait(timeout=timeout)
+                output = ''
+            else:
+                output, _ = process.communicate(input=input_text, timeout=timeout)
         except subprocess.TimeoutExpired:
             process.kill()
             process.communicate()
@@ -236,6 +296,7 @@ class Deployment:
     def compose(self, release, *args, capture=True):
         values = self.config | dict(zip(('DSPACE_IMAGE', 'SOLR_IMAGE', 'ANGULAR_IMAGE'),
                                         (release['images'][k] for k in IMAGE_KEYS)))
+        values['DB_PROFILE'] = self.config.get('DB_PROFILE', 'institutional')
         values.update(ASSETSTORE_PATH=str(self.root / 'data/assetstore'),
                       SOLR_DATA_PATH=str(self.root / 'data/solr'))
         with tempfile.NamedTemporaryFile(mode='w', dir=self.root, prefix='.env-') as envfile, \
@@ -285,6 +346,10 @@ class Deployment:
                          '-c', 'BEGIN READ ONLY; ' + query + ' COMMIT;'], pg=True, timeout=30).strip()
 
     def pending(self, release):
+        history = 'fresh_migrations' if self.config.get('DB_PROFILE') == 'fresh' else 'migrations'
+        if history not in release['database']:
+            raise Error('Manifesto não suporta o perfil de inicialização deste banco')
+        expected = {m['version']: m for m in release['database'][history]}
         table = self.sql("SELECT to_regclass('public.schema_version') IS NOT NULL;")
         if table == 'f':
             if self.user_objects() != 0:
@@ -295,7 +360,6 @@ class Deployment:
         rows = json.loads(self.sql('SELECT COALESCE(json_agg(row_to_json(h)),\'[]\'::json) '
                                    'FROM (SELECT version, script, checksum, success '
                                    'FROM public.schema_version) h;'))
-        expected = {m['version']: m for m in release['database']['migrations']}
         applied = set()
         for row in rows:
             if row['version'] is None or not row['success']:
@@ -355,8 +419,11 @@ class Deployment:
                 with tarfile.open(directory / f'{name}.tar.gz', 'w:gz') as archive:
                     archive.add(self.root / 'data' / name, arcname=name)
             write_json(directory / 'release.json', release)
-            write_json(directory / 'metadata.json', {'db_url': self.config['DB_URL'],
-                       'db_user': self.config['DB_USERNAME'], 'root': str(self.root)})
+            metadata = {'db_url': self.config['DB_URL'],
+                        'db_user': self.config['DB_USERNAME'], 'root': str(self.root)}
+            if self.config.get('DB_PROFILE') == 'fresh':
+                metadata['database_profile'] = 'fresh'
+            write_json(directory / 'metadata.json', metadata)
             names = ('database.dump', 'assetstore.tar.gz', 'solr.tar.gz', 'release.json', 'metadata.json')
             write_json(directory / 'checksums.json', {n: checksum(directory / n) for n in names})
             verified_backup(directory, self)
@@ -477,8 +544,11 @@ def verified_backup(directory, deployment):
     if set(hashes) != expected or any(checksum(directory / n) != hashes[n] for n in expected):
         raise Error('Backup incompleto ou checksum divergente')
     metadata = read_json(directory / 'metadata.json')
-    if metadata != {'db_url': deployment.config['DB_URL'],
-                    'db_user': deployment.config['DB_USERNAME'], 'root': str(deployment.root)}:
+    expected_metadata = {'db_url': deployment.config['DB_URL'],
+                         'db_user': deployment.config['DB_USERNAME'], 'root': str(deployment.root)}
+    if deployment.config.get('DB_PROFILE') == 'fresh':
+        expected_metadata['database_profile'] = 'fresh'
+    if metadata != expected_metadata:
         raise Error('Backup pertence a outra instalação/banco')
     for name in ('assetstore', 'solr'):
         with tarfile.open(directory / f'{name}.tar.gz') as archive:
@@ -493,6 +563,7 @@ def verified_backup(directory, deployment):
 
 def provision(args):
     root = Path(args.root).absolute()
+    secure_ancestors(root)
     if root == Path('/') or root.resolve() != root:
         raise Error('Use um diretório dedicado sem links simbólicos')
     config = configuration(args.config) if args.config else None
@@ -516,6 +587,8 @@ def provision(args):
     compose = compose_source.read_text().replace('- solr_data:/var/solr/data',
                                                 '- ${SOLR_DATA_PATH}:/var/solr/data')
     compose = compose.replace('db__P__username:', 'db__P__schema: public\n      db__P__username:')
+    compose = compose.replace('db__P__schema: public',
+                              'db__P__pcirn__P__profile: ${DB_PROFILE:-institutional}\n      db__P__schema: public')
     files = {root / 'compose.yml': compose,
              root / 'smtp.env': smtp_source.read_text(),
              root / 'dspace/config/local.cfg': 'db.schema = public\n',
@@ -528,6 +601,10 @@ def provision(args):
              # Kept so a later provision from the installed copy can still seed
              # smtp.env, exactly like the Compose template above.
              root / 'bin/smtp.env.example': smtp_source.read_text()}
+    for module in ('host_setup.py', 'releases.py', 'manager_update.py'):
+        files[root / 'bin' / module] = Path(__file__).with_name(module).read_text()
+    if config and config.get('DB_PROFILE') == 'fresh':
+        files[root / 'dspace/config/local.cfg'] += 'db.pcirn.profile = fresh\n'
     for path, content in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
@@ -548,8 +625,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='DSPACEPCIRN — instalação e administração')
     parser.add_argument('command', nargs='?', choices=('install', 'update', 'status', 'version', 'doctor',
                                           'health', 'logs', 'backup', 'restore', 'rollback',
-                                          'export-data', 'migrate-data', 'verify-data'))
+                                          'export-data', 'migrate-data', 'verify-data', 'update-manager'))
     parser.add_argument('--wizard', action='store_true')
+    parser.add_argument('--installation-mode', choices=('new', 'migration'))
     parser.add_argument('--root', default='/srv/dspacepcirn')
     parser.add_argument('--manifest')
     parser.add_argument('--config')
@@ -560,11 +638,27 @@ def main(argv=None):
     parser.add_argument('--data-package', type=Path)
     parser.add_argument('--expected', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--manager-package', type=Path)
+    parser.add_argument('--manager-sha256')
     args = parser.parse_args(argv)
+    if args.command == 'update-manager':
+        from manager_update import update
+        if args.manager_package:
+            if not args.manager_sha256:
+                parser.error('--manager-package exige --manager-sha256')
+            package, digest = args.manager_package, args.manager_sha256
+        else:
+            from releases import download_manager
+            with tempfile.TemporaryDirectory(prefix='dspacepcirn-manager-') as directory:
+                package, digest = download_manager(Path(directory))
+                update(package, digest)
+            return 0
+        update(package, digest)
+        return 0
     if args.command is None:
         from wizard import menu
         return menu(args)
-    if args.command == 'install' and (args.wizard or not args.config):
+    if args.command == 'install' and (args.wizard or not args.config or args.installation_mode):
         from wizard import install
         return install(args)
     if args.command in ('install', 'update') and not args.manifest:
@@ -578,6 +672,7 @@ def main(argv=None):
     if args.data_package and args.command not in ('install', 'migrate-data'):
         parser.error('--data-package vale apenas para install/migrate-data')
     root = Path(args.root).absolute()
+    secure_ancestors(root)
     if root == Path('/') or root.resolve() != root:
         raise Error('Use um diretório dedicado sem links simbólicos')
     if args.command == 'install' or (args.command == 'migrate-data' and args.manifest):

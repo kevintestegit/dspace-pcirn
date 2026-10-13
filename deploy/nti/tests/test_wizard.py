@@ -59,6 +59,24 @@ class WizardTests(unittest.TestCase):
             self.assertEqual((self.root / name).stat().st_mode & 0o777, 0o600)
         self.assertNotIn(pcirn.configuration(self.fx.config)['DB_PASSWORD'], self.output.getvalue())
 
+    def test_fresh_repository_migration_selects_and_preserves_source_profile(self):
+        release = pcirn.read_json(self.fx.target)
+        release['database']['fresh_bootstrap'] = 'pcirn-fresh-v1'
+        release['database']['fresh_migrations'] = release['database']['migrations']
+        pcirn.write_json(self.fx.target, release)
+        pcirn.write_json(self.fixture.package / 'release.json', release)
+        path = self.fixture.package / 'source-report.json'
+        report = pcirn.read_json(path)
+        report['database_profile'] = 'fresh'
+        pcirn.write_json(path, report)
+        self.fixture.hashes()
+        with mock.patch.object(wizard.Wizard, 'validate_bootstrap'):
+            self.run_wizard()
+        self.assertEqual(pcirn.configuration(self.root / 'config.json')['DB_PROFILE'], 'fresh')
+        self.assertEqual(self.fx.state()['tables'], self.fixture.tables)
+        self.assertEqual(pcirn.read_json(self.root / 'data-verification.json')['database_profile'], 'fresh')
+        self.assertFalse(any('migrate' in args for _, args in self.fx.calls()))
+
     def configure_docker(self, root):
         config = pcirn.read_json(self.fx.config)
         config.update(PG_MODE='docker', PG_IMAGE='postgres@sha256:' + '1' * 64,
@@ -203,6 +221,7 @@ class WizardTests(unittest.TestCase):
         with self.assertRaises(pcirn.Error): self.run_wizard()
 
     def test_interactive_correction_retries_failed_stage(self):
+        self.stack.enter_context(mock.patch.object(wizard, 'secure_ancestors'))
         self.args.config = None
         self.stack.enter_context(mock.patch.object(wizard.os, 'isatty', return_value=True))
         self.stack.enter_context(mock.patch.object(wizard.os, 'geteuid', return_value=0))
@@ -217,7 +236,7 @@ class WizardTests(unittest.TestCase):
     def test_menu_routes_existing_administration_commands(self):
         with mock.patch.object(wizard.os, 'isatty', return_value=True), \
                 mock.patch.object(wizard.os, 'geteuid', return_value=0), \
-                mock.patch.object(wizard, 'ask', side_effect=['6', '/new/package', '7', '0']), \
+                mock.patch.object(wizard, 'ask', side_effect=['6', '4', '/new/package', '6', '5', '0']), \
                 mock.patch.object(pcirn, 'main') as main:
             wizard.menu(self.args)
         self.assertEqual(main.call_args_list[0].args[0], ['export-data', '--root', str(self.root), '--output', '/new/package'])
@@ -250,6 +269,13 @@ class DockerPostgresTests(unittest.TestCase):
         if args[:3] == ['docker', 'context', 'inspect']: return json.dumps('unix:///var/run/docker.sock')
         if args[:3] == ['docker', 'volume', 'ls']: return '\n'.join(self.volumes)
         if args[:3] == ['docker', 'ps', '-a']: return '\n'.join(self.containers)
+        if args[:2] == ['docker', 'inspect']:
+            return json.dumps([{'Config': {'Image': self.config['PG_IMAGE'], 'Labels': {
+                'com.docker.compose.project': 'dspacepcirn-' + wizard.hashlib.sha256(str(self.root).encode()).hexdigest()[:12],
+                'com.docker.compose.service': 'postgres'}}, 'Mounts': [
+                {'Destination': '/var/lib/postgresql/data', 'Type': 'volume', 'Name': self.name},
+                {'Destination': '/run/postgres-tls', 'Source': str(self.root / 'postgres-tls'), 'RW': False},
+                {'Destination': '/run/secrets/postgres-password', 'Source': str(self.root / 'postgres-password'), 'RW': False}]}])
         if args[:3] == ['docker', 'volume', 'create']:
             self.volumes.append(self.name)
         if args[:3] == ['docker', 'volume', 'inspect']:
@@ -294,7 +320,7 @@ class DockerPostgresTests(unittest.TestCase):
         self.dep.compose.side_effect = pcirn.Error('falha fictícia')
         with self.assertRaises(pcirn.Error): wizard.provision_postgres(self.dep)
         before = len(self.calls)
-        with self.assertRaisesRegex(pcirn.Error, 'interrompida'): wizard.provision_postgres(self.dep)
+        with self.assertRaises(pcirn.Error): wizard.provision_postgres(self.dep)
         self.assertFalse(any('create' in args or 'exec' in args for args, _ in self.calls[before:]))
 
     def test_volume_creation_race_never_uses_foreign_resource(self):

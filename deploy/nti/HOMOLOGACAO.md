@@ -200,3 +200,12 @@ simulado roda o mesmo executor da VM e verifica os dados fictícios após restor
 rollback; não apenas códigos de saída. A simulação não comprova execução real de
 Flyway, pg_restore, arquitetura das imagens, certificados dentro do backend ou
 consumo de memória. Esses pontos exigem imagens A/B e a VM futura.
+
+## Automatização posterior à RC4
+
+O fluxo automático e suas provas descartáveis estão descritos em
+[AUTOMACAO.md](AUTOMACAO.md). Os procedimentos e resultados anteriores deste
+arquivo representam a homologação RC4; não comprovam o novo fluxo. A VM Oracle
+parcialmente provisionada deve ser preservada: não apagar recursos nem remover
+checkpoints para simular uma instalação limpa. A nova homologação de host Ubuntu
+com systemd e a execução ARM64 exigem uma VM descartável separada.

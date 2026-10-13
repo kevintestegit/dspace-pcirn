@@ -27,6 +27,25 @@
     <build>
         <resources>
             <resource>
+                <directory>src/main/resources/org/dspace/storage/rdbms/sqlmigration/postgres</directory>
+                <targetPath>org/dspace/storage/rdbms/fresh/postgres</targetPath>
+                <includes>
+                    <include>*.sql</include>
+                </includes>
+                <excludes>
+                    <exclude>V9.4_2026.08.14__pcirn_mvp_access.sql</exclude>
+                    <exclude>V9.4_2026.08.15__pcirn_sector_access.sql</exclude>
+                    <exclude>V9.4_2026.08.16__pcirn_sector_membership_reconcile.sql</exclude>
+                    <exclude>V9.4_2026.08.17__pcirn_portarias_collections.sql</exclude>
+                    <exclude>V9.4_2026.08.18__pcirn_public_portarias.sql</exclude>
+                    <exclude>V9.4_2026.08.24__pcirn_sector_submission_and_shared_read.sql</exclude>
+                    <exclude>V9.4_2026.09.15__pcirn_public_items.sql</exclude>
+                    <exclude>V9.4_2026.09.17__pcirn_access_reconcile.sql</exclude>
+                    <exclude>V9.4_2026.09.23__pcirn_memoria_institucional_collection.sql</exclude>
+                </excludes>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
                 <directory>src/main/resources</directory>
                 <includes>
                     <include>maven.properties</include>

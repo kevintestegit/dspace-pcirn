@@ -9,6 +9,22 @@ if [[ $# -gt 1 || "$PREFIX" != /* || "$(realpath -m -- "$PREFIX")" != "$PREFIX" 
 fi
 LIB="$PREFIX/lib/dspacepcirn"
 COMMAND="$PREFIX/bin/dspacepcirn"
+for location in "$PREFIX" "$PREFIX/bin" "$PREFIX/lib"; do
+    ancestor="$location"
+    while [[ "$ancestor" != / ]]; do
+        if [[ -e "$ancestor" ]]; then
+            owner="$(stat -c %u -- "$ancestor")"
+            permissions="$(stat -c %a -- "$ancestor")"
+            mode=$((8#$permissions))
+            if [[ "$owner" != "$EUID" && "$owner" != 0 ]] ||
+               (( (mode & 0022) != 0 && !(owner == 0 && (mode & 01000) != 0) )); then
+                echo 'Prefixo administrativo pertence a outro usuário ou permite alterações externas.' >&2
+                exit 1
+            fi
+        fi
+        ancestor="$(dirname -- "$ancestor")"
+    done
+done
 if [[ "$(realpath -m -- "$LIB")" != "$LIB" || "$(realpath -m -- "$COMMAND")" != "$COMMAND" ]]; then
     echo 'Diretórios do gerenciador não podem conter links simbólicos.' >&2
     exit 1
@@ -19,15 +35,20 @@ if [[ -e "$COMMAND" || -L "$COMMAND" || -e "$LIB" || -L "$LIB" ]]; then
 fi
 mkdir -p -- "$PREFIX/bin" "$PREFIX/lib"
 mkdir -- "$LIB"
-install -m 644 -- "$SCRIPT_DIR"/{pcirn.py,wizard.py,preflight.py,data_migration.py} "$LIB/"
+install -m 644 -- "$SCRIPT_DIR"/{pcirn.py,wizard.py,preflight.py,data_migration.py,host_setup.py,releases.py,manager_update.py} "$LIB/"
 install -m 755 -- "$SCRIPT_DIR/dspacepcirn" "$LIB/dspacepcirn"
-install -m 644 -- "$SCRIPT_DIR/../../docker-compose.yml" "$LIB/compose.template.yml"
-install -m 644 -- "$SCRIPT_DIR/../../smtp.env.example" "$LIB/smtp.env.example"
+install -m 755 -- "$SCRIPT_DIR/install-manager.sh" "$LIB/install-manager.sh"
+COMPOSE_SOURCE="$SCRIPT_DIR/compose.template.yml"
+SMTP_SOURCE="$SCRIPT_DIR/smtp.env.example"
+if [[ ! -f "$COMPOSE_SOURCE" ]]; then COMPOSE_SOURCE="$SCRIPT_DIR/../../docker-compose.yml"; fi
+if [[ ! -f "$SMTP_SOURCE" ]]; then SMTP_SOURCE="$SCRIPT_DIR/../../smtp.env.example"; fi
+install -m 644 -- "$COMPOSE_SOURCE" "$LIB/compose.template.yml"
+install -m 644 -- "$SMTP_SOURCE" "$LIB/smtp.env.example"
 (set -o noclobber; cat > "$COMMAND" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_DIR/../lib/dspacepcirn/pcirn.py" "$@"
+exec "$SCRIPT_DIR/../lib/dspacepcirn/dspacepcirn" "$@"
 EOF
 )
 chmod 755 -- "$COMMAND"

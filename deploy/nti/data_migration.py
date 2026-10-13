@@ -58,6 +58,8 @@ def snapshot(dep, assetstore, solr):
     if not REQUIRED_TABLES <= set(names):
         raise Error('Banco DSpace incompleto: tabelas obrigatórias ausentes')
     report = {'schema_version': 1, 'tables': {}, 'verified_files': 0}
+    if dep.config.get('DB_PROFILE') == 'fresh':
+        report['database_profile'] = 'fresh'
     for name in names:
         quoted = '"' + name.replace('"', '""') + '"'
         # COPY CSV preserves JSON escapes; each row is decoded by the CSV reader below.
@@ -172,6 +174,9 @@ def migrate_data(dep, package):
     expected = read_json(package / 'source-report.json')
     if expected.get('schema_version') != 1 or not REQUIRED_TABLES <= set(expected.get('tables', {})):
         raise Error('Relatório de origem inválido')
+    profile = expected.get('database_profile', 'institutional')
+    if profile not in ('institutional', 'fresh') or profile != dep.config.get('DB_PROFILE', 'institutional'):
+        raise Error('Perfil do banco diverge do pacote; configure DB_PROFILE antes da restauração')
     with (package / 'database.dump').open('rb') as stream:
         if stream.read(5) != b'PGDMP':
             raise Error('Dump deve usar pg_dump -Fc')

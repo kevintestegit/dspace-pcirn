@@ -189,6 +189,7 @@ class RegistryCredentialTests(DeploymentTestCase):
             environ['SUDO_USER'] = 'operator'
             account = mock.Mock(pw_dir=home)
             with mock.patch.dict(os.environ, environ, clear=True), \
+                    mock.patch.object(pcirn, 'secure_ancestors'), \
                     mock.patch.object(pcirn.os, 'geteuid', return_value=0), \
                     mock.patch.object(pcirn.pwd, 'getpwnam', return_value=account) as lookup:
                 deployment = self.deployment()
@@ -200,6 +201,7 @@ class RegistryCredentialTests(DeploymentTestCase):
             environ = {key: value for key, value in os.environ.items() if key != 'DOCKER_CONFIG'}
             environ['SUDO_USER'] = 'operator'
             with mock.patch.dict(os.environ, environ, clear=True), \
+                    mock.patch.object(pcirn, 'secure_ancestors'), \
                     mock.patch.object(pcirn.os, 'geteuid', return_value=0), \
                     mock.patch.object(pcirn.pwd, 'getpwnam', return_value=mock.Mock(pw_dir=home)):
                 deployment = self.deployment()
@@ -208,7 +210,8 @@ class RegistryCredentialTests(DeploymentTestCase):
     def test_root_shell_is_left_to_the_docker_default(self):
         environ = {key: value for key, value in os.environ.items() if key != 'DOCKER_CONFIG'}
         with mock.patch.dict(os.environ, environ, clear=True), \
-                mock.patch.object(pcirn.os, 'geteuid', return_value=0):
+                mock.patch.object(pcirn, 'secure_ancestors'), \
+                    mock.patch.object(pcirn.os, 'geteuid', return_value=0):
             deployment = self.deployment()
         self.assertNotIn('DOCKER_CONFIG', deployment.env)
 
