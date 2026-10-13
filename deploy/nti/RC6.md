@@ -56,9 +56,60 @@ integration tests (S3 mock bucket/HTTP errors and a teardown concurrent modifica
 Log: `/tmp/pcirn-rc5-build-failure.log`; run 38420781722. No S3 or Context code was
 changed in this installer branch, and these failures were not suppressed.
 
-Remaining acceptance checks: native CI results, installation from a clean Ubuntu
-24.04 VM with systemd, complete backend/Angular/Solr health, and a hosted data
-package. The Oracle VPS is not a disposable test environment and deployment there
+Remaining acceptance checks: installation from a clean Ubuntu 24.04 VM with
+systemd, the full stack on ARM64, and an authorized hosted data package.
+The Oracle VPS is not a disposable test environment and deployment there
 remains paused. The preexisting REST integration failures recorded in AUTOMACAO.md
 remain disclosed; publication does not claim the entire Maven integration suite
 passes.
+
+## Published release and full stack
+
+[RC6](https://github.com/kevintestegit/dspace-pcirn/releases/tag/v1.0.0-rc6) was
+published as a prerelease from `45bdcc9f8493569bd3d2f18f1821411aeadb06f9`.
+[Publication run](https://github.com/kevintestegit/dspace-pcirn/actions/runs/38421955489)
+passed the 237 installer tests, Maven unit gate, all six native image builds and
+empty bootstrap on AMD64 and ARM64. Both backends reproduced 79 migration checksums,
+resumed initialization and rejected existing/incompatible data. The manager's
+automatic discovery selected RC6 and independently verified the assets and both
+platforms for every image.
+
+- Manifest SHA-256: `5a037d1a2233bafbf7b03b487a8cdfb483076671bea9e00bd6828b61e1761d36`.
+- Manager SHA-256: `03da3082d110da6029f651645e43f5b32d3b8e97d4e5a528347cbc8e6087526c`.
+- Proof: `/home/gecid007/dspacepcirn-release-proof-rc6/verified-release.json`.
+
+The published manager ran the complete empty installation in an isolated Ubuntu
+24.04 runner with its own PostgreSQL16, network, ports and persistent storage.
+REST and Angular returned HTTP200; all three services were healthy. PostgreSQL
+used TLS and a NOSUPERUSER role; no items, communities, collections or users were
+seeded. Repeating the wizard preserved the 79-entry history. A missing Docker
+storage mount in the runner caused an initial preflight failure; after correcting
+the test mount, the saved checkpoint resumed with identical password and TLS files.
+This proves container-based Ubuntu operation, not a fresh systemd host installation.
+Proof: `/home/gecid007/dspacepcirn-release-proof-rc6/full-stack-proof.json`.
+
+After publication, the authorized private exporter produced a second complete
+copy against the verified RC6 manifest, checking the same 87 institutional
+migrations before its brief source pause. The original services returned healthy.
+The RC4 copy remains intact; neither copy was relabeled or uploaded.
+
+RC6 archive: `/home/gecid007/dspacepcirn-private-exports/source-rc6-20261013.tar.gz`,
+520,857,085 bytes, SHA-256
+`3b97490757c3c625429e71d62b919b7b343c9664749a0f8dee9e8e6a146e005d`.
+Directory: `/home/gecid007/dspacepcirn-private-exports/source-rc6-20261013`.
+
+The published migration wizard restored this real package into another dedicated
+PostgreSQL16 with TLS and a NOSUPERUSER role, in Ubuntu24.04. All 65 table
+fingerprints matched after application startup (2,256 items and preserved UUIDs,
+handles, users, permissions and 87 Flyway records). Assetstore fingerprints matched;
+the complete Solr restore was verified before services started. Backend, Angular
+and Solr were healthy, with REST and frontend HTTP200. Both disposable stacks were
+stopped; containers, volumes, files and backups were retained.
+Proof: `/home/gecid007/dspacepcirn-release-proof-rc6/data-stack-proof.json`.
+Logs: `/tmp/pcirn-rc6-full-stack-resume.log` and
+`/tmp/pcirn-rc6-real-data-stack.log`.
+
+Automatic data download remains pending: the exact archive contains user and
+repository data and has no authorized hosting URL or `data-package.json` asset.
+Local import uses the matching RC6 directory. Source data was not committed or
+published. There was no main merge or VPS deployment during this delivery.

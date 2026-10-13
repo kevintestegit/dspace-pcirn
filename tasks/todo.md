@@ -6,5 +6,8 @@
 - [x] Correct host test isolation discovered by the RC5 publication gate.
 - [x] Prepare and test private local Docker source export with restart and socket verification.
 - [x] Complete private export, prove real-data restoration and confirm source application health.
-- [ ] Confirm native RC publication results and verified release assets.
-- [ ] Select an authorized hosted data package and complete clean-VM stack acceptance.
+- [x] Confirm native RC publication results and verified release assets.
+- [x] Validate published Ubuntu24.04 stack, empty bootstrap, checkpoint resume and real-data migration.
+- [x] Prepare and preserve an exact private RC6 package without changing source migrations.
+- [ ] Select an authorized hosted data package.
+- [ ] Complete clean Ubuntu24.04 systemd VM and full ARM64 stack acceptance.

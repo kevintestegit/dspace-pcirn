@@ -31,8 +31,10 @@ preexistentes. Não execute downloads como scripts nem use `curl | bash`.
 
 **A RC4 publicada não contém o pacote novo nem a capacidade de inicialização vazia.**
 A seleção automática reconhece RCs pelo nome da tag, mesmo se o GitHub não as marcou
-como prerelease. A publicação autorizada da RC6 inclui estas capacidades e é
-condicionada aos testes da pipeline. Consulte [o relatório da entrega](RC6.md).
+como prerelease. A RC6 foi publicada com estas capacidades, builds AMD64/ARM64 e
+bootstrap vazio aprovado nas duas arquiteturas. O fluxo completo com banco vazio
+e com o acervo real foi validado em runner Ubuntu24.04 AMD64. Consulte
+[o relatório da entrega e as limitações](RC6.md).
 
 ## Menu
 
