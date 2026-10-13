@@ -31,8 +31,8 @@ preexistentes. Não execute downloads como scripts nem use `curl | bash`.
 
 **A RC4 publicada não contém o pacote novo nem a capacidade de inicialização vazia.**
 A seleção automática reconhece RCs pelo nome da tag, mesmo se o GitHub não as marcou
-como prerelease. As capacidades descritas aqui pertencem a este código e precisam
-ser incluídas numa próxima release; esta implementação não publica nada.
+como prerelease. A publicação autorizada da RC6 inclui estas capacidades e é
+condicionada aos testes da pipeline. Consulte [o relatório da entrega](RC6.md).
 
 ## Menu
 

@@ -5,6 +5,6 @@
 - [x] Add installer/data and native bootstrap gates before release image tags.
 - [x] Correct host test isolation discovered by the RC5 publication gate.
 - [x] Prepare and test private local Docker source export with restart and socket verification.
-- [ ] Complete private export and confirm source application health.
+- [x] Complete private export, prove real-data restoration and confirm source application health.
 - [ ] Confirm native RC publication results and verified release assets.
 - [ ] Select an authorized hosted data package and complete clean-VM stack acceptance.
