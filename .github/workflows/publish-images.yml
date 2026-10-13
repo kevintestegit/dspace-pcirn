@@ -184,6 +184,14 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Test installer and data preservation
+        env:
+          PCIRN_RUN_POSTGRES15: '1'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y python3-yaml
+          /usr/bin/python3 -m unittest discover -s deploy/nti/tests -p 'test_*.py'
+
       - name: Build and run the unit tests
         # The same gate the branch build uses. A tag that does not compile or
         # fails its tests must not reach the registry.
@@ -315,6 +323,22 @@ jobs:
           [ -n "${digest}" ] || { echo "::error::no digest produced"; exit 1; }
           mkdir -p /tmp/digests
           touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Verify empty bootstrap on the native architecture
+        if: matrix.image == 'backend'
+        env:
+          BACKEND_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_REPOSITORY: ${{ steps.inputs.outputs.repository }}
+        run: |
+          set -euo pipefail
+          image="${REGISTRY}/${IMAGE_REPOSITORY}@${BACKEND_DIGEST}"
+          docker pull "${image}"
+          container="$(docker create "${image}")"
+          docker cp "${container}:/dspace/lib/dspace-api-9.4-SNAPSHOT.jar" /tmp/bootstrap-api.jar
+          python3 deploy/nti/tests/bootstrap_fresh.py \
+            --backend-image "${image}" --api-jar /tmp/bootstrap-api.jar \
+            --postgres-image postgres:16 --output /tmp/fresh-history.json
+          diff <(jq -S . scripts/flyway-fresh-history.json) <(jq -S . /tmp/fresh-history.json)
 
       - name: Upload the digest
         uses: actions/upload-artifact@v7
@@ -484,6 +508,7 @@ jobs:
             dspacepcirn-manager.tar.gz
             dspacepcirn-manager.tar.gz.sha256
           generate_release_notes: true
+          prerelease: ${{ contains(needs.validate.outputs.version, '-') }}
           body: |
             Images published to GitHub Container Registry:
 

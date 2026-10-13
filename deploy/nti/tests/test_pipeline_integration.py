@@ -255,6 +255,27 @@ class ReleaseArtifactTests(unittest.TestCase):
         # cannot leave a partially built version pullable.
         self.assertNotIn('tags:', json.dumps(jobs['build']))
 
+    def test_release_checks_installer_and_native_bootstrap_before_tags(self):
+        import yaml
+        workflow = yaml.safe_load((REPO / '.github/workflows/publish-images.yml').read_text())
+        jobs = workflow['jobs']
+        test = next(s for s in jobs['validate']['steps']
+                    if s.get('name') == 'Test installer and data preservation')
+        self.assertEqual(test['env']['PCIRN_RUN_POSTGRES15'], '1')
+        self.assertIn('unittest discover', test['run'])
+        steps = jobs['build']['steps']
+        bootstrap = next(s for s in steps
+                         if s.get('name') == 'Verify empty bootstrap on the native architecture')
+        self.assertEqual(bootstrap['if'], "matrix.image == 'backend'")
+        self.assertIn('bootstrap_fresh.py', bootstrap['run'])
+        self.assertIn('diff <(jq -S . scripts/flyway-fresh-history.json)', bootstrap['run'])
+        self.assertLess(steps.index(bootstrap), next(i for i, s in enumerate(steps)
+                                                   if s.get('name') == 'Upload the digest'))
+        release = next(s for s in jobs['manifest']['steps']
+                       if s.get('name') == 'Attach the manifest to the release')
+        self.assertEqual(release['with']['prerelease'],
+                         "${{ contains(needs.validate.outputs.version, '-') }}")
+
     def test_workflow_builds_every_image_for_both_architectures(self):
         import yaml
         workflow = yaml.safe_load(

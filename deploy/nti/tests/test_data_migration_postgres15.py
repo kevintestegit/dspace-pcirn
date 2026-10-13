@@ -33,6 +33,8 @@ class PostgreSQL15MigrationTests(unittest.TestCase):
         subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
                         '-keyout', str(self.base / 'server.key'), '-out', str(self.base / 'server.crt'),
                         '-subj', '/CN=localhost', '-days', '1'], check=True, capture_output=True)
+        # Other installer tests use umask 077; the container must read this public certificate.
+        (self.base / 'server.crt').chmod(0o644)
         self.addCleanup(lambda: subprocess.run([self.docker, '--context', 'default', 'stop', '--time', '30', self.name],
                                                capture_output=True, check=False))
         subprocess.run([self.docker, '--context', 'default', 'run', '-d', '--name', self.name,
