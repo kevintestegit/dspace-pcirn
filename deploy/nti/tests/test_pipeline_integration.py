@@ -208,7 +208,7 @@ class RestoredDatabaseTests(unittest.TestCase):
         target = self.restored(migrations, applied=altered)
         process = self.cli('install', '--root', self.root, '--config', self.config,
                            '--manifest', target, success=False)
-        self.assertIn('divergente', process.stderr)
+        self.assertIn('differs', process.stderr)
 
 
 class ReleaseArtifactTests(unittest.TestCase):

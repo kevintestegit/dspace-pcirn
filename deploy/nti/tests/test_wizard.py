@@ -151,7 +151,7 @@ class WizardTests(unittest.TestCase):
         self.assertFalse(any('up' in a for _, a in calls))
         before = len(calls)
         (self.fx.base / 'fail').unlink()
-        with self.assertRaisesRegex(pcirn.Error, 'sem reimportação'): self.run_wizard()
+        with self.assertRaisesRegex(pcirn.Error, 'review required before import'): self.run_wizard()
         self.assertEqual(self.fx.calls()[before:], [])
         self.assertTrue((self.root / 'operation.json').exists())
 
@@ -191,7 +191,7 @@ class WizardTests(unittest.TestCase):
 
     def test_nonempty_external_database_rejected(self):
         (self.fx.base / 'fake-state.json').write_text(json.dumps({'rows': [], 'running': False, 'extra_objects': 1}))
-        with self.assertRaisesRegex(pcirn.Error, 'não vazio'): self.run_wizard()
+        with self.assertRaisesRegex(pcirn.Error, 'not empty'): self.run_wizard()
         self.assertFalse(any('up' in a or '--dbname' in a for _, a in self.fx.calls()))
 
     def test_corrupt_package_does_not_restore_or_start_backend(self):
@@ -203,7 +203,7 @@ class WizardTests(unittest.TestCase):
         with mock.patch.object(wizard.Wizard, 'import_data', side_effect=pcirn.Error('stop')):
             with self.assertRaises(pcirn.Error): self.run_wizard()
         self.fx.next_release()
-        with self.assertRaisesRegex(pcirn.Error, 'Manifesto alterado'): self.run_wizard()
+        with self.assertRaisesRegex(pcirn.Error, 'Manifest changed'): self.run_wizard()
 
     def test_pending_migrations_are_never_authorized_by_wizard(self):
         with mock.patch.object(wizard.Wizard, 'installation', side_effect=pcirn.Error('stop')):
@@ -312,7 +312,7 @@ class DockerPostgresTests(unittest.TestCase):
         for target in (self.volumes, self.containers):
             with self.subTest(resource=target):
                 target.append(self.name)
-                with self.assertRaisesRegex(pcirn.Error, 'existente'): wizard.provision_postgres(self.dep)
+                with self.assertRaisesRegex(pcirn.Error, 'Existing'): wizard.provision_postgres(self.dep)
                 target.clear()
         self.assertFalse(any('create' in args or 'exec' in args for args, _ in self.calls))
 
@@ -326,12 +326,12 @@ class DockerPostgresTests(unittest.TestCase):
     def test_volume_creation_race_never_uses_foreign_resource(self):
         original = self.dep.run.side_effect
         self.dep.run.side_effect = lambda args, **kw: '{}' if args[:3] == ['docker', 'volume', 'inspect'] else original(args, **kw)
-        with self.assertRaisesRegex(pcirn.Error, 'preexistente'): wizard.provision_postgres(self.dep)
+        with self.assertRaisesRegex(pcirn.Error, 'Existing'): wizard.provision_postgres(self.dep)
         self.dep.compose.assert_not_called()
 
     def test_remote_daemon_rejected_before_mutation(self):
         self.dep.run.side_effect = lambda args, **kw: json.dumps('ssh://remote.invalid')
-        with self.assertRaisesRegex(pcirn.Error, 'Unix local'): wizard.provision_postgres(self.dep)
+        with self.assertRaisesRegex(pcirn.Error, 'local Unix'): wizard.provision_postgres(self.dep)
         self.dep.compose.assert_not_called()
         self.assertFalse((self.root / 'postgres.json').exists())
 
@@ -339,12 +339,12 @@ class DockerPostgresTests(unittest.TestCase):
         wizard.provision_postgres(self.dep)
         original = self.dep.run.side_effect
         self.dep.run.side_effect = lambda args, **kw: '{}' if args[:3] == ['docker', 'volume', 'inspect'] else original(args, **kw)
-        with self.assertRaisesRegex(pcirn.Error, 'outra instalação'): wizard.provision_postgres(self.dep)
+        with self.assertRaisesRegex(pcirn.Error, 'another installation'): wizard.provision_postgres(self.dep)
 
     def test_missing_volume_is_not_recreated(self):
         wizard.provision_postgres(self.dep)
         self.volumes.clear()
-        with self.assertRaisesRegex(pcirn.Error, 'nada recriado'): wizard.provision_postgres(self.dep)
+        with self.assertRaisesRegex(pcirn.Error, 'nothing recreated'): wizard.provision_postgres(self.dep)
 
     def test_unsafe_database_configuration_rejected(self):
         for key, value in (('PG_IMAGE', 'postgres:latest'), ('DB_USERNAME', 'postgres'),

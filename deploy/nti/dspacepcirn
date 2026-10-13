@@ -3,27 +3,31 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if ! command -v python3 >/dev/null 2>&1; then
     if (( EUID != 0 )) || [[ ! -t 0 ]] || (( $# != 0 )); then
-        printf '%s\n' 'Python 3 ausente. Execute sudo dspacepcirn em um terminal para preparar o ambiente.' >&2
+        printf '%s\n' 'Python 3 is missing. Run sudo dspacepcirn in a terminal.' >&2
         exit 1
     fi
     # This is the local operating-system identity, never downloaded code.
     . /etc/os-release
     if [[ "${ID:-}" != ubuntu || "${VERSION_ID:-}" != 24.04 ]]; then
-        printf '%s\n' 'Preparação automática exige Ubuntu 24.04.' >&2
+        printf '%s\n' 'Automatic setup requires Ubuntu 24.04.' >&2
         exit 1
     fi
     case "$(uname -m)" in
         x86_64|aarch64) ;;
-        *) printf '%s\n' 'Arquitetura suportada: AMD64 ou ARM64.' >&2; exit 1 ;;
+        *) printf '%s\n' 'Supported architecture: AMD64 or ARM64.' >&2; exit 1 ;;
     esac
-    printf '%s' 'Autoriza instalar ou atualizar dependências incompatíveis dos repositórios oficiais e iniciar/habilitar Docker quando necessário? [S/n]: '
+    printf '%s' 'Install missing dependencies and enable Docker? [Y/n]: '
     read -r answer
     case "${answer,,}" in
-        ''|s|sim|y|yes) ;;
-        *) printf '%s\n' 'Preparação cancelada.'; exit 1 ;;
+        ''|y|yes) ;;
+        *) printf '%s\n' 'Setup cancelled.'; exit 1 ;;
     esac
-    apt-get update
-    apt-get -y --no-remove --no-upgrade install --no-install-recommends python3 ca-certificates
+    bootstrap_log="$(mktemp /var/log/dspacepcirn-bootstrap.XXXXXX.log)"
+    if ! { apt-get update && apt-get -y --no-remove --no-upgrade install \
+           --no-install-recommends python3 ca-certificates; } >>"$bootstrap_log" 2>&1; then
+        printf 'Dependency installation failed. Log: %s\n' "$bootstrap_log" >&2
+        exit 1
+    fi
     python3 --version >/dev/null
     export DSPACEPCIRN_BOOTSTRAP_APPROVED=1
 fi

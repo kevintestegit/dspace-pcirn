@@ -39,7 +39,7 @@ def secure_ancestors(path):
         if (ancestor.is_symlink() or not ancestor.is_dir()
                 or metadata.st_uid not in (0, os.geteuid())
                 or (metadata.st_mode & 0o022 and not sticky_root)):
-            raise Error('Diretório administrativo pertence a outro usuário ou permite alterações externas')
+            raise Error('Administrative directory has unsafe ownership or permissions')
 
 
 def read_json(path):
@@ -70,21 +70,21 @@ def manifest(path):
     data = read_json(path)
     if (not isinstance(data, dict) or data.get('schema_version') != 1
             or not isinstance(data.get('version'), str) or not VERSION.fullmatch(data['version'])):
-        raise Error('Manifesto: schema_version=1 e version SemVer obrigatórios')
+        raise Error('Manifest requires schema_version=1 and a SemVer version')
     if not isinstance(data.get('images'), dict) or set(data['images']) != set(IMAGE_KEYS):
-        raise Error('Manifesto: imagens backend, solr e frontend obrigatórias')
+        raise Error('Manifest requires backend, solr and frontend images')
     if any(not isinstance(data['images'][key], str) or not DIGEST.fullmatch(data['images'][key]) for key in IMAGE_KEYS):
-        raise Error('Imagens devem usar ghcr.io/repository@sha256:<64 hex>, sem tags')
+        raise Error('Images must use ghcr.io/repository@sha256:<64 hex>, no tags')
     database = data.get('database', {})
     if not isinstance(database, dict):
-        raise Error('Manifesto: database deve descrever o histórico Flyway')
+        raise Error('Manifest database must describe Flyway history')
     if 'fresh_migrations' in database or 'fresh_bootstrap' in database:
         if database.get('fresh_bootstrap') != 'pcirn-fresh-v1' or not database.get('fresh_migrations'):
-            raise Error('Manifesto: capacidade e histórico de inicialização vazia obrigatórios')
+            raise Error('Manifest requires empty bootstrap capability and history')
     for history in ('migrations', 'fresh_migrations') if 'fresh_migrations' in database else ('migrations',):
         migrations = database.get(history)
         if not isinstance(migrations, list) or not migrations:
-            raise Error('Manifesto: database.migrations deve listar o histórico Flyway esperado')
+            raise Error('Manifest database.migrations must list expected Flyway history')
         versions = set()
         for item in migrations:
             if (not isinstance(item, dict) or set(item) != {'version', 'script', 'checksum'}
@@ -93,7 +93,7 @@ def manifest(path):
                     or not isinstance(item['script'], str)
                     or (item['checksum'] is not None and type(item['checksum']) is not int)
                     or item['version'] in versions):
-                raise Error('Manifesto: migration inválida/duplicada')
+                raise Error('Manifest contains an invalid/duplicate migration')
             versions.add(item['version'])
     return data
 
@@ -101,39 +101,39 @@ def manifest(path):
 def configuration(path):
     path = Path(path)
     if path.stat().st_mode & 0o077:
-        raise Error('Configuração contém credenciais: execute chmod 600')
+        raise Error('Configuration contains credentials; use chmod 600')
     data = read_json(path)
     optional = {'PG_MODE', 'PG_IMAGE', 'DSPACE_NAME', 'DSPACE_SHORTNAME', 'PG_MAJOR', 'DB_PROFILE'}
     optional |= {'REST_BIND_PORT', 'UI_BIND_PORT', 'DSPACE_NETWORK_SUBNET', 'TRUSTED_PROXY_NETWORK'}
     required = {'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'PUBLIC_UI_URL',
                 'PUBLIC_REST_URL', 'PUBLIC_REST_HOST'}
     if set(data) - required - optional or not required <= set(data):
-        raise Error('Configuração: informe somente os campos documentados')
+        raise Error('Configuration accepts documented fields only')
     if any(not isinstance(v, str) or not v or any(c in v for c in '\n\r\x00')
            for v in data.values()):
-        raise Error('Configuração: valores devem ser strings não vazias em uma linha')
+        raise Error('Configuration values must be nonempty single-line strings')
     for key in ('PUBLIC_UI_URL', 'PUBLIC_REST_URL'):
         url = urlsplit(data[key])
         if url.scheme != 'https' or not url.hostname or url.username:
-            raise Error('URLs públicas devem usar HTTPS')
+            raise Error('Public URLs must use HTTPS')
     if (urlsplit(data['PUBLIC_REST_URL']).hostname != data['PUBLIC_REST_HOST']
             or urlsplit(data['PUBLIC_REST_URL']).path != '/server'):
-        raise Error('PUBLIC_REST_HOST deve corresponder à URL REST terminada em /server')
+        raise Error('PUBLIC_REST_HOST must match the REST URL ending in /server')
     if data.get('PG_MODE', 'external') not in ('docker', 'external'):
-        raise Error('PG_MODE deve ser docker ou external')
+        raise Error('PG_MODE must be docker or external')
     if data.get('DB_PROFILE', 'institutional') not in ('fresh', 'institutional'):
-        raise Error('DB_PROFILE deve ser fresh ou institutional')
+        raise Error('DB_PROFILE must be fresh or institutional')
     if 'PG_MAJOR' in data and data['PG_MAJOR'] not in ('13', '14', '15', '16', '17'):
-        raise Error('PG_MAJOR incompatível')
+        raise Error('Incompatible PG_MAJOR')
     for key in ('REST_BIND_PORT', 'UI_BIND_PORT'):
         if key in data and (not data[key].isdigit() or not 1024 <= int(data[key]) <= 65535):
-            raise Error('Porta de aplicação inválida')
+            raise Error('Invalid application port')
     if 'DSPACE_NETWORK_SUBNET' in data:
         import ipaddress
         subnet = ipaddress.ip_network(data['DSPACE_NETWORK_SUBNET'])
         if (subnet.version != 4 or subnet.prefixlen != 24 or not subnet.is_private
                 or data.get('TRUSTED_PROXY_NETWORK') != str(subnet.network_address).rsplit('.', 1)[0]):
-            raise Error('Rede Docker e proxies confiáveis divergentes')
+            raise Error('Docker network and trusted proxies differ')
     if data.get('PG_MODE') == 'docker':
         from wizard import validate_docker_config
         validate_docker_config(data)
@@ -143,23 +143,23 @@ def configuration(path):
 
 def pg_environment(config):
     if not config['DB_URL'].startswith('jdbc:postgresql://'):
-        raise Error('DB_URL deve ser jdbc:postgresql://host:porta/banco?sslmode=...')
+        raise Error('DB_URL must use jdbc:postgresql://host:port/database?sslmode=...')
     url = urlsplit(config['DB_URL'][5:])
     if not url.hostname or url.username or not re.fullmatch(r'/[A-Za-z0-9_-]+', url.path):
-        raise Error('DB_URL inválida; use um host e um banco dedicado')
+        raise Error('Invalid DB_URL; use a dedicated host and database')
     params = dict(parse_qsl(url.query, strict_parsing=True))
     mapping = {'sslmode': 'PGSSLMODE', 'sslrootcert': 'PGSSLROOTCERT',
                'sslcert': 'PGSSLCERT', 'sslkey': 'PGSSLKEY'}
     if set(params) - set(mapping):
-        raise Error('Parâmetro JDBC não suportado pelos clientes PostgreSQL')
+        raise Error('JDBC parameter unsupported by PostgreSQL clients')
     if params.get('sslmode') not in ('require', 'verify-ca', 'verify-full'):
-        raise Error('DB_URL deve especificar sslmode=require, verify-ca ou verify-full')
+        raise Error('DB_URL must specify sslmode=require, verify-ca or verify-full')
     # The certificate is read by the host clients and, through a read-only bind
     # mount at the same path, by the JDBC driver inside the backend. libpq would
     # also accept a directory of CAs; the JDBC driver reads one PEM file, so a
     # directory would work for psql and break the application.
     if params.get('sslmode') in ('verify-ca', 'verify-full') and 'sslrootcert' not in params:
-        raise Error('DB_URL deve informar sslrootcert para verificar o servidor')
+        raise Error('DB_URL requires sslrootcert to verify the server')
     for key in ('sslrootcert', 'sslcert', 'sslkey'):
         if key in params:
             path = Path(params[key])
@@ -167,7 +167,7 @@ def pg_environment(config):
                           and path.name == 'server.crt' and path.parent.name == 'postgres-tls')
             if not path.is_absolute() or (not managed_ca and
                     (not path.is_file() or not os.access(path, os.R_OK))):
-                raise Error(f'DB_URL: {key} deve ser arquivo absoluto e legível')
+                raise Error(f'DB_URL: {key} must be an absolute readable file')
     return dict(PGHOST=url.hostname, PGPORT=str(url.port or 5432), PGDATABASE=url.path[1:],
                 PGUSER=config['DB_USERNAME'], PGPASSWORD=config['DB_PASSWORD'],
                 PGSSLMODE=params.get('sslmode', 'verify-full'), PGCONNECT_TIMEOUT='10',
@@ -204,7 +204,7 @@ class Deployment:
         self.root = Path(root).absolute()
         secure_ancestors(self.root)
         if self.root.is_symlink() or self.root.resolve() != self.root:
-            raise Error('Diretório de instalação não pode conter links simbólicos')
+            raise Error('Installation directory cannot contain symlinks')
         self.config = config if config is not None else configuration(self.root / 'config.json')
         self.env = {k: v for k, v in os.environ.items()
                     if not k.startswith(('COMPOSE_', 'DOCKER_', 'PG', 'DSPACE_', 'DB_'))}
@@ -243,7 +243,7 @@ class Deployment:
                 for line in process.stdout:
                     for secret in secrets:
                         if secret:
-                            line = line.replace(secret, '[credencial omitida]')
+                            line = line.replace(secret, '[credential omitted]')
                     print(line, end='', flush=True)
                 process.stdout.close()
                 process.stdout = None
@@ -254,7 +254,7 @@ class Deployment:
         except subprocess.TimeoutExpired:
             process.kill()
             process.communicate()
-            raise Error(f'{Path(args[0]).name}: tempo limite excedido')
+            raise Error(f'{Path(args[0]).name}: timed out')
         except KeyboardInterrupt:
             process.terminate()
             try:
@@ -265,7 +265,7 @@ class Deployment:
             raise
         if process.returncode:
             # Tools may echo URLs/passwords. Never relay unfiltered stderr.
-            raise Error(f'{Path(args[0]).name}: falha (código {process.returncode})')
+            raise Error(f'{Path(args[0]).name}: failed (exit code {process.returncode})')
         return output if capture else ''
 
     def current(self):
@@ -324,14 +324,14 @@ class Deployment:
     def doctor(self):
         for tool in ('docker', 'psql', 'pg_dump', 'pg_restore'):
             if not shutil.which(tool):
-                raise Error(f'Pré-requisito ausente: {tool}')
+                raise Error(f'Missing dependency: {tool}')
         compose_version = self.run(['docker', 'compose', 'version', '--short']).strip().lstrip('v')
         if tuple(int(n) for n in compose_version.split('.')[:2]) < (2, 20):
-            raise Error('Docker Compose >= 2.20 obrigatório')
+            raise Error('Docker Compose >= 2.20 required')
         self.run(['docker', 'info'])
         self.database_clients()
         self.compose(self.current(), 'config', '--quiet')
-        print('doctor: Docker, Compose, PostgreSQL TLS e configuração OK')
+        print('doctor: Docker, Compose, PostgreSQL TLS and configuration OK')
 
     def database_clients(self):
         """Reject incompatible host tools before stopping services or restoring data."""
@@ -339,7 +339,7 @@ class Deployment:
         for tool in ('psql', 'pg_dump', 'pg_restore'):
             client = re.search(r'(\d+)\.', self.run([tool, '--version']))
             if not client or int(client[1]) != server:
-                raise Error('psql/pg_dump/pg_restore devem ter o mesmo major do PostgreSQL')
+                raise Error('psql/pg_dump/pg_restore must match the PostgreSQL major version')
 
     def sql(self, query):
         return self.run(['psql', '-X', '-q', '--no-password', '-At', '-v', 'ON_ERROR_STOP=1',
@@ -348,27 +348,27 @@ class Deployment:
     def pending(self, release):
         history = 'fresh_migrations' if self.config.get('DB_PROFILE') == 'fresh' else 'migrations'
         if history not in release['database']:
-            raise Error('Manifesto não suporta o perfil de inicialização deste banco')
+            raise Error('Manifest does not support this database profile')
         expected = {m['version']: m for m in release['database'][history]}
         table = self.sql("SELECT to_regclass('public.schema_version') IS NOT NULL;")
         if table == 'f':
             if self.user_objects() != 0:
-                raise Error('Banco sem histórico Flyway deve estar vazio; revisão administrativa necessária')
+                raise Error('Database without Flyway history must be empty; review required')
             return True
         if table != 't':
-            raise Error('Resposta inesperada ao consultar histórico Flyway')
+            raise Error('Unexpected Flyway history response')
         rows = json.loads(self.sql('SELECT COALESCE(json_agg(row_to_json(h)),\'[]\'::json) '
                                    'FROM (SELECT version, script, checksum, success '
                                    'FROM public.schema_version) h;'))
         applied = set()
         for row in rows:
             if row['version'] is None or not row['success']:
-                raise Error('Histórico repetível/falho requer revisão administrativa')
+                raise Error('Repeatable/failed history requires review')
             wanted = expected.get(row['version'])
             if not wanted or any(row[k] != wanted[k] for k in ('script', 'checksum')):
-                raise Error('Histórico Flyway divergente do manifesto; nenhuma migration executada')
+                raise Error('Flyway history differs from manifest; no migrations executed')
             if row['version'] in applied:
-                raise Error('Histórico Flyway contém versão duplicada')
+                raise Error('Flyway history contains a duplicate version')
             applied.add(row['version'])
         return bool(set(expected) - applied)
 
@@ -395,10 +395,10 @@ class Deployment:
         states = {row['Service']: row for row in rows}
         if any(s not in states or states[s].get('State') != 'running'
                or states[s].get('Health') != 'healthy' for s in SERVICES):
-            raise Error('health: todos os três serviços devem estar running/healthy')
+            raise Error('health: all three services must be running/healthy')
         if self.sql('SELECT 1;') != '1':
-            raise Error('health: resposta inesperada do PostgreSQL')
-        print('health: aplicação, Solr, frontend e PostgreSQL OK')
+            raise Error('health: unexpected PostgreSQL response')
+        print('health: application, Solr, frontend and PostgreSQL OK')
 
     def up(self, release):
         self.compose(release, 'up', '-d', '--wait', '--wait-timeout', '600', *SERVICES)
@@ -439,11 +439,11 @@ class Deployment:
         old = self.current()
         if old == target and (self.root / 'installed.json').exists():
             self.healthy(old)
-            print('update: versão já instalada')
+            print('update: release already installed')
             return
         needs_migration = self.pending(target)
         if needs_migration and not authorize:
-            raise Error('Migrations necessárias: repita com --authorize-migrations')
+            raise Error('Migrations required; repeat with --authorize-migrations')
         self.compose(target, 'pull')
         journal = {'previous': old, 'target': target, 'backup': None, 'migration_started': False}
         write_json(self.root / 'operation.json', journal)
@@ -456,7 +456,7 @@ class Deployment:
                 self.compose(target, 'run', '--rm', '--no-deps', '-T', '--entrypoint',
                              '/dspace/bin/dspace', 'dspace', 'database', 'migrate')
                 if self.pending(target):
-                    raise Error('Migrations incompletas: aplicação permanece parada')
+                    raise Error('Migrations incomplete; application remains stopped')
             self.up(target)
             write_json(self.root / 'release.json', target)
             write_json(self.root / 'installed.json', {'version': target['version']})
@@ -475,16 +475,16 @@ class Deployment:
                     self.up(old)
                     (self.root / 'operation.json').unlink()
                 except (Error, OSError):
-                    print('Recuperação falhou; operation.json preservado', file=sys.stderr)
+                    print('Recovery failed; operation.json preserved', file=sys.stderr)
             else:
                 self.stop(target)
-                print('Migration iniciada: restore/rollback exige --authorize-restore; '
+                print('Migration started: restore/rollback requires --authorize-restore; '
                       f"backup={journal['backup']}", file=sys.stderr)
             raise
 
     def restore(self, directory, authorize):
         if not authorize:
-            raise Error('Restore substitui banco/dados: --authorize-restore obrigatório')
+            raise Error('Restore replaces database/data; --authorize-restore required')
         self.database_clients()
         release = verified_backup(directory, self)
         self.compose(release, 'pull')
@@ -522,10 +522,10 @@ class Deployment:
             write_json(self.root / 'release.json', release)
             write_json(self.root / 'installed.json', {'version': release['version']})
             (self.root / 'operation.json').unlink()
-            print(f'restore: OK; dados anteriores preservados em {staging}')
+            print(f'restore: OK; previous data preserved at {staging}')
         except (Error, OSError, KeyboardInterrupt, ValueError, tarfile.TarError):
             self.stop(release)
-            print(f'Restore incompleto; aplicação parada. Dados em {staging}', file=sys.stderr)
+            print(f'Restore incomplete; application stopped. Data at {staging}', file=sys.stderr)
             raise
 
 
@@ -542,21 +542,21 @@ def verified_backup(directory, deployment):
     expected = {'database.dump', 'assetstore.tar.gz', 'solr.tar.gz', 'release.json', 'metadata.json'}
     hashes = read_json(directory / 'checksums.json')
     if set(hashes) != expected or any(checksum(directory / n) != hashes[n] for n in expected):
-        raise Error('Backup incompleto ou checksum divergente')
+        raise Error('Backup incomplete or checksum mismatch')
     metadata = read_json(directory / 'metadata.json')
     expected_metadata = {'db_url': deployment.config['DB_URL'],
                          'db_user': deployment.config['DB_USERNAME'], 'root': str(deployment.root)}
     if deployment.config.get('DB_PROFILE') == 'fresh':
         expected_metadata['database_profile'] = 'fresh'
     if metadata != expected_metadata:
-        raise Error('Backup pertence a outra instalação/banco')
+        raise Error('Backup belongs to another installation/database')
     for name in ('assetstore', 'solr'):
         with tarfile.open(directory / f'{name}.tar.gz') as archive:
             for item in archive:
                 parts = Path(item.name).parts
                 if (not parts or parts[0] != name or '..' in parts
                         or not (item.isfile() or item.isdir())):
-                    raise Error('Archive contém caminho/link/dispositivo inseguro')
+                    raise Error('Archive contains unsafe paths, links or devices')
     deployment.run(['pg_restore', '--list', str(directory / 'database.dump')])
     return manifest(directory / 'release.json')
 
@@ -565,16 +565,16 @@ def provision(args):
     root = Path(args.root).absolute()
     secure_ancestors(root)
     if root == Path('/') or root.resolve() != root:
-        raise Error('Use um diretório dedicado sem links simbólicos')
+        raise Error('Use a dedicated directory without symlinks')
     config = configuration(args.config) if args.config else None
     release = manifest(args.manifest)
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     if not (root / 'config.json').exists():
         if config is None:
-            raise Error('Primeira instalação exige --config com credenciais protegidas')
+            raise Error('Initial installation requires --config with protected credentials')
         write_json(root / 'config.json', config)
     elif config is not None and config != configuration(root / 'config.json'):
-        raise Error('Configuração existente diverge; nada sobrescrito')
+        raise Error('Existing configuration differs; nothing overwritten')
     compose_source = Path(__file__).with_name('compose.template.yml')
     if not compose_source.exists():
         compose_source = SOURCE / 'docker-compose.yml'
@@ -601,7 +601,7 @@ def provision(args):
              # Kept so a later provision from the installed copy can still seed
              # smtp.env, exactly like the Compose template above.
              root / 'bin/smtp.env.example': smtp_source.read_text()}
-    for module in ('host_setup.py', 'releases.py', 'manager_update.py'):
+    for module in ('host_setup.py', 'releases.py', 'manager_update.py', 'remote_data.py'):
         files[root / 'bin' / module] = Path(__file__).with_name(module).read_text()
     if config and config.get('DB_PROFILE') == 'fresh':
         files[root / 'dspace/config/local.cfg'] += 'db.pcirn.profile = fresh\n'
@@ -616,13 +616,13 @@ def provision(args):
     if not (root / 'release.json').exists():
         write_json(root / 'release.json', release)
     elif manifest(root / 'release.json') != release:
-        raise Error('Versão existente diverge: use update')
+        raise Error('Existing release differs; use update')
     return Deployment(root)
 
 
 def main(argv=None):
     os.umask(0o077)
-    parser = argparse.ArgumentParser(description='DSPACEPCIRN — instalação e administração')
+    parser = argparse.ArgumentParser(description='DSPACEPCIRN installer and manager')
     parser.add_argument('command', nargs='?', choices=('install', 'update', 'status', 'version', 'doctor',
                                           'health', 'logs', 'backup', 'restore', 'rollback',
                                           'export-data', 'migrate-data', 'verify-data', 'update-manager'))
@@ -645,7 +645,7 @@ def main(argv=None):
         from manager_update import update
         if args.manager_package:
             if not args.manager_sha256:
-                parser.error('--manager-package exige --manager-sha256')
+                parser.error('--manager-package requires --manager-sha256')
             package, digest = args.manager_package, args.manager_sha256
         else:
             from releases import download_manager
@@ -662,19 +662,19 @@ def main(argv=None):
         from wizard import install
         return install(args)
     if args.command in ('install', 'update') and not args.manifest:
-        parser.error('install/update exige --manifest')
+        parser.error('install/update requires --manifest')
     if args.command == 'restore' and not args.backup:
-        parser.error('restore exige --backup')
+        parser.error('restore requires --backup')
     if args.command == 'export-data' and not args.output:
-        parser.error('export-data exige --output')
+        parser.error('export-data requires --output')
     if args.command == 'migrate-data' and not args.data_package:
-        parser.error('migrate-data exige --data-package')
+        parser.error('migrate-data requires --data-package')
     if args.data_package and args.command not in ('install', 'migrate-data'):
-        parser.error('--data-package vale apenas para install/migrate-data')
+        parser.error('--data-package applies only to install/migrate-data')
     root = Path(args.root).absolute()
     secure_ancestors(root)
     if root == Path('/') or root.resolve() != root:
-        raise Error('Use um diretório dedicado sem links simbólicos')
+        raise Error('Use a dedicated directory without symlinks')
     if args.command == 'install' or (args.command == 'migrate-data' and args.manifest):
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     for relative in ('config.json', '.lock', 'compose.yml', 'smtp.env', 'release.json',
@@ -687,24 +687,24 @@ def main(argv=None):
                      'postgres-compose.json', 'postgres.json', 'postgres-tls', 'postgres-password'):
         path = root / relative
         if path.resolve() != path:
-            raise Error('Arquivos/diretórios administrativos não podem ser links simbólicos')
+            raise Error('Administrative files/directories cannot be symlinks')
     with (root / '.lock').open('a') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise Error('Outra operação administrativa está em execução') from exc
+            raise Error('Another administrative operation is running') from exc
         dep = provision(args) if (args.command == 'install' or
                                   (args.command == 'migrate-data' and args.manifest)) else Deployment(root)
         if (root / 'operation.json').exists() and args.command in ('install', 'update', 'backup',
                                                                  'export-data', 'migrate-data', 'health'):
-            raise Error('Operação interrompida: examine operation.json e execute restore/rollback')
+            raise Error('Interrupted operation; inspect operation.json and run restore/rollback')
         release = dep.current()
         if args.command == 'version':
             print(release['version'])
         elif args.command == 'status':
             print(dep.compose(release, 'ps', '--all'), end='')
             if (root / 'operation.json').exists():
-                print('ATENÇÃO: operação pendente em operation.json')
+                print('Pending operation in operation.json')
         elif args.command == 'doctor':
             dep.doctor()
         elif args.command == 'health':
@@ -748,7 +748,7 @@ def main(argv=None):
                     write_json(root / 'release.json', history['previous'])
                     journal_path.unlink()
                 else:
-                    raise Error('Rollback sem backup disponível: execute restore --backup')
+                    raise Error('No rollback backup; run restore --backup')
             else:
                 dep.restore(Path(history['backup']), args.authorize_restore)
     return 0
@@ -768,5 +768,5 @@ if __name__ == '__main__':
         print(f'dspacepcirn: {message}', file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
-        print('dspacepcirn: interrompido; examine status/operation.json', file=sys.stderr)
+        print('dspacepcirn: interrupted; inspect status/operation.json', file=sys.stderr)
         sys.exit(130)

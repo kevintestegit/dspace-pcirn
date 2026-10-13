@@ -32,10 +32,10 @@ def detect():
 def supported_host():
     info = detect()
     if (info['distribution'], info['version'], info['codename']) != ('ubuntu', '24.04', 'noble'):
-        raise Error('Preparação automática exige Ubuntu 24.04; distribuição detectada: '
+        raise Error('Automatic setup requires Ubuntu 24.04; detected: '
                     + info['distribution'] + ' ' + info['version'])
     if info['architecture'] not in ('amd64', 'arm64'):
-        raise Error('Arquitetura suportada: AMD64 ou ARM64')
+        raise Error('Supported architecture: AMD64 or ARM64')
     return info
 
 
@@ -43,16 +43,16 @@ def resources(root):
     """Check resources before installing anything; ports are reported, not reserved."""
     memory = dict(line.split(':', 1) for line in Path('/proc/meminfo').read_text().splitlines())
     if (os.cpu_count() or 0) < 2:
-        raise Error('São necessárias pelo menos 2 CPUs')
+        raise Error('At least 2 CPUs required')
     if int(memory['MemTotal'].split()[0]) * 1024 < 8 * GIB:
-        raise Error('São necessários pelo menos 8 GiB de RAM')
+        raise Error('At least 8 GiB RAM required')
     if int(memory['MemAvailable'].split()[0]) * 1024 < 4 * GIB:
-        raise Error('São necessários pelo menos 4 GiB de memória disponível')
+        raise Error('At least 4 GiB available RAM required')
     ancestor = Path(root).absolute()
     while not ancestor.exists():
         ancestor = ancestor.parent
     if shutil.disk_usage(ancestor).free < 30 * GIB:
-        raise Error('São necessários pelo menos 30 GiB livres em disco')
+        raise Error('At least 30 GiB free disk space required')
     ports = {}
     for port in (4000, 8501):
         with socket.socket() as handle:
@@ -76,9 +76,9 @@ def network():
             # The OCI registry challenges anonymous requests before issuing tokens.
             if url.endswith('/v2/') and error.code == 401:
                 continue
-            raise Error('Rede indisponível para ' + url) from None
+            raise Error('Network unavailable: ' + url) from None
         except (URLError, OSError, TimeoutError):
-            raise Error('Falha de DNS, TLS ou conectividade para ' + url) from None
+            raise Error('DNS, TLS or connection failed: ' + url) from None
 
 
 def available(run, command):
@@ -90,9 +90,9 @@ def available(run, command):
 
 def approve(confirm, message):
     if os.geteuid() != 0:
-        raise Error('Execute sudo dspacepcirn para preparar o ambiente')
+        raise Error('Run sudo dspacepcirn to prepare the environment')
     if os.environ.get('DSPACEPCIRN_BOOTSTRAP_APPROVED') != '1' and not confirm(message):
-        raise Error('Preparação do ambiente cancelada; nenhuma dependência foi alterada')
+        raise Error('Environment setup cancelled; dependencies unchanged')
 
 
 def apt_install(run, packages):
@@ -106,10 +106,10 @@ def write_repository_file(path, content, mode):
     """Never overwrite a repository/key belonging to another configuration."""
     path = Path(path)
     if path.is_symlink():
-        raise Error('Repositório APT não pode ser link: ' + str(path))
+        raise Error('APT repository cannot be a symlink: ' + str(path))
     if path.exists():
         if path.read_bytes() != content:
-            raise Error('Repositório APT existente diverge: ' + str(path))
+            raise Error('Existing APT repository differs: ' + str(path))
         return
     path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
@@ -137,9 +137,9 @@ def repository(run, name, info):
         with urlopen(key_url, timeout=30) as response:
             key = response.read(128 * 1024 + 1)
     except OSError:
-        raise Error('Não foi possível obter a chave oficial de ' + name) from None
+        raise Error('Cannot download the official signing key: ' + name) from None
     if len(key) > 128 * 1024 or not key.startswith(b'-----BEGIN PGP PUBLIC KEY BLOCK-----'):
-        raise Error('Chave oficial inválida: ' + name)
+        raise Error('Invalid official signing key: ' + name)
     with tempfile.TemporaryDirectory(prefix='dspacepcirn-key-') as directory:
         path = Path(directory) / 'key.asc'
         path.write_bytes(key)
@@ -149,7 +149,7 @@ def repository(run, name, info):
                         if line.startswith('fpr:')]
         if (sum(line.startswith('pub:') for line in identity.splitlines()) != 1
                 or not fingerprints or fingerprints[0] != fingerprint):
-            raise Error('Identidade da chave oficial divergente: ' + name)
+            raise Error('Official signing key fingerprint mismatch: ' + name)
     destination = '/etc/apt/keyrings/dspacepcirn-' + name + '.asc'
     write_repository_file(destination, key, 0o644)
     source = (f'Types: deb\nURIs: {uri}\nSuites: {suite}\nComponents: {component}\n'
@@ -161,7 +161,7 @@ def repository(run, name, info):
 def client_path(major):
     """Return the private client bin directory without changing system alternatives."""
     if type(major) is not int or not 13 <= major <= 17:
-        raise Error('PostgreSQL suportado: versões 13 a 17')
+        raise Error('Supported PostgreSQL versions: 13 to 17')
     directory = Path(f'/usr/lib/postgresql/{major}/bin')
     return str(directory) if all((directory / tool).is_file() for tool in
                                  ('psql', 'pg_dump', 'pg_restore')) else None
@@ -180,19 +180,19 @@ def client_major(run, tool, major=None):
 def ensure_clients(run, confirm, major):
     """Install client tools of the exact server major; never install a host server."""
     if type(major) is not int or not 13 <= major <= 17:
-        raise Error('PostgreSQL suportado: versões 13 a 17')
+        raise Error('Supported PostgreSQL versions: 13 to 17')
     if all(client_major(run, tool, major) == major for tool in ('psql', 'pg_dump', 'pg_restore')):
         return
     info = supported_host()
-    approve(confirm, f'Instalar clientes PostgreSQL {major} do repositório oficial?')
+    approve(confirm, f'Install PostgreSQL clients {major} from the official repository?')
     if major != 16:
         if not shutil.which('gpg'):
             apt_install(run, ['gnupg', 'ca-certificates'])
         repository(run, 'postgresql', info)
     apt_install(run, [f'postgresql-client-{major}'])
     if not all(client_major(run, tool, major) == major for tool in ('psql', 'pg_dump', 'pg_restore')):
-        raise Error('Clientes PostgreSQL instalados não correspondem à versão do servidor; '
-                    'revise /usr/lib/postgresql e os clientes instalados')
+        raise Error('PostgreSQL clients do not match the server version; '
+                    'check /usr/lib/postgresql')
 
 
 def compose_supported(version):
@@ -210,9 +210,9 @@ def tracked_compose(run):
         try:
             extra = json.loads(document.read_text()).get('cliPluginsExtraDirs', [])
         except (OSError, ValueError, AttributeError):
-            raise Error('Configuração Docker inválida; atualização Compose recusada') from None
+            raise Error('Invalid Docker configuration; Compose update refused') from None
         if not isinstance(extra, list) or any(not isinstance(path, str) for path in extra):
-            raise Error('Diretórios de plugins Docker inválidos')
+            raise Error('Invalid Docker plugin directories')
     directories = [*extra, str(config / 'cli-plugins'),
                    '/usr/local/lib/docker/cli-plugins', '/usr/local/libexec/docker/cli-plugins',
                    '/usr/lib/docker/cli-plugins', '/usr/libexec/docker/cli-plugins']
@@ -231,15 +231,15 @@ def tracked_compose(run):
         if status == 'install ok installed':
             return package
         break
-    raise Error('Compose incompatível instalado fora dos pacotes oficiais; '
-                'binário personalizado exige revisão, sem substituição automática')
+    raise Error('Incompatible Compose is not an official package; '
+                'custom binary requires review, no automatic replacement')
 
 
 def validate_endpoint(run):
     endpoint = json.loads(run(['docker', 'context', 'inspect', 'default', '--format',
                                '{{json .Endpoints.docker.Host}}'], timeout=30))
     if not isinstance(endpoint, str) or not endpoint.startswith('unix://'):
-        raise Error('Docker exige endpoint Unix local')
+        raise Error('Docker requires a local Unix endpoint')
 
 
 def prepare(run, confirm, pg_major=16, root='/srv/dspacepcirn'):
@@ -261,8 +261,8 @@ def prepare(run, confirm, pg_major=16, root='/srv/dspacepcirn'):
         for package in ('docker.io', 'podman-docker', 'containerd', 'runc'):
             status = available(run, ['dpkg-query', '-W', '-f=${Status}', package])
             if status == 'install ok installed':
-                raise Error('Pacote Docker conflitante existente: ' + package +
-                            '; revisão manual necessária, sem remoção automática')
+                raise Error('Conflicting Docker package: ' + package +
+                            '; review required, no automatic removal')
         packages += ['ca-certificates', 'docker-ce', 'docker-ce-cli', 'containerd.io',
                      'docker-buildx-plugin', 'docker-compose-plugin']
     elif not compose:
@@ -274,8 +274,8 @@ def prepare(run, confirm, pg_major=16, root='/srv/dspacepcirn'):
     active = available(run, ['systemctl', 'is-active', 'docker']) == 'active' if docker else False
     enabled = available(run, ['systemctl', 'is-enabled', 'docker']) == 'enabled' if docker else False
     if packages or compose_upgrade or clients_missing or not active or not enabled:
-        approve(confirm, 'Autoriza instalar ou atualizar dependências incompatíveis dos repositórios oficiais '
-                         'e iniciar/habilitar Docker quando necessário?')
+        approve(confirm, 'Install missing dependencies from official repositories '
+                         'and enable Docker?')
     if not docker:
         apt_install(run, [p for p in packages if p in ('ca-certificates', 'gnupg')])
         repository(run, 'docker', info)
@@ -296,13 +296,13 @@ def prepare(run, confirm, pg_major=16, root='/srv/dspacepcirn'):
     for command in (['python3', '--version'], ['openssl', 'version'],
                     ['docker', 'compose', 'version', '--short']):
         if not available(run, command):
-            raise Error('Componente não funcional: ' + command[0])
+            raise Error('Component not working: ' + command[0])
     if not compose_supported(available(run, ['docker', 'compose', 'version', '--short'])):
-        raise Error('Docker Compose permanece incompatível após preparação (mínimo 2.20)')
+        raise Error('Docker Compose is still incompatible (minimum 2.20)')
     validate_endpoint(run)
     engine = json.loads(run(['docker', 'info', '--format', '{{json .}}'], timeout=30))
     arch = {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(engine.get('Architecture'),
                                                   engine.get('Architecture'))
     if engine.get('OSType') != 'linux' or arch != info['architecture']:
-        raise Error('Docker não corresponde à arquitetura Linux detectada')
+        raise Error('Docker does not match the detected Linux architecture')
     return info

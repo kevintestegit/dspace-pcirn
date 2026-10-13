@@ -1,18 +1,23 @@
 """Opt-in PostgreSQL 15 round trip in a new container with no host ports or volumes."""
 import hashlib
+import io
 import json
+from email.message import Message
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import tarfile
 import time
 import unittest
+from unittest import mock
 from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pcirn
+import remote_data
 
 
 @unittest.skipUnless(os.environ.get('PCIRN_RUN_POSTGRES15') == '1',
@@ -146,7 +151,24 @@ INSERT INTO bitstream VALUES ('00000000-0000-0000-0000-000000000002','1234567890
         self.assertEqual(set(json.loads((package / 'checksums.json').read_text())),
                          {'database.dump', 'assetstore.tar.gz', 'solr.tar.gz',
                           'source-report.json', 'release.json'})
-        self.cli('target', 'migrate-data', '--data-package', package)
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode='w:gz') as archive:
+            for path in sorted(package.iterdir()):
+                archive.add(path, arcname=path.name, recursive=False)
+        payload = stream.getvalue()
+        source = {'url': 'https://downloads.example/fixture.tar.gz', 'size': len(payload),
+                  'sha256': hashlib.sha256(payload).hexdigest()}
+        response = io.BytesIO(payload)
+        response.geturl = lambda: source['url']
+        response.headers = Message()
+        response.headers['Content-Type'] = 'application/gzip'
+        with mock.patch.object(remote_data, 'urlopen', return_value=response), \
+                mock.patch.object(remote_data.socket, 'getaddrinfo', return_value=[
+                    (2, 1, 6, '', ('8.8.8.8', 443))]), \
+                mock.patch.object(remote_data.shutil, 'disk_usage',
+                                  return_value=mock.Mock(free=120 * remote_data.GIB)):
+            downloaded = remote_data.download_package(self.base / 'download', source)
+        self.cli('target', 'migrate-data', '--data-package', downloaded)
         self.cli('target', 'verify-data', '--expected', package / 'source-report.json')
         for table in ('item', 'handle', 'resourcepolicy', 'schema_version', 'metadatavalue', 'bitstream'):
             query = f'SELECT json_agg(t)::text FROM {table} t;'
@@ -159,7 +181,7 @@ INSERT INTO bitstream VALUES ('00000000-0000-0000-0000-000000000002','1234567890
         (self.roots['target'] / 'data-import.json').unlink()
         denied = self.cli('target', 'migrate-data', '--data-package', package,
                           '--authorize-restore', expected=1)
-        self.assertIn('Banco não vazio', denied.stderr)
+        self.assertIn('Database is not empty', denied.stderr)
         self.assertEqual(self.sql('fictional_target', 'SELECT count(*) FROM item;'), '1')
         self.sql('fictional_target', "UPDATE handle SET handle='fictitious/changed';")
         self.cli('target', 'verify-data', '--expected', package / 'source-report.json', expected=1)

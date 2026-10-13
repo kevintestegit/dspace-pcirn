@@ -97,9 +97,35 @@ Branch de entrega: `feat/automated-installer`, worktree `.worktrees/automated-in
 
 ## Preservação
 
-Não houve acesso/modificação à VM Oracle ou a containers, bancos e volumes
+Na implementação inicial não houve acesso/modificação à VM Oracle ou a containers, bancos e volumes
 institucionais. Não houve merge na main, push nem release. Recursos descartáveis
 criados para prova têm nomes/rótulos exclusivos, foram parados e preservados;
 nenhum volume foi apagado. O checkout inicial com alterações locais ficou intacto.
 O estado RC4 `creating` pode retomar apenas se propriedade, TLS e credenciais forem
 comprovados; recursos incompletos/estranhos continuam exigindo revisão administrativa.
+
+## Interface em inglês e importação HTTPS
+
+O wizard agora pergunta `Import data? [y/N]` após preparar o banco. Ao aceitar,
+consulta `data-package.json` na release oficial, verifica o digest do asset e baixa
+o pacote de uma URL HTTPS pública usando tamanho e SHA-256 fixados. A origem fica
+registrada no checkpoint para retomada. O manifesto do software permanece inalterado,
+sem checksum circular; pacote e release continuam precisando corresponder exatamente.
+
+`scripts/package-data.py` empacota uma exportação completa e produz o descritor.
+URLs de visualização/login do Drive não são suportadas. Consulte [DATA-IMPORT.md](DATA-IMPORT.md).
+Mensagens do gerenciador são em inglês; detalhes internos vão para `ROOT/installer.log`
+com permissão 600. Comandos não interativos e pacotes locais continuam disponíveis.
+
+Validação desta extensão: 228 testes, um opt-in pulado, em 70,490 segundos
+(`/tmp/pcirn-english-data-delivery.log`); 15 testes focados após a revisão do
+empacotador; prova separada PostgreSQL 15 aprovada em 12,806 segundos
+(`/tmp/pcirn-remote-data-postgres-final.log`). A prova usa transporte HTTPS simulado,
+mas dump/restauração PostgreSQL reais e confere documentos, UUIDs, handles, permissões,
+histórico e bytes Solr. Sintaxe Bash, bundle do gerenciador e diff verificados.
+
+Durante a etapa posterior de conexão SSH, o gerenciador da VPS foi atualizado com
+a versão inicial desta branch, preservando a versão anterior e os arquivos do banco.
+DSpace/migrations não foram iniciados. Esta extensão de importação e idioma não foi
+aplicada à VPS; não há pacote real hospedado, novo asset ou RC publicada. Teste de
+download com um servidor/Drive real depende da URL e de um pacote autorizado.

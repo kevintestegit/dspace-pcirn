@@ -1,5 +1,6 @@
 """Interactive installation using the existing deployment and data operations."""
 import fcntl
+from contextlib import redirect_stdout
 import getpass
 import hashlib
 import json
@@ -14,8 +15,8 @@ from urllib.parse import urlencode, urlsplit
 from pcirn import (Deployment, Error, SERVICES, checksum, configuration, manifest,
                    provision, read_json, secure_ancestors, write_json)
 
-STEPS = ('Diagnóstico do servidor', 'Preparação do PostgreSQL', 'Modo de instalação',
-         'Configuração institucional', 'Instalação', 'Validação dos serviços', 'Relatório final')
+STEPS = ('Checking environment', 'Preparing database', 'Preparing data',
+         'Configuring repository', 'Installing', 'Checking services', 'Finishing')
 
 
 def ask(label, default=None, secret=False):
@@ -23,30 +24,31 @@ def ask(label, default=None, secret=False):
     while True:
         try:
             value = (getpass.getpass if secret else input)(label +
-                    (f' [{default}]' if default and not secret else '') + ': ')
+                    (f' [{"Y/n" if default == "Y" else "y/N" if default == "N" else default}]'
+                     if default and not secret else '') + ': ')
         except EOFError as exc:
             raise KeyboardInterrupt from exc
         value = value or default
         if value and not any(c in value for c in '\r\n\x00'):
             return value
-        print('Informe um valor válido.')
+        print('Enter a valid value.')
 
 
 def safe_root(root):
     root = Path(root).absolute()
     if root == Path('/') or root.resolve() != root:
-        raise Error('Use um diretório dedicado sem links simbólicos')
+        raise Error('Use a dedicated directory without symlinks')
     secure_ancestors(root)
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     if root.stat().st_mode & 0o077:
-        raise Error('Diretório administrativo exige chmod 700')
-    for name in ('wizard.json', 'wizard-config.json', 'config.json', 'postgres-password'):
+        raise Error('Installation directory requires chmod 700')
+    for name in ('wizard.json', 'wizard-config.json', 'config.json', 'postgres-password', 'installer.log'):
         path = root / name
         if path.exists() and path.stat().st_mode & 0o077:
-            raise Error('Credenciais e estado exigem chmod 600')
+            raise Error('Credentials and state files require chmod 600')
     for entry in root.rglob('*'):
         if entry.is_symlink():
-            raise Error('Links simbólicos não são aceitos no diretório administrativo')
+            raise Error('Symlinks are not allowed in the installation directory')
     return root
 
 
@@ -58,17 +60,17 @@ def validate_docker_config(config, directory=None):
             or not re.fullmatch(r'/[A-Za-z_][A-Za-z0-9_]*', url.path)
             or config['DB_USERNAME'] == 'postgres' or config['DB_USERNAME'].startswith('pg_')
             or url.path[1:] in ('postgres', 'template0', 'template1')):
-        raise Error('Docker exige host 127.0.0.1, porta e nomes SQL dedicados')
+        raise Error('Managed PostgreSQL requires loopback access and dedicated database names')
     if not re.fullmatch(r'(?:docker.io/library/)?postgres@sha256:[a-f0-9]{64}',
                         config.get('PG_IMAGE', '')):
-        raise Error('PG_IMAGE exige postgres@sha256:<64 hex>')
+        raise Error('PG_IMAGE requires postgres@sha256:<64 hex>')
     from urllib.parse import parse_qs
     params = parse_qs(url.query)
     ca = params.get('sslrootcert', [''])[0]
     if (set(params) != {'sslmode', 'sslrootcert'} or params['sslmode'] != ['verify-ca']
             or len(params['sslrootcert']) != 1 or not Path(ca).is_absolute()
             or (directory is not None and ca != str(Path(directory) / 'postgres-tls/server.crt'))):
-        raise Error('Docker exige verify-ca e certificado local postgres-tls/server.crt')
+        raise Error('Managed PostgreSQL requires verify-ca and postgres-tls/server.crt')
 
 
 def postgres_compose(dep):
@@ -99,7 +101,7 @@ def postgres_compose(dep):
         'volumes': {'postgres_data': {'external': True, 'name': name}}}
     path = dep.root / 'postgres-compose.json'
     if path.exists() and read_json(path) != document:
-        raise Error('Configuração PostgreSQL existente diverge; nada sobrescrito')
+        raise Error('Existing PostgreSQL configuration differs; nothing overwritten')
     if not path.exists():
         write_json(path, document)
     return name
@@ -121,7 +123,7 @@ def verify_postgres_container(dep, name):
             or volume.get('Type') != 'volume' or volume.get('Name') != name
             or tls.get('Source') != str(dep.root / 'postgres-tls') or tls.get('RW') is not False
             or secret.get('Source') != str(dep.root / 'postgres-password') or secret.get('RW') is not False):
-        raise Error('Container PostgreSQL diverge da instalação; nada reutilizado')
+        raise Error('PostgreSQL container does not belong to this installation')
 
 
 def provision_postgres(dep):
@@ -130,7 +132,7 @@ def provision_postgres(dep):
     endpoint = json.loads(dep.run(['docker', 'context', 'inspect', 'default',
                                    '--format', '{{json .Endpoints.docker.Host}}'], timeout=30))
     if not isinstance(endpoint, str) or not endpoint.startswith('unix://'):
-        raise Error('Docker precisa usar endpoint Unix local')
+        raise Error('Docker requires a local Unix endpoint')
     name = postgres_compose(dep)
     journal_path = dep.root / 'postgres.json'
     label = 'org.dspacepcirn.root=' + str(dep.root)
@@ -139,20 +141,20 @@ def provision_postgres(dep):
     journal = read_json(journal_path) if journal_path.exists() else None
     if journal is None:
         if not shutil.which('openssl'):
-            raise Error('Pré-requisito ausente: openssl')
+            raise Error('Missing dependency: openssl')
         version = dep.run(['docker', 'run', '--rm', '--entrypoint', 'postgres',
                            dep.config['PG_IMAGE'], '--version'], timeout=60)
         major = re.search(r'PostgreSQL\)? (\d+)\.', version)
         if not major or not 15 <= int(major[1]) <= 17:
-            raise Error('Imagem Docker exige PostgreSQL 15, 16 ou 17')
+            raise Error('Managed PostgreSQL image must use version 15, 16 or 17')
         for tool in ('psql', 'pg_dump', 'pg_restore'):
             client = re.search(r'(\d+)\.', dep.run([tool, '--version'], timeout=30))
             if not client or client[1] != major[1]:
-                raise Error('Clientes PostgreSQL devem ter o mesmo major da imagem')
+                raise Error('PostgreSQL clients must match the image major version')
         if name in volumes or name in containers:
-            raise Error('Banco/container/volume existente: provisionamento recusado')
+            raise Error('Existing database/container/volume: provisioning refused')
         if any((dep.root / p).exists() for p in ('postgres-password', 'postgres-tls')):
-            raise Error('Credenciais PostgreSQL preexistentes: nada sobrescrito')
+            raise Error('Existing PostgreSQL credentials; nothing overwritten')
         token = secrets.token_hex(16)
         write_json(journal_path, {'status': 'creating', 'name': name, 'token': token})
         tls = dep.root / 'postgres-tls'
@@ -178,28 +180,28 @@ def provision_postgres(dep):
         labels = json.loads(dep.run(['docker', 'volume', 'inspect', name,
                                      '--format', '{{json .Labels}}']))
         if labels.get('org.dspacepcirn.install') != token:
-            raise Error('Volume preexistente: nada utilizado ou sobrescrito')
+            raise Error('Existing volume; nothing reused or overwritten')
         dep.compose(dep.current(), 'up', '-d', '--wait', '--wait-timeout', '180', 'postgres')
         initialize_postgres_role(dep, name)
         write_json(journal_path, {'status': 'ready', 'name': name, 'token': token})
     else:
         if (set(journal) != {'status', 'name', 'token'} or journal.get('status') not in ('creating', 'ready')
                 or journal.get('name') != name or not re.fullmatch(r'[a-f0-9]{32}', journal.get('token', ''))):
-            raise Error('Criação PostgreSQL interrompida; revisão manual necessária, sem recriação')
+            raise Error('PostgreSQL setup interrupted; review required, nothing recreated')
         if name not in volumes or (journal['status'] == 'ready' and name not in containers):
-            raise Error('Volume/container gerenciado ausente; nada recriado')
+            raise Error('Managed volume/container missing; nothing recreated')
         labels = json.loads(dep.run(['docker', 'volume', 'inspect', name,
                                      '--format', '{{json .Labels}}']))
         if (labels.get('org.dspacepcirn.root') != str(dep.root)
                 or labels.get('org.dspacepcirn.install') != journal['token']):
-            raise Error('Volume pertence a outra instalação')
+            raise Error('Volume belongs to another installation')
         for path in ('postgres-password', 'postgres-tls/server.key', 'postgres-tls/server.crt',
                      'postgres-tls/pg_hba.conf'):
             file = dep.root / path
             if not file.is_file() or file.is_symlink() or not file.stat().st_size:
-                raise Error('Credenciais/TLS incompletos; revisão manual necessária, nada regenerado')
+                raise Error('Credentials/TLS incomplete; review required, nothing regenerated')
         if (dep.root / 'postgres-password').stat().st_mode & 0o077:
-            raise Error('Senha PostgreSQL exige permissões 600')
+            raise Error('PostgreSQL password file requires mode 600')
         if name in containers:
             verify_postgres_container(dep, name)
         dep.compose(dep.current(), 'up', '-d', '--wait', '--wait-timeout', '180', 'postgres')
@@ -211,7 +213,7 @@ def provision_postgres(dep):
                               '-c', f"SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{username}');"],
                              timeout=30).strip()
             if exists not in ('t', 'f'):
-                raise Error('Estado da função PostgreSQL não comprovado; nada alterado')
+                raise Error('PostgreSQL role ownership could not be verified; nothing changed')
             if exists == 'f':
                 # Only a database with no user objects may finish a interrupted role setup.
                 empty = dep.run(['docker', 'exec', '--user', 'postgres', name, 'psql', '-X', '-At',
@@ -220,7 +222,7 @@ def provision_postgres(dep):
                                  "ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' "
                                  "AND n.nspname <> 'information_schema');"], timeout=30).strip()
                 if empty != 't':
-                    raise Error('Banco contém objetos: retomada de credenciais recusada')
+                    raise Error('Database contains objects; credential setup refused')
                 initialize_postgres_role(dep, name)
             import preflight
             preflight.database(dep)
@@ -253,53 +255,59 @@ class Wizard:
                 or not isinstance(self.state['completed'], list)
                 or len(self.state['completed']) > 7
                 or self.state['completed'] != list(range(len(self.state['completed'])))):
-            raise Error('Estado do wizard inválido')
+            raise Error('Invalid installer state')
         self.inputs = self.state['inputs']
         mode = getattr(args, 'installation_mode', None)
         if mode:
             if self.inputs.get('installation_mode', mode) != mode:
-                raise Error('Retomada exige o mesmo modo de instalação')
+                raise Error('Resume requires the same installation mode')
             self.inputs['installation_mode'] = mode
         for name, value in (('manifest', args.manifest), ('package', args.data_package)):
             if value:
                 value = str(Path(value).absolute())
                 if self.inputs.get(name, value) != value:
-                    raise Error('Retomada exige os mesmos manifesto e pacote')
+                    raise Error('Resume requires the same manifest and package')
                 self.inputs[name] = value
         if args.config:
             incoming = configuration(args.config)
             if 'config' in self.inputs and incoming != self.inputs['config']:
                 if (len(self.state['completed']) > 1 or (self.root / 'config.json').exists()
                         or (self.root / 'postgres.json').exists()):
-                    raise Error('Configuração diverge do estado de retomada')
+                    raise Error('Configuration differs from saved state')
             self.inputs['config'] = incoming
         self.dep = None
         self.dependencies_approved = os.environ.get('DSPACEPCIRN_BOOTSTRAP_APPROVED') == '1'
         if 'config' in self.inputs and (self.root / 'config.json').exists():
             if configuration(self.root / 'config.json') != self.inputs['config']:
-                raise Error('Configuração existente diverge; nada sobrescrito')
+                raise Error('Existing configuration differs; nothing overwritten')
 
     def save(self):
         write_json(self.path, self.state)
 
+    def record(self, operation, *args, **kwargs):
+        """Keep internal progress in a private log instead of repeating status lines."""
+        path = self.root / 'installer.log'
+        with path.open('a') as log, redirect_stdout(log):
+            path.chmod(0o600)
+            return operation(*args, **kwargs)
+
     def release(self):
         if not self.inputs.get('manifest'):
             if not self.interactive:
-                raise Error('--manifest obrigatório')
+                raise Error('--manifest is required')
             from releases import discover
-            print('Procurando versões disponíveis...')
             path = discover(self.root)
             found = manifest(path)
-            print('Versão encontrada: ' + found['version'] +
-                  (' (versão de testes)' if '-' in found['version'] else ''))
-            if not self.confirm('Instalar esta versão?'):
-                raise Error('Instalação cancelada; nenhum banco alterado')
+            print('Release: ' + found['version'] +
+                  (' (test release)' if '-' in found['version'] else ''))
+            if not self.confirm('Install this release?'):
+                raise Error('Installation cancelled; database unchanged')
             self.inputs['manifest'] = str(path)
             self.save()
         path = Path(self.inputs['manifest'])
         digest = checksum(path)
         if self.state['completed'] and self.inputs.get('manifest_checksum', digest) != digest:
-            raise Error('Manifesto alterado desde o diagnóstico')
+            raise Error('Manifest changed since diagnosis')
         release = manifest(path)
         self.inputs['manifest_checksum'] = digest
         return release
@@ -308,10 +316,7 @@ class Wizard:
         import preflight
         if self.interactive:
             import host_setup
-            print('Verificando ambiente...')
-            info = host_setup.prepare(self.host_run, self.confirm_dependencies, root=str(self.root))
-            print('✓ Ubuntu ' + info['version'] + ' ' + info['architecture'].upper())
-            print('✓ Docker e Docker Compose disponíveis\n✓ Recursos suficientes')
+            host_setup.prepare(self.host_run, self.confirm_dependencies, root=str(self.root))
             if 'config' not in self.inputs:
                 self.inputs['runtime'] = preflight.select_resources(self.host_run, self.root)
                 self.save()
@@ -319,13 +324,12 @@ class Wizard:
         # Host diagnosis precedes choosing or accessing any database.
         probe = SimpleNamespace(root=self.root, run=self.host_run,
                                 config=self.inputs.get('config', self.inputs.get('runtime', {})))
-        preflight.check(probe, release, server_only=True)
-        print('✓ Manifesto validado\n✓ Imagens disponíveis para a arquitetura do servidor')
+        self.record(preflight.check, probe, release, server_only=True)
 
-    def confirm(self, message):
+    def confirm(self, message, default=True):
         if not self.interactive:
             return self.authorize_migrations
-        return ask(message + ' [S/n]', 'S').lower() in ('s', 'sim', 'y', 'yes')
+        return ask(message, 'Y' if default else 'N').lower() in ('y', 'yes')
 
     def confirm_dependencies(self, message):
         if not self.dependencies_approved:
@@ -346,11 +350,11 @@ class Wizard:
     def postgres(self):
         import preflight
         if 'config' not in self.inputs:
-            choice = ask('1. PostgreSQL em Docker\n2. PostgreSQL externo\nEscolha', '1')
+            choice = ask('1. Managed PostgreSQL (Docker)\n2. Existing PostgreSQL\nChoice', '1')
             if choice not in ('1', '2'):
-                raise Error('Escolha 1 ou 2')
+                raise Error('Choose 1 or 2')
             mode = 'docker' if choice == '1' else 'external'
-            host = '127.0.0.1' if mode == 'docker' else ask('Host PostgreSQL')
+            host = '127.0.0.1' if mode == 'docker' else ask('Database host')
             if mode == 'docker':
                 import socket
                 from releases import postgres_image
@@ -363,10 +367,10 @@ class Wizard:
                 database, username = 'dspace', 'dspace'
                 password = secrets.token_urlsafe(48)
             else:
-                port = ask('Porta PostgreSQL', '5432')
-                database = ask('Banco', 'dspace')
-                username = ask('Usuário', 'dspace')
-                password = ask('Senha', secret=True)
+                port = ask('Database port', '5432')
+                database = ask('Database', 'dspace')
+                username = ask('Username', 'dspace')
+                password = ask('Password', secret=True)
             if mode == 'docker':
                 params = {'sslmode': 'verify-ca', 'sslrootcert': str(self.root / 'postgres-tls/server.crt')}
             else:
@@ -403,7 +407,7 @@ class Wizard:
             probe = Deployment(self.root, config=config)
         preflight.database(probe)
         if not (self.root / 'data-import.json').exists() and probe.user_objects():
-            raise Error('Banco não vazio: importação recusada')
+            raise Error('Database is not empty; import refused')
         self.dep = self.seed(config)
 
     def seed(self, config):
@@ -418,12 +422,11 @@ class Wizard:
             if self.inputs.get('package') or not self.interactive:
                 choice = '2'
             else:
-                available = self.release().get('database', {}).get('fresh_bootstrap') == 'pcirn-fresh-v1'
-                choice = ask('Como deseja instalar o DSpace?\n1. Instalação nova' +
-                             ('' if available else ' (indisponível nesta versão)') +
-                             '\n2. Migrar repositório existente\nEscolha', '1' if available else '2')
+                choice = '2' if self.confirm('Import data?', default=False) else '1'
             if choice not in ('1', '2'):
-                raise Error('Escolha 1 ou 2')
+                raise Error('Choose 1 or 2')
+            if choice == '2' and self.interactive and not self.inputs.get('package'):
+                self.data_source()
             if choice == '1':
                 self.validate_bootstrap()
                 selected_new = True
@@ -436,24 +439,34 @@ class Wizard:
         from data_migration import PACKAGE_FILES, REQUIRED_TABLES
         if not self.inputs.get('package'):
             if not self.interactive:
-                raise Error('--data-package obrigatório para o wizard')
-            self.inputs['package'] = str(Path(ask('Diretório do pacote export-data')).absolute())
+                raise Error('--data-package is required for import')
+            from remote_data import download_package
+            print('Downloading data...')
+            self.inputs['package'] = str(download_package(self.root, self.data_source()))
         package = Path(self.inputs['package'])
         hashes = read_json(package / 'checksums.json')
         if set(hashes) != PACKAGE_FILES or any(checksum(package / n) != hashes[n] for n in PACKAGE_FILES):
-            raise Error('Pacote incompleto ou checksum divergente')
+            raise Error('Package incomplete or checksum mismatch')
         if manifest(package / 'release.json') != self.release():
-            raise Error('Pacote e manifesto devem usar a mesma versão; atualize após a instalação')
+            raise Error('Package and release must match; update after installation')
         report = read_json(package / 'source-report.json')
         if report.get('schema_version') != 1 or not REQUIRED_TABLES <= set(report.get('tables', {})):
-            raise Error('Relatório de origem inválido')
+            raise Error('Invalid source report')
         profile = report.get('database_profile', 'institutional')
         if profile not in ('fresh', 'institutional'):
-            raise Error('Perfil do banco de origem inválido')
+            raise Error('Invalid source database profile')
         if profile == 'fresh':
             self.validate_bootstrap()
         self.inputs['database_profile'] = profile
         self.inputs['package_checksums'] = hashes
+
+    def data_source(self):
+        """Pin the official data descriptor so retries cannot change the source."""
+        if 'remote_source' not in self.inputs:
+            from releases import download_data_source
+            self.inputs['remote_source'] = download_data_source(self.release()['version'])
+            self.save()
+        return self.inputs['remote_source']
 
     def validate_bootstrap(self):
         """Require the selected backend to implement the verified empty bootstrap."""
@@ -461,13 +474,13 @@ class Wizard:
         release = self.release()
         if (release.get('database', {}).get('fresh_bootstrap') != 'pcirn-fresh-v1'
                 or not release['database'].get('fresh_migrations')):
-            raise Error('Esta versão não oferece instalação nova validada; use migração ou uma versão compatível')
+            raise Error('This release does not support an empty repository; select a compatible release')
         self.dep.compose(release, 'pull', 'dspace')
         capability = self.dep.compose(release, 'run', '--rm', '--no-deps', '-T',
                                       '--entrypoint', '/dspace/bin/dspace',
                                       'dspace', 'database', 'fresh-capability').strip()
         if capability != 'pcirn-fresh-v1':
-            raise Error('Esta imagem não comprova suporte à instalação nova; selecione uma versão compatível')
+            raise Error('This image does not support an empty repository; select a compatible release')
 
     def institutional(self):
         config = self.inputs['config'].copy()
@@ -475,9 +488,9 @@ class Wizard:
                 or self.inputs.get('database_profile') == 'fresh'):
             config['DB_PROFILE'] = 'fresh'
         if self.interactive:
-            config['DSPACE_NAME'] = ask('Nome do repositório', config.get('DSPACE_NAME', 'Repositório'))
+            config['DSPACE_NAME'] = ask('Repository name', config.get('DSPACE_NAME', 'Repository'))
             config['DSPACE_SHORTNAME'] = config.get('DSPACE_SHORTNAME', 'DSPACEPCIRN')
-            config['PUBLIC_UI_URL'] = ask('Endereço público HTTPS do repositório (ex.: https://repositorio.exemplo.br)')
+            config['PUBLIC_UI_URL'] = ask('Repository HTTPS URL')
             config['PUBLIC_REST_URL'] = config['PUBLIC_UI_URL'].rstrip('/') + '/server'
             config['PUBLIC_REST_HOST'] = urlsplit(config['PUBLIC_REST_URL']).hostname or ''
         path = self.root / 'wizard-config.json'
@@ -488,38 +501,38 @@ class Wizard:
         provisional = self.inputs['config'].copy()
         provisional.pop('DB_PROFILE', None)
         if existing != self.inputs['config'] and existing != provisional:
-            raise Error('Configuração existente diverge; nada sobrescrito')
+            raise Error('Existing configuration differs; nothing overwritten')
         write_json(self.root / 'config.json', config)
         self.inputs['config'] = config
         self.dep = Deployment(self.root)
         import preflight
-        preflight.check(self.dep, self.release())
+        self.record(preflight.check, self.dep, self.release())
 
     def installation(self):
         from data_migration import migrate_data, verify_data
         self.dep = Deployment(self.root)
         import preflight
-        preflight.check(self.dep, self.release())
+        self.record(preflight.check, self.dep, self.release())
         if self.inputs.get('installation_mode') == 'new':
             self.new_installation()
             return
         package = Path(self.inputs['package'])
         if read_json(package / 'checksums.json') != self.inputs['package_checksums']:
-            raise Error('Pacote alterado desde a validação')
+            raise Error('Package changed after verification')
         journal = self.root / 'operation.json'
         if journal.exists():
-            raise Error('Operação interrompida; revisão manual necessária, sem reimportação')
+            raise Error('Operation interrupted; review required before import')
         imported = self.root / 'data-import.json'
         if not imported.exists():
-            migrate_data(self.dep, package)
+            self.record(migrate_data, self.dep, package)
         record = read_json(imported)
         if record != {'status': 'verified', 'checksums': self.inputs['package_checksums']}:
-            raise Error('Importação existente não corresponde ao pacote')
-        verify_data(self.dep, package / 'source-report.json')
+            raise Error('Existing import does not match this package')
+        self.record(verify_data, self.dep, package / 'source-report.json')
         if self.dep.pending(self.release()):
-            raise Error('Histórico exige migrations: execute update com autorização após revisão')
+            raise Error('Database needs migrations; review and authorize an update')
         # Existing deploy owns pull, backup, health and interrupted-operation handling.
-        self.dep.deploy(self.release(), False, initial=True)
+        self.record(self.dep.deploy, self.release(), False, initial=True)
 
     def new_installation(self):
         release = self.release()
@@ -530,19 +543,19 @@ class Wizard:
         installed = self.root / 'installed.json'
         if not journal and installed.exists():
             if read_json(installed) != {'version': release['version']} or self.dep.pending(release):
-                raise Error('Instalação existente diverge da inicialização solicitada')
-            self.dep.healthy(release)
+                raise Error('Existing installation differs from the requested initialization')
+            self.record(self.dep.healthy, release)
             return
         if journal:
             if (journal.get('kind') != 'fresh-install' or journal.get('target') != release
                     or journal.get('configuration') != fingerprint
                     or journal.get('stage') not in ('prepared', 'migrating', 'migrated')):
-                raise Error('Operação interrompida diverge: revisão administrativa necessária')
+                raise Error('Interrupted operation differs; review required')
         else:
             if self.dep.user_objects():
-                raise Error('Banco não vazio: inicialização recusada; nada apagado')
-            if not self.confirm('Autorizar a inicialização do banco e as migrations desta versão?'):
-                raise Error('Inicialização não autorizada')
+                raise Error('Database is not empty; initialization refused')
+            if not self.confirm('Initialize the database?'):
+                raise Error('Database initialization not authorized')
             self.dep.compose(release, 'pull')
             journal = {'kind': 'fresh-install', 'target': release, 'configuration': fingerprint,
                        'stage': 'prepared'}
@@ -550,25 +563,25 @@ class Wizard:
         if journal['stage'] != 'migrated':
             pending = self.dep.pending(release)
             if pending:
-                if journal['stage'] == 'migrating' and not self.confirm('Autorizar a retomada das migrations?'):
-                    raise Error('Retomada não autorizada; dados preservados')
+                if journal['stage'] == 'migrating' and not self.confirm('Resume database migrations?'):
+                    raise Error('Resume not authorized; data preserved')
                 journal['stage'] = 'migrating'
                 write_json(path, journal)
                 self.dep.compose(release, 'run', '--rm', '--no-deps', '-T', '--entrypoint',
                                  '/dspace/bin/dspace', 'dspace', 'database', 'migrate')
                 if self.dep.pending(release):
-                    raise Error('Inicialização incompleta; aplicação permanece parada')
+                    raise Error('Initialization incomplete; application remains stopped')
             journal['stage'] = 'migrated'
             write_json(path, journal)
         elif self.dep.pending(release):
-            raise Error('Histórico diverge da inicialização validada; nada alterado')
-        self.dep.up(release)
+            raise Error('Database history differs from the verified initialization')
+        self.record(self.dep.up, release)
         write_json(self.root / 'installed.json', {'version': release['version']})
         path.unlink()
 
     def services(self):
         self.dep = Deployment(self.root)
-        self.dep.healthy(self.release())
+        self.record(self.dep.healthy, self.release())
 
     def report(self):
         result = {'status': 'verified', 'version': self.release()['version'],
@@ -578,17 +591,14 @@ class Wizard:
                   'ui': self.inputs['config']['PUBLIC_UI_URL'],
                   'rest': self.inputs['config']['PUBLIC_REST_URL']}
         write_json(self.root / 'report.json', result)
-        print('DSPACEPCIRN instalado com sucesso. Serviços internos verificados.')
-        print('Instalação validada. Relatório: ' + str(self.root / 'report.json'))
-        print('URLs HTTPS exigem proxy reverso configurado pelo administrador.')
+        print('Installed. Local services verified.')
 
     def run(self):
         actions = (self.diagnostic, self.postgres, self.import_data, self.institutional,
                    self.installation, self.services, self.report)
-        print('DSPACEPCIRN')
         if ((self.root / 'operation.json').exists()
                 and read_json(self.root / 'operation.json').get('kind') != 'fresh-install'):
-            raise Error('Operação interrompida; revisão manual necessária, sem reimportação')
+            raise Error('Operation interrupted; review required before import')
         if self.state['completed'] == list(range(7)):
             self.services()
             self.report()
@@ -597,7 +607,7 @@ class Wizard:
             if index in self.state['completed']:
                 continue
             while True:
-                print(f'Etapa {index + 1}/7 — {STEPS[index]}')
+                print(STEPS[index] + '...')
                 try:
                     action()
                     self.state['completed'].append(index)
@@ -612,9 +622,9 @@ class Wizard:
                     print(str(error) if isinstance(error, Error) else type(error).__name__)
                     if not self.interactive or (self.root / 'operation.json').exists():
                         raise
-                    choice = ask('1. Corrigir e tentar novamente\n2. Sair e retomar depois', '2')
+                    choice = ask('1. Retry\n2. Exit', '2')
                     if choice != '1':
-                        raise Error('Etapa pendente; execute sudo dspacepcirn para retomar')
+                        raise Error('Installation pending; run sudo dspacepcirn to resume')
                     if index == 0:
                         self.inputs.pop('manifest', None)
                         self.inputs.pop('manifest_checksum', None)
@@ -627,33 +637,30 @@ class Wizard:
 
 def install(args):
     if not args.config and (not os.isatty(0) or os.geteuid() != 0):
-        raise Error('Instalação interativa exige terminal e sudo dspacepcirn')
+        raise Error('Interactive installation requires a terminal and sudo dspacepcirn')
     os.umask(0o077)
     root = safe_root(args.root)
     with (root / '.lock').open('a') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise Error('Outra operação administrativa está em execução') from exc
+            raise Error('Another administrative operation is running') from exc
         return Wizard(args).run()
 
 
 def menu(args):
     """Keep administration routed through the same CLI commands as automation."""
     if not os.isatty(0):
-        raise Error('Menu exige terminal; use um comando com --config para automação')
+        raise Error('Menu requires a terminal; use --config for automation')
     if os.geteuid() != 0:
-        raise Error('Execute sudo dspacepcirn')
+        raise Error('Run sudo dspacepcirn')
     from pcirn import main
     while True:
-        print('\n╔══════════════════════════════════════════════╗\n'
-              '║                  DSPACEPCIRN                  ║\n'
-              '║          Repositório Institucional            ║\n'
-              '╚══════════════════════════════════════════════╝\n'
-              '1. Instalar DSpace\n2. Atualizar DSpace\n3. Fazer backup\n'
-              '4. Restaurar backup\n5. Verificar funcionamento\n'
-              '6. Configurações avançadas\n0. Sair')
-        choice = ask('Escolha', '0')
+        print('\nDSPACEPCIRN\n'
+              '1. Install DSpace\n2. Update DSpace\n3. Back up\n'
+              '4. Restore\n5. Check health\n'
+              '6. Advanced\n0. Exit')
+        choice = ask('Choice', '0')
         if choice == '0':
             return 0
         try:
@@ -665,7 +672,7 @@ def menu(args):
                 continue
             command = {'2': 'update', '3': 'backup', '4': 'restore', '5': 'health'}.get(choice)
             if not command:
-                print('Escolha inválida.')
+                print('Invalid choice.')
                 continue
             argv = [command, '--root', str(args.root)]
             if command == 'update':
@@ -673,18 +680,18 @@ def menu(args):
                 root = safe_root(args.root)
                 path = discover(root)
                 release = manifest(path)
-                print('Versão encontrada: ' + release['version'] +
-                      (' (versão de testes)' if '-' in release['version'] else ''))
-                if ask('Atualizar para esta versão? [S/n]', 'S').lower() not in ('s', 'sim'):
+                print('Release: ' + release['version'] +
+                      (' (test release)' if '-' in release['version'] else ''))
+                if ask('Update to this release?', 'Y').lower() not in ('y', 'yes'):
                     continue
                 argv += ['--manifest', str(path)]
                 if Deployment(root).pending(release):
-                    if ask('Autorizar migrations após backup? [s/N]', 'N').lower() not in ('s', 'sim'):
+                    if ask('Run migrations after backup?', 'N').lower() not in ('y', 'yes'):
                         continue
                     argv += ['--authorize-migrations']
             elif command == 'restore':
-                argv += ['--backup', ask('Diretório do backup')]
-                if ask('Autorizar restauração após backup de segurança? [s/N]', 'N').lower() not in ('s', 'sim'):
+                argv += ['--backup', ask('Backup directory')]
+                if ask('Restore after safety backup?', 'N').lower() not in ('y', 'yes'):
                     continue
                 argv += ['--authorize-restore']
             main(argv)
@@ -695,34 +702,34 @@ def menu(args):
 def advanced(args):
     """Technical administration continues to use the established CLI operations."""
     from pcirn import main
-    print('1. Diagnóstico\n2. Status\n3. Logs\n4. Exportar dados para migração\n'
-          '5. Verificar dados\n6. Selecionar versão para instalação\n'
-          '7. Atualizar gerenciador\n8. Autenticar no GHCR\n0. Voltar')
-    choice = ask('Escolha', '0')
+    print('1. Diagnose\n2. Status\n3. Logs\n4. Export data\n'
+          '5. Verify data\n6. Select release\n'
+          '7. Update manager\n8. GHCR login\n0. Back')
+    choice = ask('Choice', '0')
     if choice == '0':
         return
     if choice == '8':
-        user = ask('Usuário GitHub')
-        token = ask('Token com permissão de leitura de pacotes', secret=True)
+        user = ask('GitHub username')
+        token = ask('Package read token', secret=True)
         Wizard(args).host_run(['docker', 'login', 'ghcr.io', '--username', user, '--password-stdin'],
                               input_text=token + '\n', timeout=30)
-        print('Autenticação GHCR concluída.')
+        print('GHCR login complete.')
         return
     if choice == '6':
         from releases import discover
         if (Path(args.root) / 'wizard.json').exists():
-            raise Error('Instalação em andamento: preserve a versão do checkpoint')
-        args.manifest = discover(safe_root(args.root), version=ask('Versão oficial (ex.: v1.0.0)'))
+            raise Error('Installation in progress; keep the saved release')
+        args.manifest = discover(safe_root(args.root), version=ask('Release version'))
         install(args)
         return
     command = {'1': 'doctor', '2': 'status', '3': 'logs', '4': 'export-data',
                '5': 'verify-data', '7': 'update-manager'}.get(choice)
     if not command:
-        raise Error('Escolha inválida')
+        raise Error('Invalid choice')
     argv = [command, '--root', str(args.root)]
     if command == 'export-data':
-        argv += ['--output', ask('Diretório novo para exportação')]
+        argv += ['--output', ask('New export directory')]
     if command == 'update-manager':
-        if ask('Atualizar somente o gerenciador? [S/n]', 'S').lower() not in ('s', 'sim'):
+        if ask('Update manager?', 'Y').lower() not in ('y', 'yes'):
             return
     main(argv)

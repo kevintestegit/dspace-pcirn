@@ -24,39 +24,39 @@ def check_file(root, row):
         return False
     identifier = row['internal_id']
     if row['store_number'] != 0 or not isinstance(identifier, str):
-        raise Error('Bitstream exige assetstore local número 0')
+        raise Error('Bitstream requires local assetstore 0')
     if identifier.startswith('-R'):
         relative = Path(identifier[2:])
     else:
         if not identifier.isdigit() or len(identifier) < 6:
-            raise Error('internal_id de bitstream inválido')
+            raise Error('Invalid bitstream internal_id')
         relative = Path(identifier[:2], identifier[2:4], identifier[4:6], identifier)
     path = root / relative
     if relative.is_absolute() or '..' in relative.parts or path.resolve() != path:
-        raise Error('Caminho de bitstream inseguro')
+        raise Error('Unsafe bitstream path')
     if not path.is_file() or path.stat().st_size != row['size_bytes']:
-        raise Error('Bitstream ausente ou tamanho divergente')
+        raise Error('Missing bitstream or size mismatch')
     algorithm = {'MD5': 'md5', 'SHA-1': 'sha1', 'SHA-256': 'sha256'}.get(row['checksum_algorithm'])
     if not algorithm or not row['checksum']:
-        raise Error('Checksum de bitstream ausente ou algoritmo não suportado')
+        raise Error('Missing bitstream checksum or unsupported algorithm')
     digest = hashlib.new(algorithm)
     with path.open('rb') as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(block)
     if digest.hexdigest().lower() != row['checksum'].lower():
-        raise Error('Checksum de bitstream divergente')
+        raise Error('Bitstream checksum mismatch')
     return True
 
 
 def snapshot(dep, assetstore, solr):
     """Fingerprint all public table rows, including identifiers, metadata and policies."""
     if dep.sql('SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid();') != 't':
-        raise Error('Conexão PostgreSQL sem TLS')
+        raise Error('PostgreSQL connection without TLS')
     dep.pending(dep.current())
     names = json.loads(dep.sql("SELECT COALESCE(json_agg(tablename ORDER BY tablename), '[]') "
                                "FROM pg_tables WHERE schemaname='public';"))
     if not REQUIRED_TABLES <= set(names):
-        raise Error('Banco DSpace incompleto: tabelas obrigatórias ausentes')
+        raise Error('Incomplete DSpace database: required tables missing')
     report = {'schema_version': 1, 'tables': {}, 'verified_files': 0}
     if dep.config.get('DB_PROFILE') == 'fresh':
         report['database_profile'] = 'fresh'
@@ -93,10 +93,10 @@ def tree_fingerprint(root):
     digest = hashlib.sha256()
     count = 0
     if not root.is_dir() or root.is_symlink():
-        raise Error('Diretório de dados ausente ou inseguro')
+        raise Error('Missing or unsafe data directory')
     for path in sorted(root.rglob('*')):
         if path.is_symlink() or not (path.is_dir() or path.is_file()):
-            raise Error('Dados contêm link ou dispositivo inseguro')
+            raise Error('Data contains unsafe links or devices')
         if path.is_file():
             digest.update(json.dumps([str(path.relative_to(root)), checksum(path)]).encode())
             count += 1
@@ -105,16 +105,16 @@ def tree_fingerprint(root):
 
 def quiescent(dep):
     if dep.compose(dep.current(), 'ps', '--status', 'running', '-q', *SERVICES).strip():
-        raise Error('Migração exige aplicação parada')
+        raise Error('Import requires a stopped application')
     if dep.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
                "AND pid <> pg_backend_pid();") != '0':
-        raise Error('O administrador deve suspender todas as outras conexões ao banco dedicado')
+        raise Error('Suspend all other connections to the dedicated database')
 
 
 def export_data(dep, output):
     output = Path(output).absolute()
     if output.exists() or output.resolve() != output or dep.root == output or dep.root in output.parents:
-        raise Error('Exportação exige novo diretório fora da instalação, sem links')
+        raise Error('Export requires a new directory outside the installation, without symlinks')
     dep.stop(dep.current())
     quiescent(dep)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -127,12 +127,12 @@ def export_data(dep, output):
         with tarfile.open(staging / f'{name}.tar.gz', 'w:gz') as archive:
             archive.add(dep.root / 'data' / name, arcname=name)
     if snapshot(dep, dep.root / 'data/assetstore', dep.root / 'data/solr') != report:
-        raise Error('Origem mudou durante exportação; pacote não publicado')
+        raise Error('Source changed during export; package not published')
     quiescent(dep)
     write_json(staging / 'release.json', dep.current())
     write_json(staging / 'checksums.json', {name: checksum(staging / name) for name in PACKAGE_FILES})
     staging.rename(output)
-    print(f'export-data: {output}; aplicação permanece parada')
+    print(f'export-data: {output}; application remains stopped')
 
 
 def verify_data(dep, expected=None, output=None, assetstore=None, solr=None):
@@ -141,50 +141,50 @@ def verify_data(dep, expected=None, output=None, assetstore=None, solr=None):
     try:
         report = snapshot(dep, assetstore or dep.root / 'data/assetstore', solr or dep.root / 'data/solr')
         if expected and report != read_json(expected):
-            raise Error('Dados divergem do relatório de origem')
+            raise Error('Data differs from the source report')
         write_json(report_path, report)
-        print('verify-data: registros, Flyway e arquivos OK')
+        print('verify-data: records, Flyway and files OK')
         return report
     except (Error, OSError, ValueError, KeyError, TypeError, csv.Error) as error:
         write_json(report_path, {'status': 'failed',
                                 'error': str(error) if isinstance(error, Error) else type(error).__name__})
         if isinstance(error, csv.Error):
-            raise Error('CSV de verificação inválido') from error
+            raise Error('Invalid verification CSV') from error
         raise
 
 
 def migrate_data(dep, package):
     """Restore into an empty dedicated database without starting the application."""
     if (dep.root / 'installed.json').exists() or (dep.root / 'data-import.json').exists():
-        raise Error('migrate-data é exclusivo da instalação inicial, sem reimportação')
+        raise Error('migrate-data is for initial installation only; no reimport')
     if dep.user_objects() != 0:
-        raise Error('Banco não vazio: migração inicial recusada')
+        raise Error('Database is not empty; initial import refused')
     if dep.sql('SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid();') != 't':
-        raise Error('Conexão PostgreSQL sem TLS')
+        raise Error('PostgreSQL connection without TLS')
     quiescent(dep)
     if any((dep.root / 'data' / name).exists() and
            any((dep.root / 'data' / name).iterdir()) for name in ('assetstore', 'solr')):
-        raise Error('Migração inicial exige assetstore e Solr vazios')
+        raise Error('Initial import requires empty assetstore and Solr')
     package = Path(package).resolve()
     names = PACKAGE_FILES
     hashes = read_json(package / 'checksums.json')
     if set(hashes) != names or any(checksum(package / name) != hashes[name] for name in names):
-        raise Error('Pacote incompleto ou checksum divergente')
+        raise Error('Package incomplete or checksum mismatch')
     manifest(package / 'release.json')
     expected = read_json(package / 'source-report.json')
     if expected.get('schema_version') != 1 or not REQUIRED_TABLES <= set(expected.get('tables', {})):
-        raise Error('Relatório de origem inválido')
+        raise Error('Invalid source report')
     profile = expected.get('database_profile', 'institutional')
     if profile not in ('institutional', 'fresh') or profile != dep.config.get('DB_PROFILE', 'institutional'):
-        raise Error('Perfil do banco diverge do pacote; configure DB_PROFILE antes da restauração')
+        raise Error('Database profile differs from package; configure DB_PROFILE before restore')
     with (package / 'database.dump').open('rb') as stream:
         if stream.read(5) != b'PGDMP':
-            raise Error('Dump deve usar pg_dump -Fc')
+            raise Error('Dump must use pg_dump -Fc')
     dep.run(['pg_restore', '--list', str(package / 'database.dump')])
     server = int(dep.sql('SHOW server_version_num;')) // 10000
     version = re.search(r'(\d+)\.', dep.run(['pg_restore', '--version']))
     if not version or int(version[1]) != server:
-        raise Error('pg_restore deve ter o mesmo major do PostgreSQL')
+        raise Error('pg_restore must match the PostgreSQL major version')
     journal = {'operation': 'migrate-data', 'status': 'started', 'checksums': hashes}
     write_json(dep.root / 'operation.json', journal)
     try:
@@ -198,16 +198,16 @@ def migrate_data(dep, package):
                     parts = Path(member.name).parts
                     if (not parts or parts[0] != name or '..' in parts
                             or not (member.isfile() or member.isdir()) or parts in seen):
-                        raise Error('Archive contém caminho/link/dispositivo duplicado ou inseguro')
+                        raise Error('Archive contains duplicate or unsafe paths, links or devices')
                     seen.add(parts)
                 archive.extractall(staging)
             if not (staging / name).is_dir():
-                raise Error('Pacote não contém diretório de dados obrigatório')
+                raise Error('Package lacks a required data directory')
         if tree_fingerprint(staging / 'solr') != expected.get('solr'):
-            raise Error('Estatísticas Solr divergem do relatório de origem')
+            raise Error('Solr statistics differ from the source report')
         quiescent(dep)
         if dep.user_objects():
-            raise Error('Banco deixou de estar vazio')
+            raise Error('Database is no longer empty')
         dep.run(['pg_restore', '--no-password', '--no-owner', '--no-acl',
                  '--single-transaction', '--exit-on-error', '--dbname', dep.env['PGDATABASE'],
                  str(package / 'database.dump')], pg=True)
@@ -220,7 +220,7 @@ def migrate_data(dep, package):
             (staging / name).rename(target)
         write_json(dep.root / 'data-import.json', {'status': 'verified', 'checksums': hashes})
         (dep.root / 'operation.json').unlink()
-        print('migrate-data: importação verificada; aplicação ainda não iniciada')
+        print('migrate-data: import verified; application not started')
     except (Error, OSError, ValueError, KeyError, TypeError, csv.Error,
             tarfile.TarError, KeyboardInterrupt) as error:
         journal['status'] = 'failed'

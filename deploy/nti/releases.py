@@ -26,7 +26,7 @@ class _OfficialRedirect(HTTPRedirectHandler):
         if (parsed.scheme != 'https' or parsed.username or parsed.password
                 or parsed.hostname not in ('api.github.com', 'github.com',
                                            'release-assets.githubusercontent.com')):
-            raise Error('Download recusado: redirecionamento fora do GitHub')
+            raise Error('Download refused: redirect outside GitHub')
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -38,7 +38,7 @@ def _download(url, limit=MAX_JSON):
     parsed = urlsplit(url)
     if (parsed.scheme != 'https' or parsed.hostname not in ('api.github.com', 'github.com')
             or parsed.username or parsed.password):
-        raise Error('Download recusado: origem GitHub oficial obrigatória')
+        raise Error('Download requires the official GitHub source')
     request = Request(url, headers={'Accept': 'application/vnd.github+json',
                                    'User-Agent': 'dspacepcirn-installer'})
     try:
@@ -46,18 +46,18 @@ def _download(url, limit=MAX_JSON):
             final = urlsplit(response.geturl())
             if final.scheme != 'https' or final.hostname not in (
                     'api.github.com', 'github.com', 'release-assets.githubusercontent.com'):
-                raise Error('Download recusado: redirecionamento fora do GitHub')
+                raise Error('Download refused: redirect outside GitHub')
             payload = response.read(limit + 1)
     except HTTPError as exc:
         if exc.code in (401, 403, 429):
-            raise Error('GitHub recusou a consulta ou limitou requisições; aguarde e tente novamente') from None
+            raise Error('GitHub denied or rate-limited the request; retry later') from None
         if exc.code == 404:
-            raise Error('Release ou arquivo oficial não encontrado no GitHub') from None
-        raise Error('GitHub indisponível; tente novamente sem alterar a instalação') from None
+            raise Error('Release or asset not found on GitHub') from None
+        raise Error('GitHub unavailable; retry later') from None
     except (URLError, TimeoutError, OSError):
-        raise Error('Não foi possível acessar GitHub; verifique rede, DNS, HTTPS e tente novamente') from None
+        raise Error('Cannot reach GitHub; check DNS/HTTPS and retry') from None
     if len(payload) > limit:
-        raise Error('Download excedeu o tamanho permitido')
+        raise Error('Download exceeds its size limit')
     return payload
 
 
@@ -65,25 +65,25 @@ def _json(url):
     try:
         return json.loads(_download(url))
     except (ValueError, UnicodeError):
-        raise Error('GitHub retornou JSON inválido') from None
+        raise Error('GitHub returned invalid JSON') from None
 
 
 def select(version=None):
     """Choose the highest stable SemVer, otherwise the highest release candidate."""
     if version is not None:
         if not VERSION.fullmatch(version):
-            raise Error('Versão inválida: use X.Y.Z ou X.Y.Z-rcN')
+            raise Error('Invalid version: use X.Y.Z or X.Y.Z-rcN')
         result = _json(API + '/releases/tags/' + quote('v' + version.lstrip('v'), safe=''))
         if not isinstance(result, dict) or result.get('draft'):
-            raise Error('Release oficial indisponível')
+            raise Error('Official release unavailable')
         if result.get('tag_name') != 'v' + version.lstrip('v'):
-            raise Error('GitHub retornou uma versão diferente da solicitada')
+            raise Error('GitHub returned a different release')
         return result
     candidates = []
     for page in range(1, 6):
         entries = _json(API + f'/releases?per_page=100&page={page}')
         if not isinstance(entries, list):
-            raise Error('Lista de releases oficial inválida')
+            raise Error('Invalid official release list')
         for entry in entries:
             match = VERSION.fullmatch(entry.get('tag_name', '')) if isinstance(entry, dict) else None
             if match and not entry.get('draft'):
@@ -96,34 +96,34 @@ def select(version=None):
         if len(entries) < 100:
             break
     else:
-        raise Error('Muitas releases: selecione uma versão nas configurações avançadas')
+        raise Error('Too many releases; select a version in Advanced')
     if not candidates:
-        raise Error('Nenhuma versão estável ou RC oficial disponível')
+        raise Error('No official stable or RC release available')
     return max(candidates, key=lambda item: item[:3])[3]
 
 
 def _asset(release, name):
     assets = [asset for asset in release.get('assets', []) if asset.get('name') == name]
     if len(assets) != 1:
-        raise Error(f'Release não contém um único {name}; escolha outra versão oficial')
+        raise Error(f'Release must contain exactly one {name}; select another release')
     asset = assets[0]
     expected = 'https://github.com/' + REPOSITORY + '/releases/download/' + release['tag_name'] + '/' + name
     if asset.get('browser_download_url') != expected:
-        raise Error('Arquivo não pertence à release oficial selecionada')
+        raise Error('Asset does not belong to the selected official release')
     digest = asset.get('digest', '')
     if not isinstance(digest, str) or not DIGEST.fullmatch(digest):
-        raise Error('Arquivo oficial sem digest SHA-256 verificável; download recusado')
+        raise Error('Official asset has no verifiable SHA-256; download refused')
     return asset
 
 
 def _verified_asset(release, name, limit):
     asset = _asset(release, name)
     if type(asset.get('size')) is not int or not 0 < asset['size'] <= limit:
-        raise Error('Tamanho do arquivo oficial inválido')
+        raise Error('Invalid official asset size')
     payload = _download(asset['browser_download_url'], limit)
     if (len(payload) != asset['size']
             or 'sha256:' + hashlib.sha256(payload).hexdigest() != asset['digest']):
-        raise Error('Checksum do arquivo oficial divergente; download recusado')
+        raise Error('Official asset checksum mismatch; download refused')
     return payload
 
 
@@ -131,7 +131,7 @@ def _directory(root, version):
     root = Path(root).absolute()
     directory = root / 'downloads' / version
     if directory.resolve() != directory:
-        raise Error('Diretório de download não pode conter links simbólicos')
+        raise Error('Download directory cannot contain symlinks')
     directory.mkdir(parents=True, mode=0o700, exist_ok=True)
     return directory
 
@@ -149,25 +149,25 @@ def discover(root, version=None):
         try:
             data = manifest(temporary)
         except (ValueError, KeyError, TypeError, AttributeError):
-            raise Error('Manifesto oficial inválido') from None
+            raise Error('Invalid official manifest') from None
         source = data.get('source', {})
         if not isinstance(source, dict):
-            raise Error('Manifesto: commit de origem inválido')
+            raise Error('Manifest: invalid source commit')
         commit = source.get('commit', '')
         if data['version'] != selected or not isinstance(commit, str) or not SHA.fullmatch(commit):
-            raise Error('Manifesto: versão ou commit de origem inválido')
+            raise Error('Manifest: invalid version or source commit')
         tag = _json(API + '/commits/' + quote(release['tag_name'], safe=''))
         if not isinstance(tag, dict) or tag.get('sha') != commit:
-            raise Error('Commit do manifesto diverge da tag oficial; instalação recusada')
+            raise Error('Manifest commit differs from the official tag; installation refused')
         for key, suffix in (('backend', 'backend'), ('solr', 'solr'), ('frontend', 'angular')):
             image = data['images'][key]
             if image.split('@')[0] != 'ghcr.io/kevintestegit/dspace-pcirn-' + suffix:
-                raise Error('Manifesto contém imagem fora do projeto oficial')
+                raise Error('Manifest contains an image outside the official project')
         target = directory / 'release-manifest.json'
         if target.is_symlink():
-            raise Error('Manifesto armazenado não pode ser link simbólico')
+            raise Error('Cached manifest cannot be a symlink')
         if target.exists() and target.read_bytes() != payload:
-            raise Error('Manifesto da mesma versão mudou; preserve a instalação e investigue a release')
+            raise Error('Manifest for the same version changed; review the release')
         os.replace(temporary, target)
         return target
     finally:
@@ -185,13 +185,26 @@ def download_manager(root, version=None):
     try:
         target = directory / 'dspacepcirn-manager.tar.gz'
         if target.is_symlink():
-            raise Error('Pacote do gerenciador não pode ser link simbólico')
+            raise Error('Manager package cannot be a symlink')
         if target.exists() and target.read_bytes() != payload:
-            raise Error('Pacote da mesma versão mudou; atualização recusada')
+            raise Error('Package for the same version changed; update refused')
         os.replace(temporary, target)
         return target, hashlib.sha256(payload).hexdigest()
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def download_data_source(version):
+    """Read a verified data descriptor from the selected official release."""
+    from remote_data import validate_source
+    release = select(version)
+    if not any(asset.get('name') == 'data-package.json' for asset in release.get('assets', [])):
+        raise Error('This release has no data package. Use --data-package for a local export')
+    payload = _verified_asset(release, 'data-package.json', 16 * 1024)
+    try:
+        return validate_source(json.loads(payload))
+    except (ValueError, UnicodeError):
+        raise Error('Invalid release data descriptor') from None
 
 
 def docker_architecture(run):
@@ -200,50 +213,50 @@ def docker_architecture(run):
         info = json.loads(run(['docker', 'info', '--format', '{{json .}}'], timeout=TIMEOUT))
         arch = {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(info['Architecture'], info['Architecture'])
         if info['OSType'] != 'linux' or arch not in ('amd64', 'arm64'):
-            raise Error('Docker precisa executar Linux AMD64 ou ARM64')
+            raise Error('Docker must run Linux AMD64 or ARM64')
         return arch
     except (ValueError, KeyError, TypeError):
-        raise Error('Docker retornou arquitetura inválida') from None
+        raise Error('Docker returned an invalid architecture') from None
 
 
 def _descriptors(run, image, arch):
     if arch not in ('amd64', 'arm64'):
-        raise Error('Arquitetura suportada: AMD64 ou ARM64')
+        raise Error('Supported architecture: AMD64 or ARM64')
     try:
         entries = json.loads(run(['docker', 'manifest', 'inspect', '--verbose', image], timeout=TIMEOUT))
     except Error:
-        raise Error('Imagem indisponível: verifique rede e acesso ao registro; para GHCR privado, '
-                    'configure autenticação nas configurações avançadas') from None
+        raise Error('Image unavailable; check network and registry access. For private GHCR, '
+                    'configure login in Advanced') from None
     except (ValueError, TypeError):
-        raise Error('Registro retornou manifesto de imagem inválido') from None
+        raise Error('Registry returned an invalid image manifest') from None
     if isinstance(entries, dict):
         entries = [entries]
     if not isinstance(entries, list):
-        raise Error('Registro retornou manifesto de imagem inválido')
+        raise Error('Registry returned an invalid image manifest')
     matches = []
     for entry in entries:
         if not isinstance(entry, dict) or not isinstance(entry.get('Descriptor'), dict):
-            raise Error('Registro retornou descritor de imagem inválido')
+            raise Error('Registry returned an invalid image descriptor')
         descriptor = entry['Descriptor']
         platform = descriptor.get('platform', {})
         if not isinstance(platform, dict):
-            raise Error('Registro retornou plataforma de imagem inválida')
+            raise Error('Registry returned an invalid image platform')
         digest = descriptor.get('digest', '')
         if (platform.get('os') == 'linux' and platform.get('architecture') == arch
                 and isinstance(digest, str) and DIGEST.fullmatch(digest)):
             matches.append(descriptor)
     if not matches:
-        raise Error(f'Imagem oficial indisponível para Linux {arch}')
+        raise Error(f'Official image unavailable for Linux {arch}')
     return matches
 
 
 def postgres_image(run, arch, major=16):
     """Pin the official supported PostgreSQL image to its architecture's digest."""
     if major != 16:
-        raise Error('PostgreSQL Docker suportado pelo instalador: versão 16')
+        raise Error('Managed PostgreSQL version: 16')
     descriptors = _descriptors(run, 'docker.io/library/postgres:16', arch)
     if len(descriptors) != 1:
-        raise Error('Registro retornou imagens PostgreSQL ambíguas para a arquitetura')
+        raise Error('Registry returned ambiguous PostgreSQL images for this architecture')
     return 'postgres@' + descriptors[0]['digest']
 
 

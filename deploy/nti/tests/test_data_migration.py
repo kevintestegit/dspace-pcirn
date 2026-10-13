@@ -175,7 +175,7 @@ class DataMigrationTests(unittest.TestCase):
         path.write_text(json.dumps(report))
         self.hashes()
         result = self.cli(success=False)
-        self.assertIn('Perfil do banco diverge', result.stderr)
+        self.assertIn('Database profile differs', result.stderr)
         self.assertFalse(any('--dbname' in args for _, args in self.fixture.calls()))
         self.assertFalse((self.root / 'operation.json').exists())
 
@@ -267,7 +267,7 @@ class DataMigrationTests(unittest.TestCase):
         self.tables['schema_version'] *= 2
         self.dump(); self.hashes()
         result = self.cli(success=False)
-        self.assertIn('duplicada', result.stderr)
+        self.assertIn('duplicate', result.stderr)
         self.assertFalse((self.root / 'data-import.json').exists())
 
     def test_large_multiline_metadata_survives_csv_verification(self):

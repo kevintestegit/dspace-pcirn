@@ -1,0 +1,4 @@
+- [x] Validate release data metadata and stream/check/extract HTTPS packages safely.
+- [x] Add the import question and preserve local/noninteractive imports.
+- [x] Convert installer messages to English and reduce normal output.
+- [x] Run focused and full installer tests; document hosting and package preparation.

@@ -59,15 +59,15 @@ class PreflightTests(unittest.TestCase):
 
     def test_low_memory_blocks(self):
         self.info['MemTotal'] = 2 * 1024 ** 3
-        with self.assertRaisesRegex(preflight.Error, 'memória'): preflight.check(self.dep, self.release)
+        with self.assertRaisesRegex(preflight.Error, 'RAM'): preflight.check(self.dep, self.release)
 
     def test_low_disk_blocks(self):
         preflight.shutil.disk_usage.return_value.free = 100
-        with self.assertRaisesRegex(preflight.Error, 'disco'): preflight.check(self.dep, self.release)
+        with self.assertRaisesRegex(preflight.Error, 'disk'): preflight.check(self.dep, self.release)
 
     def test_wrong_architecture_blocks(self):
         self.info['Architecture'] = 'aarch64'
-        with self.assertRaisesRegex(preflight.Error, 'arquitetura'): preflight.check(self.dep, self.release)
+        with self.assertRaisesRegex(preflight.Error, 'architecture'): preflight.check(self.dep, self.release)
 
     def test_missing_docker_blocks(self):
         preflight.shutil.which.return_value = None
@@ -76,7 +76,7 @@ class PreflightTests(unittest.TestCase):
     def test_missing_postgres_privileges_blocks(self):
         result = json.loads(self.dep.sql.return_value); result['owner'] = False
         self.dep.sql.return_value = json.dumps(result)
-        with self.assertRaisesRegex(preflight.Error, 'permissões'): preflight.check(self.dep, self.release)
+        with self.assertRaisesRegex(preflight.Error, 'privileges'): preflight.check(self.dep, self.release)
 
     def test_tls_required(self):
         result = json.loads(self.dep.sql.return_value); result['ssl'] = False
@@ -85,7 +85,7 @@ class PreflightTests(unittest.TestCase):
 
     def test_occupied_ports_blocks(self):
         preflight.ports_available.return_value = False
-        with self.assertRaisesRegex(preflight.Error, 'portas'): preflight.check(self.dep, self.release)
+        with self.assertRaisesRegex(preflight.Error, 'ports'): preflight.check(self.dep, self.release)
 
     def test_overlapping_network_blocks(self):
         original = self.dep.run.side_effect
@@ -95,11 +95,11 @@ class PreflightTests(unittest.TestCase):
                 return json.dumps([{'Name': 'other', 'IPAM': {'Config': [{'Subnet': '10.250.50.0/24'}]}}])
             return original(args, **kwargs)
         self.dep.run.side_effect = run
-        with self.assertRaisesRegex(preflight.Error, 'sobrepõe'): preflight.check(self.dep, self.release)
+        with self.assertRaisesRegex(preflight.Error, 'overlaps'): preflight.check(self.dep, self.release)
 
     def test_filesystem_permissions_block(self):
         with mock.patch.object(preflight.os, 'access', return_value=False):
-            with self.assertRaisesRegex(preflight.Error, 'permissões'): preflight.check(self.dep, self.release)
+            with self.assertRaisesRegex(preflight.Error, 'cannot write'): preflight.check(self.dep, self.release)
 
     def test_newer_dump_client_blocks(self):
         data = json.loads(self.dep.sql.return_value); data['server'] = 160000

@@ -5,6 +5,12 @@ prepara as dependências ausentes após uma confirmação, consulta releases ofi
 provisiona PostgreSQL em Docker por padrão. Os comandos não interativos permanecem
 disponíveis com configuração e manifesto explícitos.
 
+A interface é concisa e em inglês. Após configurar o PostgreSQL, pergunta
+`Import data? [y/N]`. Ao aceitar, obtém a origem pelo asset oficial `data-package.json`
+da RC e baixa um pacote HTTPS verificado, sem pedir URL ou SHA-256 ao administrador.
+Consulte [hospedagem e preparação do pacote](DATA-IMPORT.md). Sem importação, inicializa
+um repositório vazio numa release compatível. Detalhes internos ficam em `ROOT/installer.log`.
+
 ## Primeiro acesso
 
 Use uma cópia revisada deste código ou o pacote `dspacepcirn-manager.tar.gz` da
@@ -56,9 +62,10 @@ O fluxo tem sete checkpoints privados:
    e senhas aleatórias. No modo externo, informe host, porta, banco e credenciais;
    o padrão é `verify-full` usando CAs do sistema. CA particular ou certificado
    cliente são configurados em `--config`, conforme a seção avançada abaixo.
-3. Modo de instalação: **Instalação nova** ou **Migrar repositório existente**.
-   Somente migração solicita pacote `export-data`, verifica checksums, versão,
-   histórico e relatório antes de restaurar. O destino precisa estar vazio.
+3. Importação opcional: `Import data? [y/N]`. A importação automática usa o pacote
+   publicado para essa release e verifica checksums, versão, histórico e relatório
+   antes de restaurar. O destino precisa estar vazio. Pacotes locais continuam
+   disponíveis por `--data-package`; não há download ao escolher um repositório vazio.
 4. Nome e endereço público HTTPS do repositório. O REST usa o mesmo host em `/server`.
    Configurações avançadas podem definir URLs separadas por `--config`.
 5. Instalação: migrations de banco vazio exigem autorização explícita; migração

@@ -57,5 +57,5 @@ class GlobalManagerTests(unittest.TestCase):
             result = subprocess.run(['bash', str(REPO / 'deploy/nti/install-manager.sh'), str(prefix)],
                                     capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn('alterações externas', result.stderr)
+            self.assertIn('unsafe ownership or permissions', result.stderr)
             self.assertFalse((prefix / 'lib/dspacepcirn').exists())

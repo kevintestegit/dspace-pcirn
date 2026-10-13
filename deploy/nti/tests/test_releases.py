@@ -56,7 +56,7 @@ class ReleasesTest(unittest.TestCase):
         draft = candidate('9.0.0')[0]
         draft['draft'] = True
         with patch.object(releases, '_json', return_value=[draft, {'tag_name': 'v10.0.0-beta1'}]):
-            with self.assertRaisesRegex(Error, 'Nenhuma versão'):
+            with self.assertRaisesRegex(Error, 'No official'):
                 releases.select()
 
     def test_pagination_reaches_stable(self):
@@ -78,12 +78,12 @@ class ReleasesTest(unittest.TestCase):
 
     def test_checksum_failure_keeps_existing_download(self):
         path = self.discover()
-        with self.assertRaisesRegex(Error, 'Checksum'):
+        with self.assertRaisesRegex(Error, 'checksum'):
             self.discover(self.payload + b'corruption')
         self.assertEqual(path.read_bytes(), self.payload)
 
     def test_commit_mismatch_refuses_manifest(self):
-        with self.assertRaisesRegex(Error, 'Commit'):
+        with self.assertRaisesRegex(Error, 'commit'):
             self.discover(sha='c' * 40)
         self.assertFalse(list(self.root.rglob('release-manifest.json')))
 
@@ -93,7 +93,7 @@ class ReleasesTest(unittest.TestCase):
             altered = dict(data, **{key: value})
             payload = json.dumps(altered).encode()
             self.release['assets'][0].update(size=len(payload), digest='sha256:' + hashlib.sha256(payload).hexdigest())
-            with self.assertRaisesRegex(Error, 'versão ou commit'):
+            with self.assertRaisesRegex(Error, 'version or source commit'):
                 self.discover(payload)
 
     def test_assets_require_official_url_and_digest(self):
@@ -122,7 +122,7 @@ class ReleasesTest(unittest.TestCase):
 
     def test_symlink_download_directory_refused(self):
         (self.root / 'downloads').symlink_to(self.root)
-        with self.assertRaisesRegex(Error, 'links simbólicos'):
+        with self.assertRaisesRegex(Error, 'symlinks'):
             self.discover()
 
     def test_network_errors_do_not_leak_credentials(self):
@@ -135,7 +135,7 @@ class ReleasesTest(unittest.TestCase):
                 error.close()
 
     def test_redirect_is_refused_before_contacting_external_host(self):
-        with self.assertRaisesRegex(Error, 'redirecionamento'):
+        with self.assertRaisesRegex(Error, 'redirect'):
             releases._OfficialRedirect().redirect_request(
                 None, None, 302, '', {}, 'https://evil.example/script')
 
@@ -145,7 +145,7 @@ class ReleasesTest(unittest.TestCase):
         altered['createdAt'] = 'different bytes'
         payload = json.dumps(altered).encode()
         self.release['assets'][0].update(size=len(payload), digest='sha256:' + hashlib.sha256(payload).hexdigest())
-        with self.assertRaisesRegex(Error, 'mesma versão mudou'):
+        with self.assertRaisesRegex(Error, 'same version changed'):
             self.discover(payload)
         self.assertEqual(path.read_bytes(), self.payload)
 
@@ -154,14 +154,14 @@ class ReleasesTest(unittest.TestCase):
         altered['images']['backend'] = 'ghcr.io/kevintestegit/dspace-pcirn-untrusted@sha256:' + 'b' * 64
         payload = json.dumps(altered).encode()
         self.release['assets'][0].update(size=len(payload), digest='sha256:' + hashlib.sha256(payload).hexdigest())
-        with self.assertRaisesRegex(Error, 'fora do projeto'):
+        with self.assertRaisesRegex(Error, 'outside the official project'):
             self.discover(payload)
 
     def test_download_size_limit(self):
         response = io.BytesIO(b'a' * 11)
         response.geturl = lambda: releases.API
         with patch.object(releases, 'urlopen', return_value=response):
-            with self.assertRaisesRegex(Error, 'tamanho'):
+            with self.assertRaisesRegex(Error, 'size'):
                 releases._download(releases.API, limit=10)
 
     def test_docker_platform_and_postgres_digest(self):
@@ -188,7 +188,7 @@ class ReleasesTest(unittest.TestCase):
     def test_ghcr_errors_are_actionable_and_private(self):
         def run(*args, **kwargs):
             raise Error('secret registry token')
-        with self.assertRaisesRegex(Error, 'autenticação') as caught:
+        with self.assertRaisesRegex(Error, 'login') as caught:
             releases.validate_images(run, json.loads(self.payload), 'arm64')
         self.assertNotIn('secret', str(caught.exception))
 

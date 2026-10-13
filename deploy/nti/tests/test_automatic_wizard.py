@@ -49,7 +49,7 @@ class AutomaticWizardTests(unittest.TestCase):
         self.wiz.dep = mock.Mock()
         with mock.patch.object(wizard, 'Deployment', return_value=self.wiz.dep), \
                 mock.patch.object(self.wiz, 'release', return_value={'database': {}}):
-            with self.assertRaisesRegex(pcirn.Error, 'não oferece instalação nova'):
+            with self.assertRaisesRegex(pcirn.Error, 'does not support an empty repository'):
                 self.wiz.validate_bootstrap()
         self.wiz.dep.compose.assert_not_called()
         self.wiz.dep.sql.assert_not_called()
@@ -68,7 +68,7 @@ class AutomaticWizardTests(unittest.TestCase):
 
     def test_fresh_requires_explicit_authorization(self):
         dep = self.fresh(False)
-        with self.assertRaisesRegex(pcirn.Error, 'não autorizada'):
+        with self.assertRaisesRegex(pcirn.Error, 'not authorized'):
             self.wiz.new_installation()
         dep.compose.assert_not_called()
         dep.up.assert_not_called()
@@ -77,7 +77,7 @@ class AutomaticWizardTests(unittest.TestCase):
     def test_fresh_rejects_nonempty_database(self):
         dep = self.fresh()
         dep.user_objects.return_value = 1
-        with self.assertRaisesRegex(pcirn.Error, 'não vazio'):
+        with self.assertRaisesRegex(pcirn.Error, 'not empty'):
             self.wiz.new_installation()
         dep.compose.assert_not_called()
 
@@ -98,7 +98,7 @@ class AutomaticWizardTests(unittest.TestCase):
     def test_unknown_journal_never_runs_migrations(self):
         dep = self.fresh()
         pcirn.write_json(self.root / 'operation.json', {'kind': 'restore'})
-        with self.assertRaisesRegex(pcirn.Error, 'diverge'):
+        with self.assertRaisesRegex(pcirn.Error, 'differs'):
             self.wiz.new_installation()
         dep.compose.assert_not_called()
 
@@ -112,7 +112,7 @@ class AutomaticWizardTests(unittest.TestCase):
         dep.pending.side_effect = None
         dep.pending.return_value = True
         before = dep.compose.call_count
-        with self.assertRaisesRegex(pcirn.Error, 'não autorizada'):
+        with self.assertRaisesRegex(pcirn.Error, 'not authorized'):
             self.wiz.new_installation()
         self.assertEqual(dep.compose.call_count, before)
 
@@ -157,7 +157,7 @@ class AutomaticWizardTests(unittest.TestCase):
             dep.run([sys.executable, '-c', "import sys; print('fictitious-private-token'); "
                      "print('fictitious-private-token', file=sys.stderr)"], capture=False)
         self.assertNotIn('fictitious-private-token', output.getvalue())
-        self.assertEqual(output.getvalue().count('[credencial omitida]'), 2)
+        self.assertEqual(output.getvalue().count('[credential omitted]'), 2)
 
     def test_private_root_refuses_foreign_owner(self):
         metadata = self.root.stat()

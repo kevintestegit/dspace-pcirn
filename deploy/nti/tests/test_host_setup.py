@@ -82,7 +82,7 @@ class HostSetupTests(unittest.TestCase):
         with mock.patch.object(host.Path, 'read_text', return_value=memory), \
                 mock.patch.object(host.os, 'cpu_count', return_value=2), \
                 mock.patch.object(host.shutil, 'disk_usage', return_value=mock.Mock(free=1024)):
-            with self.assertRaisesRegex(host.Error, 'disco'):
+            with self.assertRaisesRegex(host.Error, 'disk'):
                 REAL_RESOURCES('/tmp')
         self.assertFalse(self.commands)
 
@@ -91,7 +91,7 @@ class HostSetupTests(unittest.TestCase):
         self.active = False
         self.run.side_effect = lambda args, **kwargs: (json.dumps('tcp://remote:2375')
             if args[:3] == ['docker', 'context', 'inspect'] else original(args, **kwargs))
-        with self.assertRaisesRegex(host.Error, 'Unix local'):
+        with self.assertRaisesRegex(host.Error, 'local Unix'):
             host.prepare(self.run, self.confirm)
         self.confirm.assert_not_called()
         self.assertFalse(any(c[0] == 'apt-get' or c[:2] == ['systemctl', 'start']
@@ -120,7 +120,7 @@ class HostSetupTests(unittest.TestCase):
     def test_declining_causes_no_changes(self):
         self.tools.remove('openssl')
         self.confirm.return_value = False
-        with self.assertRaisesRegex(host.Error, 'cancelada'):
+        with self.assertRaisesRegex(host.Error, 'cancelled'):
             host.prepare(self.run, self.confirm)
         self.assertFalse(any(c[0] == 'apt-get' for c in self.commands))
 
@@ -142,13 +142,13 @@ class HostSetupTests(unittest.TestCase):
         with mock.patch.object(host, 'detect', return_value=dict(self.info, version='22.04')):
             with self.assertRaisesRegex(host.Error, '24.04'):
                 host.prepare(self.run, self.confirm)
-        with self.assertRaisesRegex(host.Error, '13 a 17'):
+        with self.assertRaisesRegex(host.Error, '13 to 17'):
             host.ensure_clients(self.run, self.confirm, 18)
         self.assertFalse(self.commands)
 
     def test_network_failure_precedes_confirmation_and_mutation(self):
-        with mock.patch.object(host, 'network', side_effect=host.Error('rede')):
-            with self.assertRaisesRegex(host.Error, 'rede'):
+        with mock.patch.object(host, 'network', side_effect=host.Error('DNS')):
+            with self.assertRaisesRegex(host.Error, 'DNS'):
                 host.prepare(self.run, self.confirm)
         self.confirm.assert_not_called()
         self.assertFalse(self.commands)
@@ -169,7 +169,7 @@ class HostSetupTests(unittest.TestCase):
             return '' if args[1] == '-S' else 'install ok installed'
         with mock.patch.object(host.Path, 'exists', return_value=False), \
                 mock.patch.object(host.Path, 'is_file', lambda path: str(path) == binary):
-            with self.assertRaisesRegex(host.Error, 'personalizado'):
+            with self.assertRaisesRegex(host.Error, 'custom binary'):
                 host.tracked_compose(run)
 
     def test_old_official_compose_upgrade_only_target_package(self):
@@ -194,14 +194,14 @@ class HostSetupTests(unittest.TestCase):
         self.compose = '2.19.1'
         self.confirm.return_value = False
         with mock.patch.object(host, 'tracked_compose', return_value='docker-compose-v2'):
-            with self.assertRaisesRegex(host.Error, 'cancelada'):
+            with self.assertRaisesRegex(host.Error, 'cancelled'):
                 host.prepare(self.run, self.confirm)
         self.assertFalse(any(c[0] == 'apt-get' for c in self.commands))
 
     def test_old_custom_compose_blocked_without_overwriting(self):
         self.compose = '2.19.1'
         with mock.patch.object(host.Path, 'is_file', return_value=False):
-            with self.assertRaisesRegex(host.Error, 'personalizado'):
+            with self.assertRaisesRegex(host.Error, 'custom binary'):
                 host.prepare(self.run, self.confirm)
         self.confirm.assert_not_called()
         self.assertFalse(any(c[0] == 'apt-get' for c in self.commands))
@@ -217,7 +217,7 @@ class HostSetupTests(unittest.TestCase):
         original = self.command
         self.run.side_effect = lambda args, **kwargs: ('install ok installed'
             if args[0] == 'dpkg-query' and args[-1] == 'containerd' else original(args, **kwargs))
-        with self.assertRaisesRegex(host.Error, 'conflitante'):
+        with self.assertRaisesRegex(host.Error, 'Conflicting'):
             host.prepare(self.run, self.confirm)
         self.assertFalse(any(c[0] == 'apt-get' for c in self.commands))
 
@@ -234,7 +234,7 @@ class HostSetupTests(unittest.TestCase):
         response.__enter__.return_value.read.return_value = b'-----BEGIN PGP PUBLIC KEY BLOCK-----\n'
         with mock.patch.object(host, 'urlopen', return_value=response), \
                 mock.patch.object(host, 'write_repository_file') as write:
-            with self.assertRaisesRegex(host.Error, 'Identidade'):
+            with self.assertRaisesRegex(host.Error, 'fingerprint'):
                 host.repository(self.run, 'docker', self.info)
         write.assert_not_called()
 
@@ -243,7 +243,7 @@ class HostSetupTests(unittest.TestCase):
             path = Path(directory) / 'repo'
             host.write_repository_file(path, b'original', 0o644)
             host.write_repository_file(path, b'original', 0o644)
-            with self.assertRaisesRegex(host.Error, 'diverge'):
+            with self.assertRaisesRegex(host.Error, 'differs'):
                 host.write_repository_file(path, b'changed', 0o644)
             link = Path(directory) / 'link'
             link.symlink_to(path)

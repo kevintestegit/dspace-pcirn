@@ -4,7 +4,7 @@ umask 022
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX="${1:-/usr/local}"
 if [[ $# -gt 1 || "$PREFIX" != /* || "$(realpath -m -- "$PREFIX")" != "$PREFIX" ]]; then
-    echo 'Use um prefixo absoluto sem links simbólicos.' >&2
+    echo 'Use an absolute prefix without symlinks.' >&2
     exit 1
 fi
 LIB="$PREFIX/lib/dspacepcirn"
@@ -18,7 +18,7 @@ for location in "$PREFIX" "$PREFIX/bin" "$PREFIX/lib"; do
             mode=$((8#$permissions))
             if [[ "$owner" != "$EUID" && "$owner" != 0 ]] ||
                (( (mode & 0022) != 0 && !(owner == 0 && (mode & 01000) != 0) )); then
-                echo 'Prefixo administrativo pertence a outro usuário ou permite alterações externas.' >&2
+                echo 'Administrative prefix has unsafe ownership or permissions.' >&2
                 exit 1
             fi
         fi
@@ -26,16 +26,16 @@ for location in "$PREFIX" "$PREFIX/bin" "$PREFIX/lib"; do
     done
 done
 if [[ "$(realpath -m -- "$LIB")" != "$LIB" || "$(realpath -m -- "$COMMAND")" != "$COMMAND" ]]; then
-    echo 'Diretórios do gerenciador não podem conter links simbólicos.' >&2
+    echo 'Manager directories cannot contain symlinks.' >&2
     exit 1
 fi
 if [[ -e "$COMMAND" || -L "$COMMAND" || -e "$LIB" || -L "$LIB" ]]; then
-    echo 'Gerenciador/comando existente: nada sobrescrito.' >&2
+    echo 'Manager/command already exists; nothing overwritten.' >&2
     exit 1
 fi
 mkdir -p -- "$PREFIX/bin" "$PREFIX/lib"
 mkdir -- "$LIB"
-install -m 644 -- "$SCRIPT_DIR"/{pcirn.py,wizard.py,preflight.py,data_migration.py,host_setup.py,releases.py,manager_update.py} "$LIB/"
+install -m 644 -- "$SCRIPT_DIR"/{pcirn.py,wizard.py,preflight.py,data_migration.py,host_setup.py,releases.py,manager_update.py,remote_data.py} "$LIB/"
 install -m 755 -- "$SCRIPT_DIR/dspacepcirn" "$LIB/dspacepcirn"
 install -m 755 -- "$SCRIPT_DIR/install-manager.sh" "$LIB/install-manager.sh"
 COMPOSE_SOURCE="$SCRIPT_DIR/compose.template.yml"
@@ -52,4 +52,4 @@ exec "$SCRIPT_DIR/../lib/dspacepcirn/dspacepcirn" "$@"
 EOF
 )
 chmod 755 -- "$COMMAND"
-echo "Gerenciador instalado: $COMMAND"
+echo "Manager installed: $COMMAND"

@@ -383,7 +383,7 @@ class InstallerTests(unittest.TestCase):
         process.communicate.side_effect = [subprocess.TimeoutExpired('docker', 30), ('', '')]
         with mock.patch.dict(os.environ, self.env), mock.patch.object(pcirn.subprocess, 'Popen', return_value=process):
             dep = pcirn.Deployment(self.root, config=pcirn.configuration(self.config))
-            with self.assertRaisesRegex(pcirn.Error, 'tempo limite'):
+            with self.assertRaisesRegex(pcirn.Error, 'timed out'):
                 dep.run(['docker', 'info'], timeout=30)
         process.kill.assert_called_once()
 
