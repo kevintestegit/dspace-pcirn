@@ -135,7 +135,8 @@ public class DiscoveryRestControllerIT extends AbstractControllerIntegrationTest
         DiscoverySortConfiguration genericSort = new DiscoverySortConfiguration();
         List<DiscoverySortFieldConfiguration> fields = new ArrayList<>(pcirnSort.getSortFields());
         List<String> order = List.of("score", "dc.title", "dc.date.issued", "dc.date.accessioned");
-        fields.sort(Comparator.comparingInt(field -> order.indexOf(field.getMetadataField())));
+        fields.sort(Comparator.comparingInt(field -> field.getMetadataField() == null
+            ? 0 : order.indexOf(field.getMetadataField())));
         genericSort.setSortFields(fields);
         defaultDiscovery.setSearchSortConfiguration(genericSort);
         context.turnOffAuthorisationSystem();

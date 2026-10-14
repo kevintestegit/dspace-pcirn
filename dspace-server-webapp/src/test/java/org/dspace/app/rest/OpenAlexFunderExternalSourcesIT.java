@@ -51,7 +51,8 @@ public class OpenAlexFunderExternalSourcesIT extends AbstractControllerIntegrati
 
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();
         ReflectionTestUtils.setField(openAlexImportMetadataSourceService, "liveImportClient", liveImportClient);
     }
 
