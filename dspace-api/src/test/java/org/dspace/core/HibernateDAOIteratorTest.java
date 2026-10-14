@@ -24,7 +24,7 @@ import org.junit.Test;
 /**
  * JDBC iteration must release resources on the owning thread, without a finalizer.
  */
-public class AbstractHibernateDAOIteratorTest {
+public class HibernateDAOIteratorTest {
 
     private Iterator<Object> iterator(Stream<Object> stream) {
         Query query = mock(Query.class);
