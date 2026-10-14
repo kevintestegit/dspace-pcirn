@@ -48,7 +48,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.MapPropertySource;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -62,7 +61,7 @@ import org.springframework.test.context.TestPropertySource;
 // Ensure the OAI SERVER IS ENABLED before any tests run.
 // This annotation overrides default DSpace config settings loaded into Spring Context
 @TestPropertySource(properties = {"oai.enabled = true"})
-@ContextConfiguration(inheritInitializers = false,
+@org.springframework.test.context.ContextConfiguration(inheritInitializers = false,
     initializers = {DSpaceKernelInitializer.class, OAIpmhIT.EnableOAI.class})
 public class OAIpmhIT extends AbstractControllerIntegrationTest {
 
