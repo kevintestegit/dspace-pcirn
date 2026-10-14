@@ -73,7 +73,7 @@ public class VocabularyEntryDetailsIT extends AbstractControllerIntegrationTest 
     public void findOneAnonymousTest() throws Exception {
         String idAuthority = "srsc:SCB110";
         getClient().perform(get("/api/submission/vocabularyEntryDetails/" + idAuthority))
-                   .andExpect(status().isOk());
+                   .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -257,7 +257,7 @@ public class VocabularyEntryDetailsIT extends AbstractControllerIntegrationTest 
     public void searchTopAnonymousTest() throws Exception {
         getClient().perform(get("/api/submission/vocabularyEntryDetails/search/top")
                    .param("vocabulary", "srsc"))
-                   .andExpect(status().isOk());
+                   .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -331,7 +331,7 @@ public class VocabularyEntryDetailsIT extends AbstractControllerIntegrationTest 
     public void srscSearchTopAnonymousTest() throws Exception {
         getClient().perform(get("/api/submission/vocabularyEntryDetails/search/top")
                    .param("vocabulary", "srsc"))
-                   .andExpect(status().isOk());
+                   .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -355,7 +355,7 @@ public class VocabularyEntryDetailsIT extends AbstractControllerIntegrationTest 
     @Test
     public void findParentByChildAnonymousTest() throws Exception {
         getClient().perform(get("/api/submission/vocabularyEntryDetails/srsc:SCB180/parent"))
-                   .andExpect(status().isOk());
+                   .andExpect(status().isUnauthorized());
     }
 
     @Test

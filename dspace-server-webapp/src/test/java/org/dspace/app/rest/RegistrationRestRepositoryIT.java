@@ -60,6 +60,7 @@ import org.dspace.services.ConfigurationService;
 import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.ArgumentMatchers;
@@ -101,6 +102,13 @@ public class RegistrationRestRepositoryIT extends AbstractControllerIntegrationT
     @AfterClass
     public static void tearDownClass() throws Exception {
         emailMockedStatic.close();
+    }
+
+    @Override
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        configurationService.setProperty("user.registration", true);
     }
 
     @Test
@@ -154,7 +162,7 @@ public class RegistrationRestRepositoryIT extends AbstractControllerIntegrationT
 
     @Test
     public void findByTokenNotExistingTokenTest() throws Exception {
-        getClient().perform(get("/api/eperson/registration/search/findByToken")
+        getClient().perform(get("/api/eperson/registrations/search/findByToken")
                                 .param("token", "ThisTokenDoesNotExist"))
                    .andExpect(status().isNotFound());
     }

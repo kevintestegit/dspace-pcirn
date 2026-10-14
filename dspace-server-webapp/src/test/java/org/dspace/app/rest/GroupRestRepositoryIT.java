@@ -411,8 +411,7 @@ public class GroupRestRepositoryIT extends AbstractControllerIntegrationTest {
 
         String generatedGroupId = group.getID().toString();
         String groupIdCall = "/api/eperson/groups/" + UUID.randomUUID();
-        getClient().perform(get(groupIdCall))
-                   //The status has to be 200 OK
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get(groupIdCall))
                    .andExpect(status().isNotFound())
         ;
     }

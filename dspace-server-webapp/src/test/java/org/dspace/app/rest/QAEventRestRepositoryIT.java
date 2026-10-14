@@ -107,7 +107,7 @@ public class QAEventRestRepositoryIT extends AbstractControllerIntegrationTest {
                                .andExpect(status()
                                .isMethodNotAllowed());
 
-        getClient().perform(get("/api/integration/qualityassuranceevents"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/qualityassuranceevents"))
                    .andExpect(status()
                    .isMethodNotAllowed());
     }

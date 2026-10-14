@@ -59,8 +59,7 @@ public class AltchaCaptchaRestControllerIT extends AbstractControllerIntegration
     @Test
     public void testGetAltchaChallengeUnauthenticated() throws Exception {
         getClient().perform(get("/api/captcha/challenge"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Content-Type", "application/json;charset=UTF-8"))
+                .andExpect(status().isUnauthorized());charset=UTF-8"))
                 .andExpect(jsonPath("$.algorithm").value("SHA-256"))
                 .andExpect(jsonPath("$.challenge").isString())
                 .andExpect(jsonPath("$.salt").isString())
@@ -72,7 +71,7 @@ public class AltchaCaptchaRestControllerIT extends AbstractControllerIntegration
         // Temporarily clear the HMAC key config
         configurationService.setProperty("altcha.hmac.key", null);
 
-        getClient().perform(get("/api/captcha/challenge"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/captcha/challenge"))
                 .andExpect(status().isBadRequest());
 
         // Reset the config

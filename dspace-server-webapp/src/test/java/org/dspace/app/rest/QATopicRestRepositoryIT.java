@@ -429,9 +429,11 @@ public class QATopicRestRepositoryIT extends AbstractControllerIntegrationTest {
         QAEventBuilder.createTarget(context, item1)
             .withTopic(QANotifyPatterns.TOPIC_ENRICH_MISSING_PID).build();
         context.restoreAuthSystemState();
-        getClient().perform(get("/api/integration/qualityassurancetopics/search/byTarget")
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(
+                get("/api/integration/qualityassurancetopics/search/byTarget")
                 .param("source", QAEvent.OPENAIRE_SOURCE)
                 .param("target", item1.getID().toString()))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page.totalElements", is(0)));
     }
 

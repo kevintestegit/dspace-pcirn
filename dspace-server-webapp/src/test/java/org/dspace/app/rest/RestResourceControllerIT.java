@@ -33,7 +33,10 @@ public class RestResourceControllerIT extends AbstractControllerIntegrationTest 
     public void privateRoutesRejectAnonymousRequests() throws Exception {
         for (String path : new String[] {"/api/integration/externalsources/orcid",
             "/api/submission/vocabularies/common_types", "/api/versioning/versionhistories/1",
-            "/api/statistics/searchevents", "/api/undefined/undefined"}) {
+            "/api/statistics/searchevents", "/api/undefined/undefined", "/api/captcha/challenge",
+            "/api/statistics/usagereports", "/api/integration/qualityassuranceevents",
+            "/api/submission/vocabularyEntryDetails/srsc:SCB110", "/api/system/systemwidealerts/1",
+            "/api/eperson/groups/00000000-0000-0000-0000-000000000000"}) {
             getClient().perform(get(path)).andExpect(status().isUnauthorized());
         }
     }

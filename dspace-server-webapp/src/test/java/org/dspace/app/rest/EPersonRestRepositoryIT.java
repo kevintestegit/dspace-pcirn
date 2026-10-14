@@ -88,6 +88,7 @@ import org.dspace.eperson.service.GroupService;
 import org.dspace.eperson.service.RegistrationDataService;
 import org.dspace.services.ConfigurationService;
 import org.hamcrest.Matchers;
+import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -113,6 +114,13 @@ public class EPersonRestRepositoryIT extends AbstractControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper mapper;
+
+    @Override
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        configurationService.setProperty("user.registration", true);
+    }
 
     @Test
     public void createTest() throws Exception {
@@ -1048,7 +1056,7 @@ public class EPersonRestRepositoryIT extends AbstractControllerIntegrationTest {
                 .andExpect(status().is(204));
 
         // Verify 404 after delete
-        getClient().perform(get("/api/eperson/epersons/" + ePerson.getID()))
+        getClient(token).perform(get("/api/eperson/epersons/" + ePerson.getID()))
                 .andExpect(status().isNotFound());
     }
 
