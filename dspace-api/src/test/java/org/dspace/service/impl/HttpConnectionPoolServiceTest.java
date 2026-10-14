@@ -75,7 +75,7 @@ public class HttpConnectionPoolServiceTest
                 .withStatusCode(HttpStatus.OK_200)
         );
 
-        try (CloseableHttpClient httpClient = instance.getClient()) {
+        try (instance; CloseableHttpClient httpClient = instance.getClient()) {
             assertNotNull("getClient should always return a client", httpClient);
 
             URI uri = new URIBuilder()

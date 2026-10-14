@@ -11,7 +11,6 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Set;
 
-import org.dspace.AbstractUnitTest;
 import org.dspace.content.Bitstream;
 import org.dspace.content.Item;
 import org.dspace.content.service.BitstreamService;
@@ -20,10 +19,13 @@ import org.dspace.services.ConfigurationService;
 import org.dspace.usage.UsageEvent;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
 
-public class MatomoEventListenerTest extends AbstractUnitTest {
+@RunWith(MockitoJUnitRunner.class)
+public class MatomoEventListenerTest {
 
     @Mock
     MatomoAsyncBulkRequestHandler matomoHandler1;

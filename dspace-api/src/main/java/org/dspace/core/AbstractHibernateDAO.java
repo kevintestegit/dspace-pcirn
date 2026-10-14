@@ -303,6 +303,7 @@ public abstract class AbstractHibernateDAO<T> implements GenericDAO<T> {
 
     /**
      * This method will return an Iterator for the given Query
+     * The stream closes on exhaustion; the transaction releases resources if iteration stops early.
      *
      * @param query
      *         The query for which an Iterator will be made
@@ -316,11 +317,12 @@ public abstract class AbstractHibernateDAO<T> implements GenericDAO<T> {
         return new AbstractIterator<T>() {
             @Override
             protected T computeNext() {
-                return iter.hasNext() ? iter.next() : endOfData();
-            }
-            @Override
-            public void finalize() {
+                if (iter.hasNext()) {
+                    return iter.next();
+                }
+                // Hibernate resources must be released on the transaction's thread, never by a finalizer.
                 stream.close();
+                return endOfData();
             }
         };
     }

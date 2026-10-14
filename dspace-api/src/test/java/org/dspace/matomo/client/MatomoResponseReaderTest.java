@@ -12,11 +12,10 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-import org.dspace.AbstractUnitTest;
 import org.junit.Before;
 import org.junit.Test;
 
-public class MatomoResponseReaderTest extends AbstractUnitTest {
+public class MatomoResponseReaderTest {
 
     MatomoResponseReader matomoResponseReader;
 

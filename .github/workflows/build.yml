@@ -63,10 +63,14 @@ jobs:
       - name: Run Maven ${{ matrix.type }}
         env:
           TEST_FLAGS: ${{ matrix.type == 'Unit Tests' && '-DskipUnitTests=false -Dsurefire.rerunFailingTestsCount=2' || '-DskipIntegrationTests=false -Denforcer.skip=true -Dcheckstyle.skip=true -Dlicense.skip=true -Dxml.skip=true -Dfailsafe.rerunFailingTestsCount=2' }}
-          TEST_FILTER: ${{ matrix.type == 'Unit Tests' && inputs.unit_tests || inputs.integration_tests }}
+          TEST_FILTER: ${{ inputs.unit_tests }}
+          INTEGRATION_FILTER: ${{ inputs.integration_tests }}
           TEST_PROPERTY: ${{ matrix.type == 'Unit Tests' && 'test' || 'it.test' }}
         run: |
           filter=()
+          if [ "$TEST_PROPERTY" = 'it.test' ]; then
+            TEST_FILTER="$INTEGRATION_FILTER"
+          fi
           if [ -n "$TEST_FILTER" ]; then
             filter+=("-D${TEST_PROPERTY}=${TEST_FILTER}")
           fi
