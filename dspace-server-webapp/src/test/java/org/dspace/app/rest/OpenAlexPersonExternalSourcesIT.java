@@ -57,7 +57,8 @@ public class OpenAlexPersonExternalSourcesIT extends AbstractControllerIntegrati
 
     @Test
     public void findOneOpenalexImportPersonServiceExternalSourceTest() throws Exception {
-        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
                    .andExpect(jsonPath("$._embedded.externalsources", Matchers.hasItem(
                        ExternalSourceMatcher.matchExternalSource("openalexPerson",
                                                                  "openalexPerson", false))));
@@ -72,7 +73,8 @@ public class OpenAlexPersonExternalSourcesIT extends AbstractControllerIntegrati
                 .thenReturn(jsonResponse);
 
 
-            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/openalexPerson/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexPerson/entries")
                                     .param("query", "empty"))
                        .andExpect(status().isOk()).andExpect(jsonPath("$.page.number", is(0)));
             verify(liveImportClient, times(2)).executeHttpGetRequest(anyInt(), anyString(), anyMap());
@@ -86,7 +88,8 @@ public class OpenAlexPersonExternalSourcesIT extends AbstractControllerIntegrati
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/openalexPerson/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexPerson/entries")
                                     .param("query", "Claudio Cortese"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$.page.number", is(0)))
@@ -141,7 +144,8 @@ public class OpenAlexPersonExternalSourcesIT extends AbstractControllerIntegrati
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/openalexPerson/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexPerson/entries")
                                     .param("query", "covid"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries", hasSize(2)))

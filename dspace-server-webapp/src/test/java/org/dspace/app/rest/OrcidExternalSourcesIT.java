@@ -72,7 +72,8 @@ public class OrcidExternalSourcesIT extends AbstractControllerIntegrationTest {
         // this test will query the real ORCID API if configured in the CI otherwise will be skipped
         onlyRunIfConfigExists();
         String entry = "0000-0002-9029-1854";
-        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/orcid/entryValues/" + entry))
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources/orcid/entryValues/" + entry))
                    .andExpect(status().isOk())
                    .andExpect(jsonPath("$", Matchers.allOf(
                            hasJsonPath("$.id", is(entry)),
@@ -92,7 +93,8 @@ public class OrcidExternalSourcesIT extends AbstractControllerIntegrationTest {
         // this test will query the real ORCID API if configured in the CI otherwise will be skipped
         onlyRunIfConfigExists();
         String q = "orcid:0000-0002-9029-1854";
-        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/orcid/entries")
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources/orcid/entries")
                    .param("query", q))
                    .andExpect(status().isOk())
                    .andExpect(jsonPath("$._embedded.externalSourceEntries[0]", Matchers.allOf(
@@ -117,7 +119,8 @@ public class OrcidExternalSourcesIT extends AbstractControllerIntegrationTest {
         // this test will query the real ORCID API if configured in the CI otherwise will be skipped
         onlyRunIfConfigExists();
         String q = "family-name:bollini AND given-names:andrea";
-        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/orcid/entries")
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources/orcid/entries")
                    .param("query", q))
                    .andExpect(status().isOk())
                    .andExpect(jsonPath("$._embedded.externalSourceEntries", Matchers.hasItem(
@@ -158,7 +161,8 @@ public class OrcidExternalSourcesIT extends AbstractControllerIntegrationTest {
                 });
 
         String entry = "0000-0002-9029-1854";
-        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/orcid/entryValues/" + entry))
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources/orcid/entryValues/" + entry))
                    .andExpect(status().isOk())
                    .andExpect(jsonPath("$", Matchers.allOf(
                            hasJsonPath("$.id", is(entry)),
@@ -200,7 +204,8 @@ public class OrcidExternalSourcesIT extends AbstractControllerIntegrationTest {
                         }
                     });
             String q = "orcid:0000-0002-9029-1854";
-            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/orcid/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/orcid/entries")
                        .param("query", q))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries[0]", Matchers.allOf(
@@ -253,7 +258,8 @@ public class OrcidExternalSourcesIT extends AbstractControllerIntegrationTest {
                         }
                     });
             String q = "family-name:bollini AND given-names:andrea";
-            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/orcid/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/orcid/entries")
                        .param("query", q))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries", Matchers.hasItem(
