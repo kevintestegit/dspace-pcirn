@@ -10,15 +10,16 @@ package org.dspace.core;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.logging.log4j.Logger;
 import org.dspace.authorize.ResourcePolicy;
@@ -31,7 +32,6 @@ import org.dspace.event.Event;
 import org.dspace.event.factory.EventServiceFactory;
 import org.dspace.event.service.EventService;
 import org.dspace.storage.rdbms.DatabaseConfigVO;
-import org.dspace.storage.rdbms.DatabaseUtils;
 import org.dspace.utils.DSpace;
 import org.springframework.util.CollectionUtils;
 
@@ -48,10 +48,11 @@ import org.springframework.util.CollectionUtils;
  * changes and free up the resources.
  * <P>
  * The context object is also used as a cache for CM API objects.
+ * Schema migrations must be executed explicitly through the database command
+ * before application contexts are initialized.
  */
 public class Context implements AutoCloseable {
     private static final Logger log = org.apache.logging.log4j.LogManager.getLogger(Context.class);
-    protected static final AtomicBoolean databaseUpdated = new AtomicBoolean(false);
 
     /**
      * Current user - null means anonymous access
@@ -124,6 +125,25 @@ public class Context implements AutoCloseable {
      */
     private final ContextReadOnlyCache readOnlyCache = new ContextReadOnlyCache();
 
+    /**
+     * Memoization for values that are expensive to compute and that are only valid for the lifetime of this
+     * Context, which normally is a single request. Nothing is shared between Contexts, so an entry can never be
+     * served stale to another request or another user.
+     * <P>
+     * Keys must encode everything the cached value depends on (for instance the current user), because entries are
+     * not invalidated when the current user changes.
+     */
+    private final Map<String, String> requestCache = new HashMap<>();
+
+    /**
+     * Resource policies fetched in batch for the objects that a single operation is about to inspect, keyed by object
+     * ID and action. See {@link org.dspace.authorize.service.ResourcePolicyService#prefetch}.
+     * <P>
+     * A key that is present holding an empty list means "this object has no policy for this action", which is
+     * different from a key that is absent ("not prefetched, go and look it up").
+     */
+    private final Map<String, List<ResourcePolicy>> prefetchedPolicies = new HashMap<>();
+
     protected EventService eventService;
 
     private DBConnection dbConnection;
@@ -169,8 +189,6 @@ public class Context implements AutoCloseable {
      * Initializes a new context object.
      */
     protected void init() {
-        updateDatabase();
-
         if (eventService == null) {
             eventService = EventServiceFactory.getInstance().getEventService();
         }
@@ -198,32 +216,6 @@ public class Context implements AutoCloseable {
             setMode(this.mode);
         }
 
-    }
-
-    /**
-     * Update the DSpace database, ensuring that any necessary migrations are run prior to initializing
-     * Hibernate.
-     * <P>
-     * This is synchronized as it only needs to be run successfully *once* (for the first Context initialized).
-     *
-     * @return true/false, based on whether database was successfully updated
-     */
-    public static synchronized boolean updateDatabase() {
-        //If the database has not been updated yet, update it and remember that.
-        if (databaseUpdated.compareAndSet(false, true)) {
-
-            // Before initializing a Context object, we need to ensure the database
-            // is up-to-date. This ensures any outstanding Flyway migrations are run
-            // PRIOR to Hibernate initializing (occurs when DBConnection is loaded in calling init() method).
-            try {
-                DatabaseUtils.updateDatabase();
-            } catch (SQLException sqle) {
-                log.fatal("Cannot update or initialize database via Flyway!", sqle);
-                databaseUpdated.set(false);
-            }
-        }
-
-        return databaseUpdated.get();
     }
 
     /**
@@ -951,6 +943,51 @@ public class Context implements AutoCloseable {
             return readOnlyCache.getCachedAllMemberGroupsSet(ePerson);
         } else {
             return null;
+        }
+    }
+
+    /**
+     * Returns a value memoized by {@link #cacheRequestValue(String, String)} on this Context.
+     *
+     * @param key the key the value was memoized under
+     * @return the memoized value, or null when nothing was memoized for that key
+     */
+    public String getCachedRequestValue(String key) {
+        return requestCache.get(key);
+    }
+
+    /**
+     * Memoizes a value for the remaining lifetime of this Context.
+     *
+     * @param key   the key, which must encode everything the value depends on
+     * @param value the value to memoize
+     */
+    public void cacheRequestValue(String key, String value) {
+        requestCache.put(key, value);
+    }
+
+    /**
+     * Returns the resource policies prefetched for this object and action, or null when they were not prefetched.
+     * An empty list is a valid answer and means the object has no policy for that action.
+     *
+     * @param dso    the object the policies belong to
+     * @param action the action the policies grant
+     * @return the prefetched policies, or null when this object and action were not prefetched
+     */
+    public List<ResourcePolicy> getPrefetchedPolicies(DSpaceObject dso, int action) {
+        return dso == null ? null : prefetchedPolicies.get(dso.getID() + ":" + action);
+    }
+
+    /**
+     * Stores the resource policies fetched in batch for this object and action.
+     *
+     * @param dso      the object the policies belong to
+     * @param action   the action the policies grant
+     * @param policies the policies, possibly empty but never null
+     */
+    public void putPrefetchedPolicies(DSpaceObject dso, int action, List<ResourcePolicy> policies) {
+        if (dso != null) {
+            prefetchedPolicies.put(dso.getID() + ":" + action, policies);
         }
     }
 

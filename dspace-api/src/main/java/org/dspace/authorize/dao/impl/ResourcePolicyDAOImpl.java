@@ -8,6 +8,7 @@
 package org.dspace.authorize.dao.impl;
 
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -103,6 +104,22 @@ public class ResourcePolicyDAOImpl extends AbstractHibernateDAO<ResourcePolicy> 
                                        criteriaBuilder.equal(resourcePolicyRoot.get(ResourcePolicy_.actionId), actionId)
                    )
         );
+        return list(context, criteriaQuery, false, ResourcePolicy.class, -1, -1);
+    }
+
+    @Override
+    public List<ResourcePolicy> findByDSOsAndAction(Context context, Collection<? extends DSpaceObject> dsos,
+                                                    int actionId) throws SQLException {
+        if (CollectionUtils.isEmpty(dsos)) {
+            return Collections.emptyList();
+        }
+        CriteriaBuilder criteriaBuilder = getCriteriaBuilder(context);
+        CriteriaQuery criteriaQuery = getCriteriaQuery(criteriaBuilder, ResourcePolicy.class);
+        Root<ResourcePolicy> resourcePolicyRoot = criteriaQuery.from(ResourcePolicy.class);
+        criteriaQuery.select(resourcePolicyRoot);
+        criteriaQuery.where(criteriaBuilder.and(
+            resourcePolicyRoot.get(ResourcePolicy_.dSpaceObject).in(dsos),
+            criteriaBuilder.equal(resourcePolicyRoot.get(ResourcePolicy_.actionId), actionId)));
         return list(context, criteriaQuery, false, ResourcePolicy.class, -1, -1);
     }
 

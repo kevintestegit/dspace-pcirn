@@ -90,7 +90,15 @@ public interface SearchService {
     List<Item> getRelatedItems(Context context, Item item,
                                DiscoveryMoreLikeThisConfiguration moreLikeThisConfiguration);
 
-    String createLocationQueryForAdministrableDSOs(String epersonAndGroupClause);
+    /**
+     * Method to create a query that includes all communities and collections the user described by the given
+     * Eperson and group clause may administrate.
+     *
+     * @param context               The relevant DSpace Context.
+     * @param epersonAndGroupClause the Eperson and group clause describing the user
+     * @return query string specific to the user's administrative rights, or an empty string when there are none
+     */
+    String createLocationQueryForAdministrableDSOs(Context context, String epersonAndGroupClause);
 
     /**
      * Method to create a  Query that includes all

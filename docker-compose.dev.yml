@@ -53,7 +53,11 @@ services:
       MANAGEMENT_HEALTH_LDAP_ENABLED: "false"
       MANAGEMENT_HEALTH_GEOIP_ENABLED: "false"
       MANAGEMENT_HEALTH_SEO_ENABLED: "false"
-      LOADER_PATH: /dspace/overrides/additions:/dspace/overrides/server:/dspace/overrides/dspace-api:/dspace/overrides/dspace-server-webapp:/dspace/overrides/dspace-services:/dspace/overrides/dspace-oai:/dspace/overrides/dspace-rdf:/dspace/overrides/dspace-sword:/dspace/overrides/dspace-swordv2:/dspace/overrides/dspace-iiif:/dspace/overrides/dspace-saml2
+      # ATENCAO: o separador do loader.path e VIRGULA, nao dois-pontos. O
+      # PropertiesLauncher divide o valor por "," (parsePathsProperty); com ":"
+      # ele trata a string inteira como um unico caminho inexistente e nao poe
+      # nada no classpath, o que faz o overlay de classes abaixo virar no-op.
+      LOADER_PATH: /dspace/overrides/additions,/dspace/overrides/server,/dspace/overrides/dspace-api,/dspace/overrides/dspace-server-webapp,/dspace/overrides/dspace-services,/dspace/overrides/dspace-oai,/dspace/overrides/dspace-rdf,/dspace/overrides/dspace-sword,/dspace/overrides/dspace-swordv2,/dspace/overrides/dspace-iiif,/dspace/overrides/dspace-saml2
     image: "${DOCKER_REGISTRY:-docker.io}/${DOCKER_OWNER:-dspace}/dspace:${DSPACE_VER:-dspace-9_x-test}"
     build:
       context: .

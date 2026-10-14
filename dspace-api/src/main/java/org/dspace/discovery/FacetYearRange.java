@@ -58,6 +58,17 @@ public class FacetYearRange {
         }
     }
 
+    /**
+     * Applies a range that was already resolved, and cached, by an earlier request.
+     *
+     * @param oldestYear the oldest year of the facet.
+     * @param newestYear the newest year of the facet.
+     */
+    void setRange(int oldestYear, int newestYear) {
+        this.oldestYear = oldestYear;
+        this.newestYear = newestYear;
+    }
+
     private void lookupPreviousRangeInFilterQueries(List<String> filterQueries) {
         for (String filterQuery : filterQueries) {
             if (filterQuery.startsWith(dateFacet + ":")) {

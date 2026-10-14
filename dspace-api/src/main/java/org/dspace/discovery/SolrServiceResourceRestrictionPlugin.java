@@ -174,7 +174,7 @@ public class SolrServiceResourceRestrictionPlugin implements SolrServiceIndexPlu
                 // inherited permissions only if the inherit authorizations flag is enabled
                 if (discoveryQuery.isInheritAuthorizationsEnabled()) {
                     String locations = searchService
-                        .createLocationQueryForAdministrableDSOs(epersonAndGroupClause.toString());
+                        .createLocationQueryForAdministrableDSOs(context, epersonAndGroupClause.toString());
 
                     if (StringUtils.isNotBlank(locations)) {
                         resourceQuery.append(" OR ");

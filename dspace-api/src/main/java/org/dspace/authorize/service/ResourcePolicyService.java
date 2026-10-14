@@ -8,6 +8,7 @@
 package org.dspace.authorize.service;
 
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,6 +61,20 @@ public interface ResourcePolicyService {
     public List<ResourcePolicy> find(Context c, DSpaceObject o, String type) throws SQLException;
 
     public List<ResourcePolicy> find(Context c, DSpaceObject o, int actionId) throws SQLException;
+
+    /**
+     * Fetches, in a single query, the policies of several objects for the same action and keeps them in the Context, so
+     * that the individual {@link #find(Context, DSpaceObject, int)} calls that follow do not each hit the database.
+     * <P>
+     * This only moves the fetch: the policies themselves, and the authorization decisions taken from them, are
+     * unchanged. Objects that turn out to have no policy for the action are remembered as having none.
+     *
+     * @param c        the DSpace context where the results are kept for the rest of its lifetime
+     * @param dsos     the objects to fetch policies for
+     * @param actionId the action the policies grant
+     * @throws SQLException if database error
+     */
+    void prefetch(Context c, Collection<? extends DSpaceObject> dsos, int actionId) throws SQLException;
 
     public List<ResourcePolicy> find(Context c, DSpaceObject dso, Group group, int action) throws SQLException;
 

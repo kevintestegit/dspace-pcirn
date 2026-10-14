@@ -11,21 +11,21 @@
 # limitations under the License.
 
 #-----------------------------------------------------------------------
-#some test synonym mappings unlikely to appear in real input text
-aaa => aaaa
-bbb => bbbb1 bbbb2
-ccc => cccc1,cccc2
-a\=>a => b\=>b
-a\,a => b\,b
-fooaaa,baraaa,bazaaa
-
-# Some synonym groups specific to this example
-GB,gib,gigabyte,gigabytes
-MB,mib,megabyte,megabytes
-Television, Televisions, TV, TVs
-#notice we use "gib" instead of "GiB" so any WordDelimiterFilter coming
-#after us won't split it into two words.
-
-# Synonym mappings can be used for spelling correction too
-pixima => pixma
-
+# Sinonimos aplicados no momento da CONSULTA. O analisador de indice nao
+# usa este arquivo, portanto alterar aqui nao exige reindexacao - basta
+# recarregar o core do Solr.
+#
+# O conteudo anterior era a lista de demonstracao do Solr ("GB,gib,
+# gigabyte", "Television, Televisions, TV, TVs", "pixima => pixma",
+# "aaa => aaaa", "bbb => bbbb1 bbbb2"), sem qualquer relacao com o acervo
+# do PCIRN. Entradas assim so geram casamentos espurios.
+#
+# Formato (uma regra por linha):
+#   termo                       mantem o proprio termo
+#   termo => substituto         substitui
+#   a, b, c                     grupo equivalente
+#
+# Adicione aqui apenas abreviaturas e variantes que existam de fato no
+# acervo - por exemplo a sigla de um orgao e o nome por extenso. Evite
+# listas genericas: cada entrada muda o resultado de toda busca futura.
+#-----------------------------------------------------------------------

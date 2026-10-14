@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import jakarta.mail.MessagingException;
@@ -73,6 +74,7 @@ import org.dspace.discovery.indexobject.IndexableItem;
 import org.dspace.discovery.indexobject.factory.IndexFactory;
 import org.dspace.discovery.indexobject.factory.IndexObjectFactoryFactory;
 import org.dspace.discovery.indexobject.factory.ItemIndexFactory;
+import org.dspace.eperson.EPerson;
 import org.dspace.eperson.Group;
 import org.dspace.eperson.factory.EPersonServiceFactory;
 import org.dspace.eperson.service.GroupService;
@@ -110,6 +112,31 @@ public class SolrServiceImpl implements SearchService, IndexingService {
     // facet by indexing "each word to end of value' partial value
     public static final String SOLR_FIELD_SUFFIX_FACET_PREFIXES = "_prefix";
 
+    /**
+     * Prefix of the Context request cache key that holds the "location" query of the administrable communities and
+     * collections. The Eperson and group clause is appended to it.
+     */
+    private static final String ADMINISTRABLE_LOCATIONS_CACHE_KEY = "discovery.administrableLocations.";
+
+    /**
+     * Indexed field used to break ties between documents that share the same relevance score. An empty query scores
+     * every document identically, so without a tiebreaker a browse would come back in an arbitrary order. See the
+     * "score" branch in {@link #resolveToSolrQuery}.
+     */
+    private static final String ACCESSIONED_SORT_FIELD = "dc.date.accessioned_dt";
+
+    /**
+     * Prefix of the Context request cache key that memoizes whose permissions a boundary value was resolved with.
+     */
+    private static final String PERMISSION_SCOPE_CACHE_KEY = "discovery.permissionScope.";
+
+    /**
+     * How long the boundaries of the index may be reused without asking Solr again. Every indexing operation of this
+     * JVM invalidates them right away; this only bounds what another process (a command line reindex, for instance)
+     * can leave behind.
+     */
+    private static final long BOUNDARY_CACHE_TTL_MILLIS = 60_000L;
+
     @Autowired
     protected ContentServiceFactory contentServiceFactory;
     @Autowired
@@ -120,6 +147,18 @@ public class SolrServiceImpl implements SearchService, IndexingService {
     protected SolrSearchCore solrSearchCore;
     @Autowired
     protected ConfigurationService configurationService;
+
+    /**
+     * The minimum and maximum value of each facet that exposes them, keyed by the permissions they were resolved
+     * with, the field and the sort direction.
+     */
+    private final BoundaryValueCache<Optional<String>> extremeValueCache =
+        new BoundaryValueCache<>(BOUNDARY_CACHE_TTL_MILLIS);
+
+    /**
+     * The year span of each date facet, keyed by the permissions, the scope and the filters it was resolved with.
+     */
+    private final BoundaryValueCache<int[]> yearRangeCache = new BoundaryValueCache<>(BOUNDARY_CACHE_TTL_MILLIS);
 
     protected SolrServiceImpl() {
 
@@ -169,6 +208,7 @@ public class SolrServiceImpl implements SearchService, IndexingService {
                           IndexableObject indexableObject) throws IOException, SQLException, SolrServerException {
         final SolrInputDocument solrInputDocument = indexableObjectService.buildDocument(context, indexableObject);
         indexableObjectService.writeDocument(context, indexableObject, solrInputDocument);
+        invalidateBoundaryValues();
     }
 
     /**
@@ -184,6 +224,7 @@ public class SolrServiceImpl implements SearchService, IndexingService {
             final SolrInputDocument solrInputDocument =
                     indexableObjectService.buildNewDocument(context, indexableObject);
             indexableObjectService.writeDocument(context, indexableObject, solrInputDocument);
+            invalidateBoundaryValues();
         } else {
             update(context, indexableObjectService, indexableObject);
         }
@@ -222,6 +263,7 @@ public class SolrServiceImpl implements SearchService, IndexingService {
             String uniqueID = indexableObject.getUniqueIndexID();
             log.info("Try to delete uniqueID:" + uniqueID);
             indexObjectServiceFactory.getIndexableObjectFactory(indexableObject).delete(indexableObject);
+            invalidateBoundaryValues();
             if (commit) {
                 solrSearchCore.getSolr().commit();
             }
@@ -260,6 +302,7 @@ public class SolrServiceImpl implements SearchService, IndexingService {
                 IndexFactory index = indexObjectServiceFactory.getIndexableObjectFactory(searchUniqueID);
                 if (index != null) {
                     index.delete(searchUniqueID);
+                    invalidateBoundaryValues();
                 } else {
                     log.warn("Object not found in Solr index: " + searchUniqueID);
                 }
@@ -376,6 +419,7 @@ public class SolrServiceImpl implements SearchService, IndexingService {
             for (IndexFactory indexableObjectService : indexableObjectServices) {
                 indexableObjectService.deleteAll();
             }
+            invalidateBoundaryValues();
         } catch (IOException | SolrServerException e) {
             log.error("Error cleaning discovery index: " + e.getMessage(), e);
         }
@@ -495,11 +539,47 @@ public class SolrServiceImpl implements SearchService, IndexingService {
         solrInputDocument.addField(field, fieldModifier);
 
         solrSearchCore.getSolr().add(solrInputDocument);
+        invalidateBoundaryValues();
     }
 
     // //////////////////////////////////
     // Private
     // //////////////////////////////////
+
+    /**
+     * Identifies whose permissions a boundary value was resolved with, so that two users never share a cached entry.
+     * <P>
+     * The boundary queries carry a filter built from the current user and the groups it belongs to. Memberships change
+     * rarely and the cache expires quickly, so the Eperson is enough to tell two users apart. The special groups are
+     * part of the identity as well because a caller can use them to act on behalf of somebody else.
+     *
+     * @param context The relevant DSpace Context.
+     * @return A value that is equal for two requests that may share a boundary value, and different otherwise.
+     */
+    private String permissionScope(Context context) {
+        String memoized = context.getCachedRequestValue(PERMISSION_SCOPE_CACHE_KEY);
+        if (memoized != null) {
+            return memoized;
+        }
+
+        EPerson currentUser = context.getCurrentUser();
+        StringBuilder scope = new StringBuilder(currentUser == null ? "anonymous" : "e" + currentUser.getID());
+        for (UUID specialGroup : new TreeSet<>(context.getSpecialGroupUuids())) {
+            scope.append('|').append(specialGroup);
+        }
+
+        String permissionScope = scope.toString();
+        context.cacheRequestValue(PERMISSION_SCOPE_CACHE_KEY, permissionScope);
+        return permissionScope;
+    }
+
+    /**
+     * Drops the cached boundaries of the index. Has to be called by every operation that changes the index.
+     */
+    private void invalidateBoundaryValues() {
+        extremeValueCache.invalidate();
+        yearRangeCache.invalidate();
+    }
 
     protected void emailException(Exception exception) {
         // Also email an alert, system admin may need to check for stale lock
@@ -596,10 +676,14 @@ public class SolrServiceImpl implements SearchService, IndexingService {
     }
 
     /**
-     * Retrieves from Solr the list of administrable communities and collections for the
-     * current user based on a clause containing the e-person and group IDs.
-     * Builds and returns the "location" query part for these DSO's.
+     * Retrieves the list of administrable communities and collections for the user described by the given clause
+     * and builds the "location" query part for these DSO's.
+     * <P>
+     * A single search issues several Solr queries (the main one plus the ones needed to resolve facet boundaries)
+     * and every one of them asks for the same permission filter. The answer only depends on the user, so it is
+     * computed once and memoized on the Context for the remainder of the request.
      *
+     * @param context               The relevant DSpace Context.
      * @param epersonAndGroupClause A Solr filter clause containing one or more IDs combined with OR,
      *                 e.g. {@code "eUUIDe1 OR gUUIDg2 OR gUUIDg3 OR ..."}.
      *
@@ -607,7 +691,29 @@ public class SolrServiceImpl implements SearchService, IndexingService {
      *         {@code "location:(mUUID1 OR lUUID2 ... )"} when there are administrable DSO's.
      */
     @Override
-    public String createLocationQueryForAdministrableDSOs(String epersonAndGroupClause) {
+    public String createLocationQueryForAdministrableDSOs(Context context, String epersonAndGroupClause) {
+        String cacheKey = ADMINISTRABLE_LOCATIONS_CACHE_KEY + epersonAndGroupClause;
+        String cachedLocations = context.getCachedRequestValue(cacheKey);
+        if (cachedLocations != null) {
+            return cachedLocations;
+        }
+
+        String locations = buildLocationQueryForAdministrableDSOs(epersonAndGroupClause);
+        context.cacheRequestValue(cacheKey, locations);
+        return locations;
+    }
+
+    /**
+     * Queries Solr for the administrable communities and collections of the user described by the given clause and
+     * builds the "location" query part for them.
+     *
+     * @param epersonAndGroupClause A Solr filter clause containing one or more IDs combined with OR,
+     *                 e.g. {@code "eUUIDe1 OR gUUIDg2 OR gUUIDg3 OR ..."}.
+     *
+     * @return An empty string if no administrable DSO exists, or a string in the form
+     *         {@code "location:(mUUID1 OR lUUID2 ... )"} when there are administrable DSO's.
+     */
+    private String buildLocationQueryForAdministrableDSOs(String epersonAndGroupClause) {
         StringBuilder locationQuery = new StringBuilder();
         try {
 
@@ -899,6 +1005,14 @@ public class SolrServiceImpl implements SearchService, IndexingService {
             }
 
             solrQuery.addSort(discoveryQuery.getSortField(), order);
+
+            // A relevance sort is unstable when many documents share a score, which is exactly what an empty query
+            // produces: every document scores the same, so a browse would come back in an arbitrary order. Adding the
+            // accessioned date as a secondary criterion keeps relevance first for a real query and falls back to
+            // "most recently added first" when there is nothing to rank.
+            if (DiscoverySortConfiguration.SCORE.equalsIgnoreCase(discoveryQuery.getSortField())) {
+                solrQuery.addSort(ACCESSIONED_SORT_FIELD, SolrQuery.ORDER.desc);
+            }
         }
 
         for (String property : discoveryQuery.getProperties().keySet()) {
@@ -1632,15 +1746,60 @@ public class SolrServiceImpl implements SearchService, IndexingService {
     public FacetYearRange getFacetYearRange(Context context, IndexableObject scope,
                                             DiscoverySearchFilterFacet facet, List<String> filterQueries,
                                             DiscoverQuery parentQuery) throws SearchServiceException {
+        String cacheKey = yearRangeCacheKey(context, scope, facet, filterQueries, parentQuery);
+        int[] cachedRange = yearRangeCache.get(cacheKey);
         FacetYearRange result = new FacetYearRange(facet);
+        if (cachedRange != null) {
+            result.setRange(cachedRange[0], cachedRange[1]);
+            return result;
+        }
+
         result.calculateRange(context, filterQueries, scope, this, parentQuery);
+        if (result.isValid()) {
+            yearRangeCache.put(cacheKey, new int[] {result.getOldestYear(), result.getNewestYear()});
+        }
         return result;
+    }
+
+    /**
+     * The span of a date facet depends on the filters the user selected and on the scope being browsed, but not on the
+     * text being searched for, which is what makes it worth caching across requests.
+     *
+     * @param context      The relevant DSpace Context.
+     * @param scope        The community or collection being browsed, or null for the whole repository.
+     * @param facet        The date facet whose span is being resolved.
+     * @param filterQueries The filters the user selected.
+     * @param parentQuery  The search this facet belongs to.
+     * @return the key under which the span of that facet may be cached.
+     */
+    private String yearRangeCacheKey(Context context, IndexableObject scope, DiscoverySearchFilterFacet facet,
+                                     List<String> filterQueries, DiscoverQuery parentQuery) {
+        return permissionScope(context) + "|year|" + facet.getIndexFieldName()
+            + "|" + (scope == null ? "repository" : scope.getUniqueIndexID())
+            + "|" + parentQuery.getDiscoveryConfigurationName()
+            + "|" + String.join(",", new TreeSet<>(filterQueries));
     }
 
     @Override
     public String calculateExtremeValue(Context context, String valueField,
                                         String sortField,
                                         DiscoverQuery.SORT_ORDER sortOrder)
+        throws SearchServiceException {
+
+        String cacheKey = permissionScope(context) + "|extreme|" + valueField + "|" + sortField + "|" + sortOrder;
+        Optional<String> cachedValue = extremeValueCache.get(cacheKey);
+        if (cachedValue != null) {
+            return cachedValue.orElse(null);
+        }
+
+        String value = resolveExtremeValue(context, valueField, sortField, sortOrder);
+        extremeValueCache.put(cacheKey, Optional.ofNullable(value));
+        return value;
+    }
+
+    private String resolveExtremeValue(Context context, String valueField,
+                                       String sortField,
+                                       DiscoverQuery.SORT_ORDER sortOrder)
         throws SearchServiceException {
 
         DiscoverQuery maxQuery = new DiscoverQuery();

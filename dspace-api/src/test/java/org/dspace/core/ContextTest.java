@@ -537,27 +537,6 @@ public class ContextTest extends AbstractUnitTest {
         cleanupContext(instance);
     }
 
-    /**
-     * Test of updateDatabase method, of class Context.
-     */
-    @Test
-    public void testUpdateDatabase() throws Throwable {
-        // We create a new Context object and force the databaseUpdated flag to false
-        Context instance = new Context() {
-            @Override
-            protected void init() {
-                super.init();
-                databaseUpdated.set(false);
-            }
-        };
-
-        // Finalize is like abort()...should invalidate our context
-        assertThat("updateDatabase 0", Context.updateDatabase(), equalTo(true));
-
-        // Cleanup our context
-        cleanupContext(instance);
-    }
-
     @Test
     public void testUncacheEntities() throws Throwable {
         // To set up the test, ensure the cache contains more than the current user entity

@@ -8,6 +8,7 @@
 package org.dspace.authorize.dao;
 
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +39,18 @@ public interface ResourcePolicyDAO extends GenericDAO<ResourcePolicy> {
     public List<ResourcePolicy> findByGroup(Context context, Group group) throws SQLException;
 
     public List<ResourcePolicy> findByDSoAndAction(Context context, DSpaceObject dso, int actionId) throws SQLException;
+
+    /**
+     * Look for the ResourcePolicies of several DSpaceObjects for the same action, in a single query.
+     *
+     * @param context  the DSpace context
+     * @param dsos     the objects to look up; an empty collection returns an empty list without querying
+     * @param actionId the action the policies grant
+     * @return every matching policy, in no particular order
+     * @throws SQLException if database error
+     */
+    public List<ResourcePolicy> findByDSOsAndAction(Context context, Collection<? extends DSpaceObject> dsos,
+                                                    int actionId) throws SQLException;
 
     public void deleteByDsoAndTypeAndAction(Context context, DSpaceObject dSpaceObject, String type, int action)
         throws SQLException;

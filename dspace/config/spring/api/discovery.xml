@@ -236,14 +236,18 @@
         <!--The sort filters for the discovery search-->
         <property name="searchSortConfiguration">
             <bean class="org.dspace.discovery.configuration.DiscoverySortConfiguration">
-                <!--PCIRN: por padrão, últimos itens adicionados primeiro-->
-                <property name="defaultSortField" ref="sortDateAccessioned" />
+                <!-- Sem defaultSortField de proposito: o DSpace cai em "score", ou seja, ordena por relevancia,
+                     como ja acontece nas demais configuracoes deste arquivo. Antes o PCIRN forcava
+                     sortDateAccessioned, o que fazia a busca devolver o item mais recente em primeiro lugar
+                     independentemente de quao bem ele casava com o termo pesquisado.
+                     O empate de score - que e o caso de uma busca vazia, isto e, a navegacao - continua sendo
+                     desempatado pela data de entrada mais recente, em SolrServiceImpl.resolveToSolrQuery. -->
                 <property name="sortFields">
                     <list>
+                        <ref bean="sortScore" />
                         <ref bean="sortDateAccessioned"/>
                         <ref bean="sortDateIssued" />
                         <ref bean="sortTitle" />
-                        <ref bean="sortScore" />
                     </list>
                 </property>
             </bean>

@@ -9,9 +9,13 @@ package org.dspace.authorize;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -112,7 +116,27 @@ public class ResourcePolicyServiceImpl implements ResourcePolicyService {
 
     @Override
     public List<ResourcePolicy> find(Context c, DSpaceObject o, int actionId) throws SQLException {
+        List<ResourcePolicy> prefetched = c.getPrefetchedPolicies(o, actionId);
+        if (prefetched != null) {
+            return prefetched;
+        }
         return resourcePolicyDAO.findByDSoAndAction(c, o, actionId);
+    }
+
+    @Override
+    public void prefetch(Context c, Collection<? extends DSpaceObject> dsos, int actionId) throws SQLException {
+        if (CollectionUtils.isEmpty(dsos)) {
+            return;
+        }
+
+        Map<UUID, List<ResourcePolicy>> byObject = new HashMap<>();
+        for (ResourcePolicy policy : resourcePolicyDAO.findByDSOsAndAction(c, dsos, actionId)) {
+            byObject.computeIfAbsent(policy.getdSpaceObject().getID(), id -> new ArrayList<>()).add(policy);
+        }
+
+        for (DSpaceObject dso : dsos) {
+            c.putPrefetchedPolicies(dso, actionId, byObject.getOrDefault(dso.getID(), Collections.emptyList()));
+        }
     }
 
     @Override

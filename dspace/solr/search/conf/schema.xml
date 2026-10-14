@@ -80,7 +80,7 @@
                 catenateAll="0"
                 splitOnCaseChange="1"/>
         <filter class="org.apache.lucene.analysis.icu.ICUFoldingFilterFactory"/>
-        <filter class="solr.SnowballPorterFilterFactory" language="English" protected="protwords.txt"/>
+        <filter class="solr.PortugueseMinimalStemFilterFactory"/>
         <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
       </analyzer>
       <analyzer type="query">
@@ -98,7 +98,7 @@
                 catenateAll="0"
                 splitOnCaseChange="1"/>
         <filter class="org.apache.lucene.analysis.icu.ICUFoldingFilterFactory"/>
-        <filter class="solr.SnowballPorterFilterFactory" language="English" protected="protwords.txt"/>
+        <filter class="solr.PortugueseMinimalStemFilterFactory"/>
         <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
       </analyzer>
     </fieldType>
@@ -361,7 +361,40 @@
         is added to the index.  It's used either to index the same field differently,
         or to add multiple fields to the same field for easier/faster searching.  -->
 
- <copyField source="*" dest="search_text"/>
- <copyField source="dspace.entity.type" dest="search.entitytype"/>
+  <!-- Every metadata field is copied into search_text so that a query without a field
+       prefix searches all metadata at once. The copy is done per metadata schema instead
+       of with source="*" on purpose: the wildcard also copied internal control fields
+       (read, edit, admin, submit, location, search.*, archived, discoverable,
+       latestVersion, withdrawn, ...), which made a search for an ordinary word such as
+       "item" or "true" match every document and exposed internal identifiers through the
+       public search. Schemas are the ones registered in metadataschemaregistry. -->
+  <copyField source="dc.*" dest="search_text"/>
+  <copyField source="dcterms.*" dest="search_text"/>
+  <copyField source="dspace.*" dest="search_text"/>
+  <copyField source="eperson.*" dest="search_text"/>
+  <copyField source="local.*" dest="search_text"/>
+  <copyField source="relation.*" dest="search_text"/>
+  <copyField source="person.*" dest="search_text"/>
+  <copyField source="project.*" dest="search_text"/>
+  <copyField source="organization.*" dest="search_text"/>
+  <copyField source="periodical.*" dest="search_text"/>
+  <copyField source="creativework.*" dest="search_text"/>
+  <copyField source="creativeworkseries.*" dest="search_text"/>
+  <copyField source="publicationissue.*" dest="search_text"/>
+  <copyField source="publicationvolume.*" dest="search_text"/>
+  <copyField source="oaire.*" dest="search_text"/>
+  <copyField source="iiif.*" dest="search_text"/>
+  <copyField source="datacite.*" dest="search_text"/>
+  <copyField source="coar.*" dest="search_text"/>
+  <copyField source="journal.*" dest="search_text"/>
+  <copyField source="journalvolume.*" dest="search_text"/>
+  <copyField source="workflow.*" dest="search_text"/>
+
+  <!-- Content that is not a metadata field but must stay searchable. -->
+  <copyField source="fulltext" dest="search_text"/>
+  <copyField source="handle" dest="search_text"/>
+  <copyField source="original_bundle_filenames" dest="search_text"/>
+
+  <copyField source="dspace.entity.type" dest="search.entitytype"/>
 
 </schema>

@@ -154,7 +154,8 @@ public class EntityTypeServiceImpl implements EntityTypeService {
             query = new StringBuilder();
             query.append("submit:(").append(epersonAndGroupClause).append(")");
             query.append(" OR ").append("admin:(").append(epersonAndGroupClause).append(")");
-            String locations = searchService.createLocationQueryForAdministrableDSOs(epersonAndGroupClause.toString());
+            String locations = searchService
+                .createLocationQueryForAdministrableDSOs(context, epersonAndGroupClause.toString());
             if (StringUtils.isNotBlank(locations)) {
                 query.append(" OR ");
                 query.append(locations);
