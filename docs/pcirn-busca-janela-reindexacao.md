@@ -1,8 +1,20 @@
 # Janela de reindexação da busca — O7 + O8 + O9
 
-> **Status:** procedimento ensaiado e pronto; **não executado**. Depende de uma janela com o serviço parado, porque a cadeia de análise do texto muda e o índice inteiro precisa ser reconstruído.
+> **Status: EXECUTADO em 2026-10-14.** Reindexação completa em **1 minuto** (11:06:31 → 11:07:31), 2.562 documentos, sem erro. O schema/stopwords/sinônimos foram publicados numa imagem construída a partir de `dspace/src/main/docker/dspace-solr/Dockerfile` (`itep/dspace-solr:search-o7o8o9`), então **sobrevivem a recriação do container** — que era a armadilha nº 1.
+>
+> Conferência pós-janela, medida no índice real:
 
-Este documento existe para que a janela seja executar e conferir, sem redescobrir armadilhas. As três armadilhas abaixo foram **medidas**, não supostas.
+| Consulta | Antes | Depois | Esperado |
+|---|---|---|---|
+| documentos | 2562 | **2562** | 2562 |
+| `manuais` / `manual` | 15 / 31 | **42 / 42** | 42 / 42 |
+| `search_text:item` | 2257 | **30** | ~30 |
+| `handle:123456789*` | 2276 | **2276** | 2276 |
+| `a` · `o` · `e` · `de` · `com` | 2562 · 1951 · 2283 · 2256 · 1291 | **0** em todas | 0 |
+| `portaria` · `custodia` · `"cadeia de custódia"` | 2250 · 50 · 33 | **2250 · 50 · 33** | iguais |
+| API `/discover/search/objects?query=portaria` | 2246 | **2246** | 2246 |
+
+Este documento continua valendo como o procedimento, para uma próxima vez (outro acervo, outro schema) — inclusive as armadilhas, que foram **medidas**, não supostas.
 
 ## O que muda e por quê
 

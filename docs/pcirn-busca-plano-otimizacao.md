@@ -56,9 +56,9 @@ Substituído por um arquivo limpo, com o formato documentado e uma orientação 
 | **P4** | ~60 consultas de política por página (várias por item) | `ResourcePolicyDAOImpl` é o call site de banco mais frequente; ~55 varreduras em `resourcepolicy` por página | **Prefetch em lote: ~60 → 3 consultas** ✅ aplicado | Médio | Não |
 | **P5** | Auto-flush/dirty-check em requisição de leitura | ~9–10 % das amostras de CPU | ~9 % de CPU | Médio | Não |
 | **P6** | JSON indentado | medido numa página de busca real: 162 KB → 94 KB compactado, **42 % são espaços** | rede + parse no navegador | Baixo | Não |
-| **O7** | Stemming em **inglês** sobre texto português | `manuais`=11 vs `manual`=31 não unificavam; com o stemmer minimal unificam | unifica plurais regulares **sem** over-stemming | Baixo | **Sim** |
-| **O8** | Stopwords de **36 palavras em inglês**, aplicadas na indexação | Descarta `no` e `as` (português legítimo: busca por `as` devolve **0**) e **não** contém `a`/`o`/`e`/`de`/`com`, indexados em 1.291 a 2.562 documentos | precisão + menos tokens; medido no ensaio | Baixo | **Sim** |
-| **O9** | Campos internos vazam para o `search_text` | `search_text:item`=2.254 vs `dc.title:item`=0 | precisão; menos ruído | Médio | **Sim** |
+| **O7** | Stemming em **inglês** sobre texto português | `manuais`=15 vs `manual`=31 não unificavam; agora ambos devolvem **42** | unifica plurais regulares **sem** over-stemming ✅ **no ar** (reindexado) | Baixo | **Sim** |
+| **O8** | Stopwords de **36 palavras em inglês**, aplicadas na indexação | Não continha `a`/`o`/`e`/`de`/`com` — as mais frequentes do português, indexadas em 1.291 a 2.562 documentos. Depois: **0** em todas ✅ **no ar** | precisão + menos tokens | Baixo | **Sim** |
+| **O9** | Campos internos vazam para o `search_text` | `search_text:item`: 2.257 → **30** ✅ **no ar**; `handle` continua encontrável | precisão; menos ruído | Médio | **Sim** |
 | **O10** | `**` sem efeito e 422 por aspas soltas | `"notas tecnicas` → HTTP 422; `operacao%%`=13 | fecha aspas e colapsa curingas ✅ aplicado e **no ar** | Baixo | Não |
 | **O11** | ~~Página de busca sem tratamento de erro~~ **JÁ EXISTIA** — minha afirmação estava errada | `search-results.component` já trata 422 com mensagem dedicada | mensagem pt-BR reescrita ✅ **no ar** | Baixo | Não |
 | **O12** | Curinga à esquerda/fuzzy não escalam | **hoje**: QTime ~0 ms (não é gargalo) | proteção futura | Baixo | Não |
@@ -68,26 +68,31 @@ Substituído por um arquivo limpo, com o formato documentado e uma orientação 
 
 ## Estado da publicação na homologação (2026-10-14)
 
-| Item | No ar? | Como foi publicado | Sobrevive a |
-|---|---|---|---|
-| P1, P4 (código) | ✅ | *overlay* de classpath (`-Dloader.path`, separado por **vírgula**) apontando para `dspace-api/target/classes` e `dspace-server-webapp/target/classes`, com o container `dspace` recriado | `docker restart` sim; recriação do container **não** |
-| R1 (config da busca) | ✅ | `dspace/config/spring/api/discovery.xml` copiado para o volume `d9_config` | recriação sim (é volume) |
-| R2 (sinônimos) | ✅ | `synonyms.txt` copiado para o conf do core **e** para o configset dentro do container (o entrypoint recopia o configset a cada start) | `docker restart` sim; recriação do container **não** |
-| O10, O11 (Angular) | ✅ | `docker cp` dos 3 arquivos para o container do dev server (watch) + rebuild automático | nada: recriar o container volta ao estado da imagem |
-| O7, O8, O9 | ❌ | — | exigem imagem do Solr + reindexação: ver [pcirn-busca-janela-reindexacao.md](pcirn-busca-janela-reindexacao.md) |
+**Tudo o que está no ar agora vem de imagem própria** — não há mais bind mount de host nem arquivo copiado à mão, então recriar um container não desfaz nada.
 
-**Nada disso é deploy definitivo:** tudo se perde numa recriação de container. O caminho definitivo é construir as imagens a partir do repositório (backend, Angular e Solr).
+| Item | No ar? | Imagem | Como |
+|---|---|---|---|
+| P1, P4 (código) | ✅ | `itep/dspace:search-p1` | derivada de `itep/dspace:restored-20260930` com as classes do working tree em `/dspace/overrides` e `LOADER_PATH` (**vírgula**) gravado na própria imagem |
+| R1 (config da busca) | ✅ | — | `discovery.xml` no volume `d9_config` |
+| R2 (sinônimos) | ✅ | `itep/dspace-solr:search-o7o8o9` | imagem construída a partir de `dspace/src/main/docker/dspace-solr/Dockerfile`, com o configset do repositório embutido |
+| O7, O8, O9 | ✅ | `itep/dspace-solr:search-o7o8o9` | reindexação completa: **2.562 documentos em 1 minuto** |
+| O10, O11 (Angular) | ✅ | `itep/dspace-angular:search-o10` | derivada da imagem em uso com os três arquivos do working tree; o dev server recompila no start |
+
+Receitas das imagens derivadas: `.estabilizacao-backup/runtime/Dockerfile.dspace-overlay` e `Dockerfile.angular-o10`. O `docker-compose.recovery.yml` já aponta para as três imagens novas.
+
+**O que ainda não é definitivo:** as duas imagens derivadas dependem de imagens-base que só existem nesta máquina (`itep/dspace:restored-20260930` e `itep/dspace-angular:institutional-links-20261006`). A do Solr é reprodutível a partir do repositório; para backend e Angular o caminho definitivo é construir do repositório (o `Dockerfile` da raiz e o do submodule).
 
 Reversão:
 
 ```bash
-# backend: sobe de novo sem o arquivo de overlay
-docker compose -f .estabilizacao-backup/docker-compose.recovery.yml up -d dspace
-# angular: devolve os dois arquivos originais (o dev server recompila sozinho)
-docker cp .estabilizacao-backup/angular-antes-o10/search-form.component.ts \
-  dspace-angular:/app/src/app/shared/search-form/search-form.component.ts
-docker cp .estabilizacao-backup/angular-antes-o10/pt-BR.json5 dspace-angular:/app/src/assets/i18n/pt-BR.json5
+docker compose -f .estabilizacao-backup/docker-compose.recovery.yml down
+# edite docker-compose.recovery.yml de volta para os tags originais:
+#   itep/dspace:restored-20260930 | itep/dspace-angular:institutional-links-20261006 | docker.io/dspace/dspace-solr:dspace-9_x
+docker compose -f .estabilizacao-backup/docker-compose.recovery.yml up -d
+# ATENCAO: voltar o Solr ao schema antigo exige reindexar de novo (o indice atual esta no formato novo)
 ```
+
+Cópias do estado anterior: `.estabilizacao-backup/angular-antes-o10/` (Angular) e `.estabilizacao-backup/discovery.xml.antes-do-deploy-search` (config da busca).
 
 **Achado à parte, fora do escopo da busca:** o servidor do container do Angular responde `Cannot GET /search` (404 do Express) para qualquer rota que não seja `/`. Link direto, refresh e URL compartilhada de uma página interna não funcionam; a navegação a partir da home funciona. É da configuração do servidor SSR (imagem `itep/dspace-angular:institutional-links-20261006`, de outro fluxo) e é **pré-existente** — conferido antes de eu tocar no container.
 
