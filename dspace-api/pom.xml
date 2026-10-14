@@ -279,6 +279,9 @@
                     <plugin>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
+                            <!-- Legacy test classes retain static services from destroyed Spring kernels. -->
+                            <forkCount>1</forkCount>
+                            <reuseForks>false</reuseForks>
                             <systemPropertyVariables>
                                 <!-- Specify the dspace.dir to use for test environment -->
                                 <!-- ${agnostic.build.dir} is set dynamically by groovy-maven-plugin above -->

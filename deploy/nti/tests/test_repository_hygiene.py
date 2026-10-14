@@ -48,3 +48,13 @@ class RepositoryHygieneTests(unittest.TestCase):
         self.assertIn('unittest discover', release)
         self.assertIn("PCIRN_RUN_POSTGRES15: '1'", release)
         self.assertIn('bootstrap_fresh.py', release)
+
+    def test_api_unit_classes_use_one_isolated_jvm_at_a_time(self):
+        import xml.etree.ElementTree as xml
+        pom = xml.parse(ROOT / 'dspace-api/pom.xml')
+        ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+        plugins = pom.findall('.//m:plugin', ns)
+        plugin = next(p for p in plugins if p.findtext('m:artifactId', namespaces=ns)
+                      == 'maven-surefire-plugin')
+        self.assertEqual(plugin.findtext('m:configuration/m:forkCount', namespaces=ns), '1')
+        self.assertEqual(plugin.findtext('m:configuration/m:reuseForks', namespaces=ns), 'false')
