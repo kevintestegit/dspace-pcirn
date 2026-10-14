@@ -461,7 +461,7 @@ public class RequestItemRepositoryIT
         RequestItem request = RequestItemBuilder
                 .createRequestItem(context, item, bitstream)
                 .build();
-        getClient().perform(delete(URI_ROOT + '/' + request.getToken()))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(delete(URI_ROOT + '/' + request.getToken()))
                 .andExpect(status().isMethodNotAllowed());
     }
 

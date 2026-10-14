@@ -25,10 +25,23 @@ import org.junit.Test;
  */
 public class RestResourceControllerIT extends AbstractControllerIntegrationTest {
 
+    /**
+     * Submission, import and version-history routes require authentication even for public resources.
+     * @throws Exception if a request cannot be performed
+     */
+    @Test
+    public void privateRoutesRejectAnonymousRequests() throws Exception {
+        for (String path : new String[] {"/api/integration/externalsources/orcid",
+            "/api/submission/vocabularies/common_types", "/api/versioning/versionhistories/1",
+            "/api/statistics/searchevents", "/api/undefined/undefined"}) {
+            getClient().perform(get(path)).andExpect(status().isUnauthorized());
+        }
+    }
+
     @Test
     public void undefinedRepository() throws Exception {
         // When we call the root endpoint
-        getClient().perform(get("/api/undefined/undefined"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/undefined/undefined"))
                 // The status has to be 404 Not Found
                 .andExpect(status().isNotFound());
     }

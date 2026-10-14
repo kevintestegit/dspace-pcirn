@@ -61,7 +61,7 @@ public class OpenAlexJournalExternalSourcesIT extends AbstractControllerIntegrat
 
     @Test
     public void findOneOpenalexImportJournalServiceExternalSourceTest() throws Exception {
-        getClient().perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
                    .andExpect(jsonPath("$._embedded.externalsources", Matchers.hasItem(
                        ExternalSourceMatcher.matchExternalSource("openalexJournal",
                                                                  "openalexJournal", false))));
@@ -76,7 +76,7 @@ public class OpenAlexJournalExternalSourcesIT extends AbstractControllerIntegrat
                 .thenReturn(jsonResponse);
 
 
-            getClient().perform(get("/api/integration/externalsources/openalexJournal/entries")
+            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/openalexJournal/entries")
                                     .param("query", "empty"))
                        .andExpect(status().isOk()).andExpect(jsonPath("$.page.number", is(0)));
             verify(liveImportClient, times(2)).executeHttpGetRequest(anyInt(), anyString(), anyMap());
@@ -91,7 +91,7 @@ public class OpenAlexJournalExternalSourcesIT extends AbstractControllerIntegrat
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexJournal/entries")
+            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/openalexJournal/entries")
                                     .param("query", "Chem"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries[0].id").value("S41354064"))
@@ -142,7 +142,7 @@ public class OpenAlexJournalExternalSourcesIT extends AbstractControllerIntegrat
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexJournal/entries")
+            getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/integration/externalsources/openalexJournal/entries")
                                     .param("query", "Chem"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries", hasSize(2)))

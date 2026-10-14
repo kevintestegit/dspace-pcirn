@@ -18,6 +18,7 @@ import static org.dspace.app.rest.matcher.FacetEntryMatcher.workflowFacetMatcher
 import static org.dspace.app.rest.matcher.FacetEntryMatcher.workspaceFacetMatchers;
 import static org.dspace.app.rest.matcher.FacetValueMatcher.entrySupervisedBy;
 import static org.dspace.app.rest.matcher.SearchFilterMatcher.searchFilterMatchers;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -36,6 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.time.Period;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,6 +79,9 @@ import org.dspace.content.WorkspaceItem;
 import org.dspace.content.authority.Choices;
 import org.dspace.content.authority.service.ChoiceAuthorityService;
 import org.dspace.content.authority.service.MetadataAuthorityService;
+import org.dspace.discovery.configuration.DiscoveryConfiguration;
+import org.dspace.discovery.configuration.DiscoveryConfigurationService;
+import org.dspace.discovery.configuration.DiscoverySortConfiguration;
 import org.dspace.discovery.configuration.DiscoverySortFieldConfiguration;
 import org.dspace.eperson.EPerson;
 import org.dspace.eperson.Group;
@@ -102,6 +109,13 @@ public class DiscoveryRestControllerIT extends AbstractControllerIntegrationTest
     @Autowired
     private ObjectMapper mapper;
 
+    @Autowired
+    private DiscoveryConfigurationService discoveryConfigurationService;
+
+    private DiscoveryConfiguration defaultDiscovery;
+    private List<String> pcirnFilters;
+    private DiscoverySortConfiguration pcirnSort;
+
     /**
      * Original value of the discovery.highlights.escape-html property, saved here to restore it after running the
      * tests.
@@ -111,6 +125,19 @@ public class DiscoveryRestControllerIT extends AbstractControllerIntegrationTest
     @Override
     public void setUp() throws Exception {
         super.setUp();
+        defaultDiscovery = discoveryConfigurationService.getDiscoveryConfiguration("default");
+        pcirnFilters = defaultDiscovery.getDefaultFilterQueries();
+        pcirnSort = defaultDiscovery.getSearchSortConfiguration();
+        // The upstream contract covers communities/collections; PCIRN's item-only contract is tested separately.
+        defaultDiscovery.setDefaultFilterQueries(List.of(
+            "(search.resourcetype:Item AND latestVersion:true) OR search.resourcetype:Collection "
+                + "OR search.resourcetype:Community", "-withdrawn:true AND -discoverable:false"));
+        DiscoverySortConfiguration genericSort = new DiscoverySortConfiguration();
+        List<DiscoverySortFieldConfiguration> fields = new ArrayList<>(pcirnSort.getSortFields());
+        List<String> order = List.of("score", "dc.title", "dc.date.issued", "dc.date.accessioned");
+        fields.sort(Comparator.comparingInt(field -> order.indexOf(field.getMetadataField())));
+        genericSort.setSortFields(fields);
+        defaultDiscovery.setSearchSortConfiguration(genericSort);
         context.turnOffAuthorisationSystem();
         escapeHTML = configurationService.getBooleanProperty("discovery.highlights.escape-html");
         context.restoreAuthSystemState();
@@ -118,10 +145,34 @@ public class DiscoveryRestControllerIT extends AbstractControllerIntegrationTest
 
     @Override
     public void destroy() throws Exception {
+        if (defaultDiscovery != null) {
+            defaultDiscovery.setDefaultFilterQueries(pcirnFilters);
+            defaultDiscovery.setSearchSortConfiguration(pcirnSort);
+        }
         context.turnOffAuthorisationSystem();
         configurationService.setProperty("discovery.highlights.escape-html", escapeHTML);
         context.restoreAuthSystemState();
         super.destroy();
+    }
+
+    /**
+     * PCIRN's actual default excludes communities and collections from public search.
+     * @throws Exception if preparing or querying the fixture fails
+     */
+    @Test
+    public void pcirnDefaultSearchReturnsOnlyItems() throws Exception {
+        defaultDiscovery.setDefaultFilterQueries(pcirnFilters);
+        defaultDiscovery.setSearchSortConfiguration(pcirnSort);
+        context.turnOffAuthorisationSystem();
+        parentCommunity = CommunityBuilder.createCommunity(context).withName("PCIRN test community").build();
+        Collection collection = CollectionBuilder.createCollection(context, parentCommunity)
+            .withName("PCIRN test collection").build();
+        ItemBuilder.createItem(context, collection).withTitle("PCIRN test item").build();
+        context.restoreAuthSystemState();
+        getClient().perform(get("/api/discover/search/objects"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$._embedded.searchResult.page.totalElements", is(1)));
+        assertThat(pcirnSort.getDefaultSortField().getMetadataField(), is("dc.date.accessioned"));
     }
 
     @Test

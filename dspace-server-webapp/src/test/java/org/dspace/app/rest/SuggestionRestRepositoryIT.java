@@ -76,7 +76,7 @@ public class SuggestionRestRepositoryIT extends AbstractControllerIntegrationTes
                 .andExpect(status().isMethodNotAllowed());
         String token = getAuthToken(eperson.getEmail(), password);
         getClient(token).perform(get("/api/integration/suggestions")).andExpect(status().isMethodNotAllowed());
-        getClient().perform(get("/api/integration/suggestions")).andExpect(status().isMethodNotAllowed());
+        getClient().perform(get("/api/integration/suggestions")).andExpect(status().isUnauthorized());
     }
 
     @Test
