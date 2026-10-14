@@ -8,7 +8,7 @@ disponíveis com configuração e manifesto explícitos.
 A interface é concisa e em inglês. Após configurar o PostgreSQL, pergunta
 `Import data? [y/N]`. Ao aceitar, obtém a origem pelo asset oficial `data-package.json`
 da RC e baixa um pacote HTTPS verificado, sem pedir URL ou SHA-256 ao administrador.
-Consulte [hospedagem e preparação do pacote](DATA-IMPORT.md). Sem importação, inicializa
+Consulte [hospedagem e preparação do pacote](OPERACOES.md#importacao). Sem importação, inicializa
 um repositório vazio numa release compatível. Detalhes internos ficam em `ROOT/installer.log`.
 
 ## Primeiro acesso
@@ -34,7 +34,7 @@ A seleção automática reconhece RCs pelo nome da tag, mesmo se o GitHub não a
 como prerelease. A RC6 foi publicada com estas capacidades, builds AMD64/ARM64 e
 bootstrap vazio aprovado nas duas arquiteturas. O fluxo completo com banco vazio
 e com o acervo real foi validado em runner Ubuntu24.04 AMD64. Consulte
-[o relatório da entrega e as limitações](RC6.md).
+[o relatório da entrega e as limitações](VALIDACAO.md).
 
 ## Menu
 
@@ -240,7 +240,7 @@ Todos aceitam `--root` (padrão `/srv/dspacepcirn`). Operações concorrentes s�
 bloqueadas. Erros retornam 1, argumentos inválidos 2 e interrupção 130.
 
 Para migrar o acervo na instalação inicial, use `install.sh --data-package DIRETÓRIO`.
-O [roteiro de migração](MIGRACAO.md) descreve preparação do pacote, configuração TLS,
+O [roteiro de migração](OPERACOES.md#importacao) descreve preparação do pacote, configuração TLS,
 SQL de provisionamento para o DBA, recusa de banco ocupado e
 recuperação de falhas. Nenhuma importação bem-sucedida é marcada como instalação
 concluída antes do deploy e healthcheck.
@@ -297,71 +297,21 @@ de backup avulso antes de qualquer alteração de dados, rollback apenas reinici
 a release anterior, sem exigir autorização de restore. Não apague o journal
 para forçar update.
 
-## Contrato esperado do pipeline GHCR — integração pendente
+## Contrato GHCR
 
-O pipeline paralelo deve publicar um arquivo JSON de release confiável com:
+A pipeline publica backend, Angular e Solr por digest para AMD64/ARM64, além do
+manifesto e do gerenciador verificável. `schema_version=1`, versão SemVer sem `v`,
+imagens GHCR com SHA-256 e histórico Flyway completo medido são obrigatórios.
+Checksums Flyway não são SHA-256 do SQL. O perfil fresh tem histórico próprio;
+repeatables não são aceitas por este contrato. Startup não executa migrations.
 
-```json
-{
-  "schema_version": 1,
-  "version": "1.0.0",
-  "images": {
-    "backend": "ghcr.io/ORGANIZACAO/backend@sha256:DIGEST_REAL_64_HEX",
-    "solr": "ghcr.io/ORGANIZACAO/solr@sha256:DIGEST_REAL_64_HEX",
-    "frontend": "ghcr.io/ORGANIZACAO/frontend@sha256:DIGEST_REAL_64_HEX"
-  },
-  "database": {
-    "migrations": [
-      {"version": "1", "script": "V1__exemplo.sql", "checksum": 123456789}
-    ]
-  }
-}
-```
-
-**Exemplo estrutural, deliberadamente não instalável.** version é SemVer e imagens
-usam apenas nomes GHCR minúsculos + SHA-256 real, nunca tags/latest. O pipeline
-versiona as três imagens e fornece o digest do índice/plataforma publicado.
-`database.migrations` é o histórico completo esperado após migrate de um banco
-vazio de homologação: valores version/script/checksum do Flyway efetivamente usados
-pela imagem, incluindo migrations Java (checksum null quando apropriado) e baseline
-se existente. Não derive checksum Flyway de SHA-256 do SQL. Entradas são únicas;
-version usa pontos, conforme persistida em schema_version. Mudanças em migrations
-já aplicadas são rejeitadas. Este contrato v1 admite migrations versionadas; se o
-pipeline introduzir repeatables, o contrato deve ser revisto antes da integração.
-
-Backend: /dspace/bin/dspace, server-boot.jar, curl e Java 17; startup sem migration.
-Solr: cores DSpace e utilitários init-var-solr/precreate-core/runuser/curl conforme
-Compose atual. Frontend: Node SSR porta 4000, configuração DSPACE_* em runtime.
-Banco usa schema public; assetstore em /dspace/assetstore. Imagens devem suportar
-os envs e healthchecks do Compose existente. A CLI instalada é distribuída junto
-com esta árvore, não atualizada implicitamente pelo manifesto de imagens.
-
-Pendente: emissão do manifesto pelo pipeline DeepSeek, digests/versões reais,
-permissões GHCR, arquitetura do servidor e ensaio end-to-end em homologação com
-PostgreSQL externo (TLS, privilégios, Flyway, backup/restore e healthchecks).
-Workflows do GitHub Actions não foram alterados por este instalador.
-
-## Testes isolados
+## Manutenção e validação
 
 ```bash
-python3 -m unittest discover -s deploy/nti/tests -v
-bash -n install.sh deploy/nti/dspacepcirn
+python3 -B scripts/check-installer.py
+bash -n install.sh deploy/nti/dspacepcirn deploy/nti/install-manager.sh
 ```
 
-Executáveis simulados verificam a CLI por subprocessos, sem daemon Docker ou banco.
-Incluem os dois tipos de PostgreSQL, falhas nas sete etapas, retomada sem reimportação,
-recusa de volumes existentes, TLS/SCRAM, falhas em pull, dump, migration, conexão, health e restore, corrupção de
-backup, autorização, concorrência, proteção de credenciais e travessia de archives.
-`test_production_operations.py` cobre a superfície fora da CLI — entrypoint do
-Compose, `scripts/backup-dspace.sh`, publicação manual e SMTP — e usa o Docker
-apenas para renderizar configurações; sem o CLI do Docker esses casos são pulados.
-Referências técnicas: [imagem oficial PostgreSQL](https://hub.docker.com/_/postgres),
-[TLS PostgreSQL](https://www.postgresql.org/docs/17/ssl-tcp.html), [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
-[interpolação Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
-e [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).
-
-## Homologação numa VM limpa
-
-O [roteiro de homologação](HOMOLOGACAO.md) inclui preflight automático no wizard,
-executor E2E opt-in e critérios de aprovação/recuperação. O contrato GHCR acima
-permanece inalterado. Testes locais são simulados e não iniciam containers.
+O comando padrão é sequencial e não inicia serviços. A suíte completa, PostgreSQL
+real e bootstrap são explícitos; veja [operações](OPERACOES.md#validacao).
+Resultados e bloqueadores da entrega: [VALIDACAO.md](VALIDACAO.md).
