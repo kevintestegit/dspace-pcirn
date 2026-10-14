@@ -59,11 +59,7 @@ public class AltchaCaptchaRestControllerIT extends AbstractControllerIntegration
     @Test
     public void testGetAltchaChallengeUnauthenticated() throws Exception {
         getClient().perform(get("/api/captcha/challenge"))
-                .andExpect(status().isUnauthorized());charset=UTF-8"))
-                .andExpect(jsonPath("$.algorithm").value("SHA-256"))
-                .andExpect(jsonPath("$.challenge").isString())
-                .andExpect(jsonPath("$.salt").isString())
-                .andExpect(jsonPath("$.signature").isString());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
