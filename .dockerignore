@@ -30,3 +30,29 @@ dspace/src/main/docker/README.md
 dspace/src/main/docker-compose/
 # Local snapshot: holds .env, smtp.env and local.cfg. Never part of a build.
 .estabilizacao-backup/
+
+# Operator data and local tooling must never enter the source build context.
+.worktrees/
+.superpowers/
+.codex/
+.maestri/
+.commandcode/
+.impeccable/
+.playwright-cli/
+.ruff_cache/
+.pytest_cache/
+**/__pycache__/
+**/node_modules/
+**/.angular/
+**/*.pyc
+output/
+video/
+docs/pcirn-publicados/
+docs/superpowers/
+release-manifest.json
+dspacepcirn-manager.tar.gz*
+data-package.json
+local.cfg
+**/*.key
+!dspace-saml2/src/test/resources/*.key
+!dspace-server-webapp/src/test/resources/org/dspace/app/rest/*-private.key

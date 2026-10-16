@@ -10,6 +10,7 @@ package org.dspace.service.impl;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -48,7 +49,7 @@ import org.dspace.services.ConfigurationService;
  */
 @Named
 @Singleton
-public class HttpConnectionPoolService {
+public class HttpConnectionPoolService implements AutoCloseable {
     @Inject
     ConfigurationService configurationService;
 
@@ -76,6 +77,7 @@ public class HttpConnectionPoolService {
     private static final int IDLE_INTERVAL = 30;
 
     private PoolingHttpClientConnectionManager connManager;
+    private IdleConnectionMonitorThread connectionMonitor;
 
     private final ConnectionKeepAliveStrategy keepAliveStrategy
             = new KeepAliveStrategy();
@@ -101,7 +103,8 @@ public class HttpConnectionPoolService {
                 configurationService.getIntProperty(configPrefix + ".client.maxPerRoute",
                         DEFAULT_MAX_PER_ROUTE));
 
-        Thread connectionMonitor = new IdleConnectionMonitorThread(connManager);
+        connectionMonitor = new IdleConnectionMonitorThread(connManager);
+        connectionMonitor.setName("dspace-http-pool-" + configPrefix);
         connectionMonitor.setDaemon(true);
         connectionMonitor.start();
     }
@@ -115,8 +118,23 @@ public class HttpConnectionPoolService {
         CloseableHttpClient httpClient = DSpaceHttpClientFactory.getInstance().builder(true).create()
                 .setKeepAliveStrategy(keepAliveStrategy)
                 .setConnectionManager(connManager)
+                .setConnectionManagerShared(true)
                 .build();
         return httpClient;
+    }
+
+    /**
+     * Stop the monitor and close the shared pool when its owning service is destroyed.
+     */
+    @Override
+    @PreDestroy
+    public void close() {
+        if (connectionMonitor != null) {
+            connectionMonitor.shutdown();
+        }
+        if (connManager != null) {
+            connManager.shutdown();
+        }
     }
 
     /**

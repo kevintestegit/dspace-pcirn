@@ -51,13 +51,15 @@ public class OpenAlexPublisherExternalSourcesIT extends AbstractControllerIntegr
 
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();
         ReflectionTestUtils.setField(openAlexImportMetadataSourceService, "liveImportClient", liveImportClient);
     }
 
     @Test
     public void findOneOpenalexImportPublisherExternalExternalSourceTest() throws Exception {
-        getClient().perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
                    .andExpect(jsonPath("$._embedded.externalsources", Matchers.hasItem(
                        ExternalSourceMatcher.matchExternalSource("openalexPublisher",
                                                                  "openalexPublisher", false))));
@@ -71,7 +73,8 @@ public class OpenAlexPublisherExternalSourcesIT extends AbstractControllerIntegr
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexPublisher/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexPublisher/entries")
                                     .param("query", "empty"))
                        .andExpect(status().isOk()).andExpect(jsonPath("$.page.number", is(0)));
             verify(liveImportClient, times(2)).executeHttpGetRequest(anyInt(), anyString(), anyMap());
@@ -86,7 +89,8 @@ public class OpenAlexPublisherExternalSourcesIT extends AbstractControllerIntegr
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexPublisher/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexPublisher/entries")
                                     .param("query", "Elsevier"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries[0].id").value("P4310320990"))
@@ -143,7 +147,8 @@ public class OpenAlexPublisherExternalSourcesIT extends AbstractControllerIntegr
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexPublisher/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexPublisher/entries")
                                     .param("query", "Elsevier"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries", hasSize(2)))

@@ -88,7 +88,7 @@ public class SuggestionTargetRestRepositoryIT extends AbstractControllerIntegrat
                 .andExpect(status().isMethodNotAllowed());
         String token = getAuthToken(eperson.getEmail(), password);
         getClient(token).perform(get("/api/integration/suggestiontargets")).andExpect(status().isMethodNotAllowed());
-        getClient().perform(get("/api/integration/suggestiontargets")).andExpect(status().isMethodNotAllowed());
+        getClient().perform(get("/api/integration/suggestiontargets")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -590,7 +590,8 @@ public class SuggestionTargetRestRepositoryIT extends AbstractControllerIntegrat
                 .andExpect(status().isBadRequest());
         getClient(adminToken).perform(get("/api/integration/suggestiontargets/search/findByTarget"))
                 .andExpect(status().isBadRequest());
-        getClient().perform(get("/api/integration/suggestiontargets/search/findByTarget").param("target", "not-exist"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(
+                get("/api/integration/suggestiontargets/search/findByTarget").param("target", "not-exist"))
                 .andExpect(status().isBadRequest());
     }
 

@@ -49,3 +49,13 @@ class GlobalManagerTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(command.read_text(), 'existing work')
             self.assertFalse((prefix / 'lib/dspacepcirn').exists())
+
+    def test_world_writable_prefix_is_refused_before_creating_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory)
+            prefix.chmod(0o777)
+            result = subprocess.run(['bash', str(REPO / 'deploy/nti/install-manager.sh'), str(prefix)],
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('unsafe ownership or permissions', result.stderr)
+            self.assertFalse((prefix / 'lib/dspacepcirn').exists())

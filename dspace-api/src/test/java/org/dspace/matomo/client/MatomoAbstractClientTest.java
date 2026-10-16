@@ -22,10 +22,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.dspace.AbstractUnitTest;
 import org.junit.Test;
 
-public class MatomoAbstractClientTest extends AbstractUnitTest {
+public class MatomoAbstractClientTest {
 
     private static class MockHttpURLConnection extends HttpURLConnection {
         private Map<String, String> requestProperties = new HashMap<>();

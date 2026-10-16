@@ -1,0 +1,42 @@
+name: Installer checks
+
+on:
+  push:
+    paths:
+      - 'deploy/nti/**'
+      - 'scripts/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.gitignore'
+      - '.dockerignore'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'deploy/nti/**'
+      - 'scripts/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.gitignore'
+      - '.dockerignore'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install YAML parser
+        run: sudo apt-get update -qq && sudo apt-get install -y python3-yaml
+      - name: Check installer without starting services
+        run: |
+          /usr/bin/python3 -B scripts/check-installer.py
+          bash -n install.sh deploy/nti/dspacepcirn deploy/nti/install-manager.sh

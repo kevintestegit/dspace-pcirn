@@ -40,6 +40,7 @@ backend_digest=
 angular_digest=
 solr_digest=
 migrations=
+fresh_migrations=
 registry=ghcr.io
 owner=
 output=release-manifest.json
@@ -55,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --angular-digest) angular_digest="$2"; shift 2 ;;
     --solr-digest)    solr_digest="$2";    shift 2 ;;
     --migrations)     migrations="$2";     shift 2 ;;
+    --fresh-migrations) fresh_migrations="$2"; shift 2 ;;
     --registry)       registry="$2";       shift 2 ;;
     --repository-owner) owner="$2";        shift 2 ;;
     --output)         output="$2";         shift 2 ;;
@@ -107,6 +109,19 @@ printf '%s' "${history}" | jq -e '
 [[ "$(printf '%s' "${history}" | jq '[.[].version] | unique | length')" == "${count}" ]] \
   || die "database.migrations tem version repetida"
 
+fresh_history=null
+if [[ -n "${fresh_migrations}" ]]; then
+  [[ -f "${fresh_migrations}" ]] || die "historico de bootstrap nao encontrado"
+  fresh_history="$(jq -e 'select(type == "array" and length > 0)
+    | select(all(.[]; (keys | sort) == ["checksum","script","version"]
+      and (.version | test("^[0-9]+(\\.[0-9]+)*$"))
+      and (.script | type == "string")
+      and (.checksum == null or (.checksum | type == "number"))))
+    | select(([.[].version] | unique | length) == length)
+    | select(any(.[]; .script == "V9.4_2026.10.13__pcirn_fresh_roles.sql"))' \
+    "${fresh_migrations}")" || die "historico de bootstrap invalido ou sem evidencia de pcirn-fresh-v1"
+fi
+
 jq -n \
   --arg version "${version}" \
   --arg commit "${commit}" \
@@ -116,6 +131,7 @@ jq -n \
   --arg solrRef "${registry}/${owner}/dspace-pcirn-solr@${solr_digest}" \
   --arg frontendRef "${registry}/${owner}/dspace-pcirn-angular@${angular_digest}" \
   --argjson migrations "${history}" \
+  --argjson freshMigrations "${fresh_history}" \
   '{
      schema_version: 1,
      version: $version,
@@ -124,7 +140,9 @@ jq -n \
        solr: $solrRef,
        frontend: $frontendRef
      },
-     database: { migrations: $migrations },
+     database: ({ migrations: $migrations } +
+       (if $freshMigrations == null then {} else
+         {fresh_bootstrap: "pcirn-fresh-v1", fresh_migrations: $freshMigrations} end)),
      source: {
        commit: $commit,
        angularCommit: (if $angularCommit == "" then null else $angularCommit end)

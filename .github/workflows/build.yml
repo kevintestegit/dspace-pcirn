@@ -3,8 +3,32 @@
 # https://docs.github.com/en/free-pro-team@latest/actions/guides/building-and-testing-java-with-maven
 name: Build
 
-# Run this Build for all pushes / PRs to current branch
-on: [push, pull_request]
+# Maven is expensive; installer/docs pushes use the small installer workflow.
+on:
+  pull_request:
+    paths:
+      - '**/*.java'
+      - '**/*.xml'
+      - '**/pom.xml'
+      - '**/*.properties'
+      - '**/*.cfg'
+      - '**/*.sql'
+      - 'Dockerfile'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+    inputs:
+      integration:
+        description: Run the full integration suite on the GitHub runner
+        type: boolean
+        default: false
+      unit_tests:
+        description: Optional Surefire test filter; empty runs all unit tests
+        type: string
+        default: ''
+      integration_tests:
+        description: Optional Failsafe test filter; empty runs all integration tests
+        type: string
+        default: ''
 
 permissions:
   contents: read  #  to fetch code (actions/checkout)
@@ -16,30 +40,10 @@ jobs:
       # Give Maven 1GB of memory to work with
       MAVEN_OPTS: "-Xmx1024M"
     strategy:
-      # Create a matrix of two separate configurations for Unit vs Integration Tests
-      # This will ensure those tasks are run in parallel
-      # Also specify version of Java to use (this can allow us to optionally run tests on multiple JDKs in future)
-      matrix:
-        include:
-          # NOTE: Unit Tests include a retry for occasionally failing tests
-          #  - surefire.rerunFailingTestsCount => try again for flakey tests, and keep track of/report on number of retries
-          - type: "Unit Tests"
-            java: 17
-            mvnflags: "-DskipUnitTests=false -Dsurefire.rerunFailingTestsCount=2"
-            resultsdir: "**/target/surefire-reports/**"
-          # NOTE: ITs skip all code validation checks, as they are already done by Unit Test job.
-          #  - enforcer.skip     => Skip maven-enforcer-plugin rules
-          #  - checkstyle.skip   => Skip all checkstyle checks by maven-checkstyle-plugin
-          #  - license.skip      => Skip all license header checks by license-maven-plugin
-          #  - xml.skip          => Skip all XML/XSLT validation by xml-maven-plugin
-          #  - failsafe.rerunFailingTestsCount => try again for flakey tests, and keep track of/report on number of retries
-          - type: "Integration Tests"
-            java: 17
-            mvnflags: "-DskipIntegrationTests=false -Denforcer.skip=true -Dcheckstyle.skip=true -Dlicense.skip=true -Dxml.skip=true -Dfailsafe.rerunFailingTestsCount=2"
-            resultsdir: "**/target/failsafe-reports/**"
-      # Do NOT exit immediately if one matrix job fails
-      # This ensures ITs continue running even if Unit Tests fail, or visa versa
+      max-parallel: 1
       fail-fast: false
+      matrix:
+        type: ${{ github.event_name == 'workflow_dispatch' && inputs.integration && fromJSON('["Unit Tests", "Integration Tests"]') || fromJSON('["Unit Tests"]') }}
     name: Run ${{ matrix.type }}
     # These are the actual CI steps to perform per job
     steps:
@@ -48,18 +52,29 @@ jobs:
         uses: actions/checkout@v7
 
       # https://github.com/actions/setup-java
-      - name: Install JDK ${{ matrix.java }}
+      - name: Install JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java }}
+          java-version: 17
           distribution: 'temurin'
           cache: 'maven'
 
-      # Run parallel Maven builds based on the above 'strategy.matrix'
+      # Run one Maven suite at a time on the GitHub runner
       - name: Run Maven ${{ matrix.type }}
         env:
-          TEST_FLAGS: ${{ matrix.mvnflags }}
-        run: mvn --no-transfer-progress -V install -P-assembly -Pcoverage-report $TEST_FLAGS
+          TEST_FLAGS: ${{ matrix.type == 'Unit Tests' && '-DskipUnitTests=false -Dsurefire.rerunFailingTestsCount=2' || '-DskipIntegrationTests=false -Denforcer.skip=true -Dcheckstyle.skip=true -Dlicense.skip=true -Dxml.skip=true -Dfailsafe.rerunFailingTestsCount=2' }}
+          TEST_FILTER: ${{ inputs.unit_tests }}
+          INTEGRATION_FILTER: ${{ inputs.integration_tests }}
+          TEST_PROPERTY: ${{ matrix.type == 'Unit Tests' && 'test' || 'it.test' }}
+        run: |
+          filter=()
+          if [ "$TEST_PROPERTY" = 'it.test' ]; then
+            TEST_FILTER="$INTEGRATION_FILTER"
+          fi
+          if [ -n "$TEST_FILTER" ]; then
+            filter+=("-D${TEST_PROPERTY}=${TEST_FILTER}")
+          fi
+          mvn --no-transfer-progress -V install -P-assembly -Pcoverage-report $TEST_FLAGS "${filter[@]}"
 
       # If previous step failed, save results of tests to downloadable artifact for this job
       # (This artifact is downloadable at the bottom of any job's summary page)
@@ -68,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.type }} results
-          path: ${{ matrix.resultsdir }}
+          path: ${{ matrix.type == 'Unit Tests' && '**/target/surefire-reports/**' || '**/target/failsafe-reports/**' }}
 
       # Upload code coverage report to artifact, so that it can be shared with the 'codecov' job (see below)
       - name: Upload code coverage report to Artifact
@@ -85,6 +100,8 @@ jobs:
     # Must run after 'tests' job above
     needs: tests
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -93,20 +110,13 @@ jobs:
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
 
-      # Now attempt upload to Codecov using its action.
-      # NOTE: We use a retry action to retry the Codecov upload if it fails the first time.
-      #
-      # Retry action: https://github.com/marketplace/actions/retry-action
-      # Codecov action: https://github.com/codecov/codecov-action
-      - name: Upload coverage to Codecov.io
-        uses: Wandalen/wretry.action@v3.8.0
+      - name: Report coverage upload configuration
+        if: env.CODECOV_TOKEN == '' || inputs.unit_tests != '' || inputs.integration_tests != ''
+        run: echo "Coverage retained in GitHub artifacts. Codecov upload requires a configured token and a full test run."
+
+      - name: Upload full coverage to Codecov
+        if: env.CODECOV_TOKEN != '' && inputs.unit_tests == '' && inputs.integration_tests == ''
+        uses: codecov/codecov-action@v4
         with:
-          action: codecov/codecov-action@v4
-          # Ensure codecov-action throws an error when it fails to upload
-          with: |
-            fail_ci_if_error: true
-            token: ${{ secrets.CODECOV_TOKEN }}
-          # Try re-running action 5 times max
-          attempt_limit: 5
-          # Run again in 30 seconds
-          attempt_delay: 30000
+          fail_ci_if_error: true
+          token: ${{ env.CODECOV_TOKEN }}

@@ -104,7 +104,8 @@ public class VersionHistoryRestRepositoryIT extends AbstractControllerIntegratio
 
     @Test
     public void findOnePublicVersionHistoryTest() throws Exception {
-        getClient().perform(get("/api/versioning/versionhistories/" + versionHistory.getID()))
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/versioning/versionhistories/" + versionHistory.getID()))
                    .andExpect(status().isOk())
                    .andExpect(jsonPath("$", is(VersionHistoryMatcher.matchEntry(versionHistory))))
                    .andExpect(jsonPath("$._links.versions.href", Matchers.allOf(Matchers.containsString(
@@ -175,14 +176,16 @@ public class VersionHistoryRestRepositoryIT extends AbstractControllerIntegratio
     @Test
     public void findOneWrongIDTest() throws Exception {
         int wrongVersionHistoryId = (versionHistory.getID() + 5) * 57;
-        getClient().perform(get("/api/versioning/versionhistories/" + wrongVersionHistoryId))
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/versioning/versionhistories/" + wrongVersionHistoryId))
                    .andExpect(status().isNotFound());
 
     }
     @Test
     public void findVersionsOneWrongIDTest() throws Exception {
         int wrongVersionHistoryId = (versionHistory.getID() + 5) * 57;
-        getClient().perform(get("/api/versioning/versionhistories/" + wrongVersionHistoryId + "/versions"))
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/versioning/versionhistories/" + wrongVersionHistoryId + "/versions"))
                    .andExpect(status().isNotFound());
 
     }

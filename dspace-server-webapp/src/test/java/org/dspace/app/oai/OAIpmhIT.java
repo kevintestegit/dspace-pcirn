@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 
 import com.lyncode.xoai.dataprovider.core.XOAIManager;
 import com.lyncode.xoai.dataprovider.exceptions.ConfigurationException;
@@ -29,6 +30,8 @@ import com.lyncode.xoai.dataprovider.services.impl.BaseDateProvider;
 import com.lyncode.xoai.dataprovider.xml.xoaiconfig.Configuration;
 import com.lyncode.xoai.dataprovider.xml.xoaiconfig.ContextConfiguration;
 import org.dspace.app.rest.test.AbstractControllerIntegrationTest;
+import org.dspace.app.rest.utils.DSpaceConfigurationInitializer;
+import org.dspace.app.rest.utils.DSpaceKernelInitializer;
 import org.dspace.builder.CollectionBuilder;
 import org.dspace.builder.CommunityBuilder;
 import org.dspace.content.Community;
@@ -43,6 +46,8 @@ import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -56,7 +61,19 @@ import org.springframework.test.context.TestPropertySource;
 // Ensure the OAI SERVER IS ENABLED before any tests run.
 // This annotation overrides default DSpace config settings loaded into Spring Context
 @TestPropertySource(properties = {"oai.enabled = true"})
+@org.springframework.test.context.ContextConfiguration(inheritInitializers = false,
+    initializers = {DSpaceKernelInitializer.class, OAIpmhIT.EnableOAI.class})
 public class OAIpmhIT extends AbstractControllerIntegrationTest {
+
+    /** Enables this optional module after DSpace's configuration source is installed. */
+    public static class EnableOAI extends DSpaceConfigurationInitializer {
+        @Override
+        public void initialize(ConfigurableApplicationContext applicationContext) {
+            super.initialize(applicationContext);
+            applicationContext.getEnvironment().getPropertySources().addFirst(
+                new MapPropertySource("oai-test", Map.of("oai.enabled", true)));
+        }
+    }
 
     @Autowired
     private ConfigurationService configurationService;

@@ -17,7 +17,6 @@ import static org.hamcrest.Matchers.startsWith;
 
 import java.util.List;
 
-import org.dspace.AbstractUnitTest;
 import org.dspace.matomo.model.MatomoRequestDetails;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
@@ -27,7 +26,7 @@ import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 
-public class MatomoRequestBuilderTest extends AbstractUnitTest {
+public class MatomoRequestBuilderTest {
 
     MatomoRequestBuilder matomoRequestBuilder;
 

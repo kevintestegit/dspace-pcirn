@@ -170,7 +170,7 @@ public class VocabularyRestRepositoryIT extends AbstractControllerIntegrationTes
 
     @Test
     public void findOneSRSC_Test() throws Exception {
-        getClient().perform(get("/api/submission/vocabularies/srsc"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/submission/vocabularies/srsc"))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$", is(
                             VocabularyMatcher.matchProperties("srsc", "srsc", false, true)
@@ -179,7 +179,7 @@ public class VocabularyRestRepositoryIT extends AbstractControllerIntegrationTes
 
     @Test
     public void findOneCommonTypesTest() throws Exception {
-        getClient().perform(get("/api/submission/vocabularies/common_types"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/submission/vocabularies/common_types"))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$", is(
                             VocabularyMatcher.matchProperties("common_types", "common_types", true, false)

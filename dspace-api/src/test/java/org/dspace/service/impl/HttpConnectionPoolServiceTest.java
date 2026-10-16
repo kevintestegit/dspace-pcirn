@@ -75,9 +75,7 @@ public class HttpConnectionPoolServiceTest
                 .withStatusCode(HttpStatus.OK_200)
         );
 
-        try (CloseableHttpClient httpClient = instance.getClient()) {
-            assertNotNull("getClient should always return a client", httpClient);
-
+        try (instance) {
             URI uri = new URIBuilder()
                     .setScheme("http")
                     .setHost("localhost")
@@ -85,11 +83,16 @@ public class HttpConnectionPoolServiceTest
                     .setPath(testPath)
                     .build();
             System.out.println(uri.toString());
-            HttpUriRequest request = RequestBuilder.get(uri)
-                    .build();
-            try (CloseableHttpResponse response = httpClient.execute(request)) {
-                assertEquals("Response status should be OK", HttpStatus.OK_200,
-                        response.getStatusLine().getStatusCode());
+            // Closing a borrower must not close the service's shared pool.
+            for (int requestNumber = 0; requestNumber < 2; requestNumber++) {
+                try (CloseableHttpClient httpClient = instance.getClient()) {
+                    assertNotNull("getClient should always return a client", httpClient);
+                    HttpUriRequest request = RequestBuilder.get(uri).build();
+                    try (CloseableHttpResponse response = httpClient.execute(request)) {
+                        assertEquals("Response status should be OK", HttpStatus.OK_200,
+                            response.getStatusLine().getStatusCode());
+                    }
+                }
             }
         }
     }

@@ -178,7 +178,7 @@ public class SystemWideAlertRestRepositoryIT extends AbstractControllerIntegrati
 
 
     @Test
-    public void findOneUnauthorizedTest() throws Exception {
+    public void findOneNonAdminTest() throws Exception {
         // Create two alert entries in the db to fully test the findOne method
         // Note: It is not possible to create two alerts through the REST API
         context.turnOffAuthorisationSystem();
@@ -199,7 +199,8 @@ public class SystemWideAlertRestRepositoryIT extends AbstractControllerIntegrati
         context.restoreAuthSystemState();
 
         // When the alert is active and the user is not an admin, the user will be able to see the alert
-        getClient().perform(get("/api/system/systemwidealerts/" + systemWideAlert1.getID()))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(
+                get("/api/system/systemwidealerts/" + systemWideAlert1.getID()))
                             .andExpect(status().isOk())
                             .andExpect(
                                     jsonPath("$", allOf(
@@ -215,7 +216,8 @@ public class SystemWideAlertRestRepositoryIT extends AbstractControllerIntegrati
 
         // When the alert is inactive and the user is not an admin, the user will not be able to see the presence of the
         // alert and a 404 will be returned by the findOne endpoint
-        getClient().perform(get("/api/system/systemwidealerts/" + systemWideAlert2.getID()))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(
+                get("/api/system/systemwidealerts/" + systemWideAlert2.getID()))
                    .andExpect(status().isNotFound());
 
     }

@@ -23,6 +23,10 @@ FAKE = installer.FAKE.replace(
               (failure == 'late-connections' and db['connection_checks'] > 1) else '0')
     elif 'SELECT count(*) FROM pg_namespace' in query: print('1' if failure == 'schemas' else '0')
     elif 'FROM pg_tables' in query: print(json.dumps(sorted(db.get('tables', {}))))
+    elif 'FROM pg_sequences' in query: print(json.dumps(sorted(db.get('sequences', {}))))
+    elif 'SELECT row_to_json(s)' in query:
+        name = query.split('public."')[1].split('"')[0]
+        print(json.dumps(db['sequences'][name]))
     elif query.startswith('COPY '):
         import csv
         name = query.split('public."')[1].split('"')[0]
@@ -65,13 +69,18 @@ class DataMigrationTests(unittest.TestCase):
                                     'internal_id': file.name, 'store_number': 0, 'deleted': False,
                                     'size_bytes': file.stat().st_size, 'checksum_algorithm': 'MD5',
                                     'checksum': hashlib.md5(file.read_bytes()).hexdigest()}]
+        self.sequence_states = {'item_seq': {'last_value': 42, 'is_called': True}}
+        self.sequences = {name: {'state': state,
+                          'sha256': hashlib.sha256((json.dumps(state, sort_keys=True) + '\n').encode()).hexdigest()}
+                          for name, state in self.sequence_states.items()}
         self.report()
         self.dump()
         self.archive()
         self.hashes()
 
     def report(self):
-        report = {'schema_version': 1, 'tables': {}, 'verified_files': 1,
+        report = {'schema_version': 1, 'tables': {}, 'sequences': self.sequences,
+                  'verified_files': 1,
                   'assetstore': migration.tree_fingerprint(self.assets),
                   'solr': migration.tree_fingerprint(self.solr)}
         for name, rows in self.tables.items():
@@ -83,7 +92,8 @@ class DataMigrationTests(unittest.TestCase):
 
     def dump(self):
         (self.package / 'database.dump').write_text('PGDMP' + json.dumps(
-            {'rows': self.tables['schema_version'], 'tables': self.tables}))
+            {'rows': self.tables['schema_version'], 'tables': self.tables,
+             'sequences': self.sequence_states}))
 
     def archive(self):
         for name, source in (('assetstore', self.assets), ('solr', self.solr)):
@@ -103,6 +113,7 @@ class DataMigrationTests(unittest.TestCase):
     def test_import_then_install_preserves_rows_files_and_skips_applied_migrations(self):
         self.cli()
         self.assertEqual(self.fixture.state()['tables'], self.tables)
+        self.assertEqual(self.fixture.state()['sequences'], self.sequence_states)
         self.assertEqual(migration.tree_fingerprint(self.root / 'data/solr'),
                          migration.tree_fingerprint(self.solr))
         self.assertFalse((self.root / 'installed.json').exists())
@@ -111,6 +122,22 @@ class DataMigrationTests(unittest.TestCase):
         self.fixture.install()
         self.assertFalse(any('migrate' in args for _, args in self.fixture.calls()))
         self.assertTrue((self.root / 'installed.json').exists())
+
+    def test_sequence_last_value_and_is_called_must_match_source(self):
+        self.cli('install')
+        for changed in ({'last_value': 43, 'is_called': True},
+                        {'last_value': 42, 'is_called': False}):
+            with self.subTest(sequence=changed):
+                state = self.fixture.state()
+                state['sequences']['item_seq'] = changed
+                (self.base / 'fake-state.json').write_text(json.dumps(state))
+                self.fixture.cli('verify-data', '--expected', self.package / 'source-report.json',
+                                 success=False)
+                failure = json.loads((self.root / 'data-verification.json').read_text())
+                self.assertEqual(failure['status'], 'failed')
+                self.assertEqual(failure['error'], 'Data differs from the source report')
+                state['sequences']['item_seq'] = self.sequence_states['item_seq']
+                (self.base / 'fake-state.json').write_text(json.dumps(state))
 
     def test_optional_install_imports_before_start(self):
         self.cli('install')
@@ -167,6 +194,17 @@ class DataMigrationTests(unittest.TestCase):
                 (self.root / 'operation.json').unlink()
                 (self.base / 'fake-state.json').unlink()
                 self.tables[table] = old
+
+    def test_fresh_profile_mismatch_refused_before_restore(self):
+        path = self.package / 'source-report.json'
+        report = json.loads(path.read_text())
+        report['database_profile'] = 'fresh'
+        path.write_text(json.dumps(report))
+        self.hashes()
+        result = self.cli(success=False)
+        self.assertIn('Database profile differs', result.stderr)
+        self.assertFalse(any('--dbname' in args for _, args in self.fixture.calls()))
+        self.assertFalse((self.root / 'operation.json').exists())
 
     def test_corrupt_package_rejected_before_restore(self):
         with (self.package / 'database.dump').open('ab') as stream:
@@ -256,7 +294,7 @@ class DataMigrationTests(unittest.TestCase):
         self.tables['schema_version'] *= 2
         self.dump(); self.hashes()
         result = self.cli(success=False)
-        self.assertIn('duplicada', result.stderr)
+        self.assertIn('duplicate', result.stderr)
         self.assertFalse((self.root / 'data-import.json').exists())
 
     def test_large_multiline_metadata_survives_csv_verification(self):

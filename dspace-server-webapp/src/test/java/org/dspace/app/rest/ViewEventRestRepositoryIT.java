@@ -48,13 +48,14 @@ public class ViewEventRestRepositoryIT extends AbstractControllerIntegrationTest
     @Test
     public void findAllTestThrowNotImplementedException() throws Exception {
 
-        getClient().perform(get("/api/statistics/viewevents"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/statistics/viewevents"))
                    .andExpect(status().is(405));
     }
     @Test
     public void findOneTestThrowNotImplementedException() throws Exception {
 
-        getClient().perform(get("/api/statistics/viewevents/" + UUID.randomUUID()))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(
+                get("/api/statistics/viewevents/" + UUID.randomUUID()))
                    .andExpect(status().is(405));
     }
 

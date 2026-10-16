@@ -86,3 +86,21 @@ output/
 # Snapshot local de estabilizacao: contem os configs nao versionados
 # (.env, smtp.env, local.cfg). NUNCA versionar.
 .estabilizacao-backup/
+__pycache__/
+
+# Local dependency caches, transfer packages and database exports
+node_modules/
+.angular/
+.pytest_cache/
+*.py[cod]
+*.dump
+*.key
+# Upstream SAML fixtures are test credentials, not operator keys.
+!dspace-saml2/src/test/resources/*.key
+!dspace-server-webapp/src/test/resources/org/dspace/app/rest/*-private.key
+.env.*
+!.env.example
+!.env.production.example
+/release-manifest.json
+/dspacepcirn-manager.tar.gz*
+/data-package.json

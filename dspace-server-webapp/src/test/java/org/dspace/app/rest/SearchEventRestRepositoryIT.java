@@ -37,13 +37,14 @@ public class SearchEventRestRepositoryIT extends AbstractControllerIntegrationTe
     @Test
     public void findAllTestThrowNotImplementedException() throws Exception {
 
-        getClient().perform(get("/api/statistics/searchevents"))
+        getClient(getAuthToken(eperson.getEmail(), password)).perform(get("/api/statistics/searchevents"))
                    .andExpect(status().is(405));
     }
     @Test
     public void findOneTestThrowNotImplementedException() throws Exception {
 
-        getClient().perform(get("/api/statistics/searchevents/" + UUID.randomUUID()))
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/statistics/searchevents/" + UUID.randomUUID()))
                    .andExpect(status().is(405));
     }
 

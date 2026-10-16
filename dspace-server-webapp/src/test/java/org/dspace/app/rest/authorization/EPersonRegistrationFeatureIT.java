@@ -9,6 +9,7 @@ package org.dspace.app.rest.authorization;
 
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,7 +56,14 @@ public class EPersonRegistrationFeatureIT extends AbstractControllerIntegrationT
     @Before
     public void setUp() throws Exception {
         super.setUp();
+        configurationService.setProperty("user.registration", true);
         epersonRegistrationFeature = authorizationFeatureService.find(EPersonRegistrationFeature.NAME);
+    }
+
+    @Test
+    public void pcirnRegistrationIsDisabledByDefault() {
+        configurationService.reloadConfig();
+        assertFalse(configurationService.getBooleanProperty("user.registration"));
     }
 
     @Test

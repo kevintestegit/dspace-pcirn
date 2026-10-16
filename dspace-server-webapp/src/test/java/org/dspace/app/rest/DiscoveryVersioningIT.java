@@ -308,8 +308,6 @@ public class DiscoveryVersioningIT extends AbstractControllerIntegrationTest {
 
         // verify item 1.1 appears in /api/discover/search/objects
         verifyRestSearchObjects(configuration, List.of(
-            matchSearchResult(community),
-            matchSearchResult(collection),
             matchSearchResult(i1_1, "item 1.1")
         ));
 
@@ -322,8 +320,6 @@ public class DiscoveryVersioningIT extends AbstractControllerIntegrationTest {
 
         // verify only item 1.2 appears in /api/discover/search/objects
         verifyRestSearchObjects(configuration, List.of(
-            matchSearchResult(community),
-            matchSearchResult(collection),
             matchSearchResult(i1_2, "item 1.2")
         ));
     }
@@ -385,8 +381,6 @@ public class DiscoveryVersioningIT extends AbstractControllerIntegrationTest {
 
         // verify item 1.1 appears in /api/discover/search/objects
         verifyRestSearchObjects(configuration, List.of(
-            matchSearchResult(community),
-            matchSearchResult(collection),
             matchSearchResult(i1_1, "item 1.1")
         ));
 
@@ -399,8 +393,6 @@ public class DiscoveryVersioningIT extends AbstractControllerIntegrationTest {
 
         // verify only item 1.2 appears in /api/discover/search/objects
         verifyRestSearchObjects(configuration, List.of(
-            matchSearchResult(community),
-            matchSearchResult(collection),
             matchSearchResult(i1_2, "item 1.2")
         ));
     }

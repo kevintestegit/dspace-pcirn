@@ -1,138 +1,160 @@
 # DSPACEPCIRN
 
-`install.sh` instala uma stack dedicada; `dspacepcirn` administra essa instalação.
-O instalador não instala pacotes do sistema. Pré-requisitos: Linux, Bash, Python
-3.9+, Docker Engine, Compose >= 2.20 e `psql`, `pg_dump`, `pg_restore` (cliente
-PostgreSQL da mesma versão major do servidor), OpenSSL para PostgreSQL em Docker. Execute como usuário
-administrativo com acesso ao Docker e leitura/escrita dos dados do Solr, incluindo
-arquivos pertencentes ao UID do container; normalmente root no servidor dedicado.
-O administrador fornece banco **dedicado**, credenciais, certificados TLS e os privilégios
-necessários para Flyway e restore. O banco pode ser externo ou provisionado em Docker pelo wizard.
+O comando principal é `sudo dspacepcirn`. Em Ubuntu 24.04 AMD64/ARM64, o gerenciador
+prepara as dependências ausentes após uma confirmação, consulta releases oficiais e
+provisiona PostgreSQL em Docker por padrão. Os comandos não interativos permanecem
+disponíveis com configuração e manifesto explícitos.
 
-## Menu e instalação interativa
+A interface é concisa e em inglês. Após configurar o PostgreSQL, pergunta
+`Import data? [y/N]`. Ao aceitar, obtém a origem pelo asset oficial `data-package.json`
+da RC e baixa um pacote HTTPS verificado, sem pedir URL ou SHA-256 ao administrador.
+Consulte [hospedagem e preparação do pacote](OPERACOES.md#importacao). Sem importação, inicializa
+um repositório vazio numa release compatível. Detalhes internos ficam em `ROOT/installer.log`.
 
-Em uma VM Ubuntu limpa, instale Bash, Python 3, OpenSSL e os clientes PostgreSQL
-do mesmo major do banco (15, 16 ou 17 no modo Docker). Exemplo para PostgreSQL 17,
-após configurar o [repositório oficial PostgreSQL](https://www.postgresql.org/download/linux/ubuntu/):
+## Primeiro acesso
 
-```bash
-sudo apt-get update
-sudo apt-get install -y bash python3 openssl postgresql-client-17
-```
-
-Instale Docker Engine e o plugin Compose pelo
-[repositório oficial Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository).
-Não é necessário instalar PostgreSQL Server no host. Confirme `docker compose version`,
-`psql --version`, `pg_dump --version` e `pg_restore --version` antes de continuar.
-
-Na cópia revisada da release, instale somente o gerenciador:
+Use uma cópia revisada deste código ou o pacote `dspacepcirn-manager.tar.gz` da
+release oficial de `kevintestegit/dspace-pcirn`. Confira o SHA-256 publicado no
+GitHub antes de extrair o pacote. O pacote é autossuficiente e dispensa Git.
 
 ```bash
+# Na árvore do projeto:
 sudo bash deploy/nti/install-manager.sh
-cd /
+# Ou, dentro do pacote verificado e extraído:
+sudo bash install-manager.sh
 sudo dspacepcirn
 ```
 
-O comando regular `/usr/local/bin/dspacepcirn` executa a cópia autossuficiente em
-`/usr/local/lib/dspacepcirn`, incluindo os módulos Python, templates Compose e SMTP. Depois
-desse passo o checkout pode ser removido; nenhum subcomando depende dele ou do
-diretório corrente. A instalação recusa comando ou biblioteca preexistentes sem
-sobrescrevê-los. Os pré-requisitos do sistema continuam sendo responsabilidade
-do administrador; o gerenciador não executa apt nem altera outras stacks.
+O gerenciador global fica em `/usr/local/lib/dspacepcirn`; o comando regular fica em
+`/usr/local/bin/dspacepcirn`. O instalador do gerenciador recusa caminhos/comandos
+preexistentes. Não execute downloads como scripts nem use `curl | bash`.
 
-`./install.sh` sem argumentos abre o mesmo menu. O menu oferece instalação/retomada,
-status, diagnóstico, validação dos serviços, backup, exportação e verificação de dados.
-Os subcomandos abaixo continuam disponíveis sem interação. Para outra raiz, use
-`sudo dspacepcirn --root /srv/outra-instalacao`.
+**A RC4 publicada não contém o pacote novo nem a capacidade de inicialização vazia.**
+A seleção automática reconhece RCs pelo nome da tag, mesmo se o GitHub não as marcou
+como prerelease. A RC6 foi publicada com estas capacidades, builds AMD64/ARM64 e
+bootstrap vazio aprovado nas duas arquiteturas. O fluxo completo com banco vazio
+e com o acervo real foi validado em runner Ubuntu24.04 AMD64. Consulte
+[o relatório da entrega e as limitações](VALIDACAO.md).
 
-O wizard contém sete etapas, com validação antes de cada avanço:
+## Menu
 
-1. **Diagnóstico do servidor:** Ubuntu, ferramentas, Docker local, Compose, recursos,
-   imagens da arquitetura correta, portas livres e conflitos de rede.
-2. **Escolha do PostgreSQL:** somente **PostgreSQL em Docker** e **PostgreSQL externo**.
-   O modo externo solicita host, porta, banco dedicado vazio, usuário, senha e TLS,
-   e verifica conexão, ownership, permissões e versões dos clientes.
-3. **Importação de dados:** seleciona um pacote criado por `export-data`, verifica
-   SHA-256, relatório de origem e igualdade entre a release do pacote e a instalação.
-   A restauração efetiva ocorre na etapa 5, com o backend parado.
-4. **Configuração institucional:** nome, sigla, URLs HTTPS da interface e do REST,
-   seguida da validação completa de recursos e PostgreSQL.
-5. **Instalação:** chama `migrate-data` somente no destino vazio; chama `verify-data`
-   antes do deploy existente. O wizard não autoriza Flyway, mesmo se receber
-   `--authorize-migrations`: o pacote deve conter o histórico completo da release.
-6. **Validação dos serviços:** backend, Solr e interface precisam estar saudáveis,
-   e PostgreSQL precisa responder.
-7. **Relatório final:** `ROOT/report.json` registra release, modo do PostgreSQL,
-   URLs e conclusão das etapas, sem credenciais.
+1. Instalar DSpace, incluindo retomada de etapas concluídas.
+2. Atualizar DSpace, com backup e autorização própria para migrations.
+3. Fazer backup.
+4. Restaurar backup, com confirmação e backup de segurança.
+5. Verificar funcionamento.
+6. Configurações avançadas: diagnóstico, status, logs, exportação/verificação de
+   dados, seleção de versão, atualização do gerenciador e autenticação GHCR.
+0. Sair.
 
-O wizard exige um pacote de dados. Para inicialização de uma base nova sem acervo,
-use o comando direto `install --config ... --manifest ... --authorize-migrations`
-após revisar e autorizar a inicialização; esse comando permanece disponível para
-automação. Para um pacote de release antiga, instale primeiro essa mesma release,
-e só depois execute `update` com autorização explícita das migrations necessárias.
+Use `sudo dspacepcirn --root /srv/outra-instalacao` para outra raiz dedicada.
 
-### PostgreSQL em Docker
+## Instalação
 
-Informe uma imagem oficial `postgres@sha256:DIGEST_REAL_64_HEX`, PostgreSQL 15, 16
-ou 17, com o mesmo major dos clientes locais. O instalador confirma a versão antes
-de criar o volume. PostgreSQL 18+ usa outro layout de dados e é recusado neste fluxo.
-O volume externo persistente e o container têm nome derivado da raiz da instalação.
-Um recurso preexistente é recusado; recursos criados pelo wizard só são reutilizados
-quando o diário e os rótulos de propriedade coincidem. Nenhum volume é excluído.
+O fluxo tem sete checkpoints privados:
 
-A porta escolhida é publicada somente em `127.0.0.1` (padrão 55432). O backend usa
-`postgres:5432` na rede privada do Compose. Todas as conexões TCP exigem TLS e SCRAM;
-o certificado local é verificado por `verify-ca`. A senha administrativa é aleatória,
-lida de arquivo protegido, e o usuário da aplicação não recebe superuser, createdb
-ou createrole. O certificado e a chave ficam em `ROOT/postgres-tls`; a chave tem
-permissão 600 e pertence ao usuário PostgreSQL da imagem. O certificado tem validade
-de dez anos; sua substituição exige manutenção planejada antes de expirar.
+1. Diagnóstico: distribuição, versão, arquitetura, CPU, RAM, disco, rede, Docker,
+   Compose, Python, OpenSSL e clientes PostgreSQL. Ubuntu 24.04 exige pelo menos
+   2 CPUs, 8 GiB de RAM total, 4 GiB disponíveis e 30 GiB livres. Dependências vêm
+   de Ubuntu, Docker e PostgreSQL oficiais, com chaves APT verificadas. Docker só é
+   iniciado/habilitado se necessário. Não se instala PostgreSQL Server no host.
+   Portas locais e subnet Docker livres são escolhidas automaticamente.
+2. Preparação do PostgreSQL: Docker é padrão, PostgreSQL 16 oficial fixado pelo
+   digest da arquitetura, cliente major 16, porta local livre, banco/usuário `dspace`
+   e senhas aleatórias. No modo externo, informe host, porta, banco e credenciais;
+   o padrão é `verify-full` usando CAs do sistema. CA particular ou certificado
+   cliente são configurados em `--config`, conforme a seção avançada abaixo.
+3. Importação opcional: `Import data? [y/N]`. A importação automática usa o pacote
+   publicado para essa release e verifica checksums, versão, histórico e relatório
+   antes de restaurar. O destino precisa estar vazio. Pacotes locais continuam
+   disponíveis por `--data-package`; não há download ao escolher um repositório vazio.
+4. Nome e endereço público HTTPS do repositório. O REST usa o mesmo host em `/server`.
+   Configurações avançadas podem definir URLs separadas por `--config`.
+5. Instalação: migrations de banco vazio exigem autorização explícita; migração
+   utiliza `migrate-data` e `verify-data`, sem autorizar migrations automaticamente.
+6. Saúde: backend, Angular, Solr e PostgreSQL precisam responder corretamente.
+7. Relatório: `ROOT/report.json`, sem credenciais. Erros deixam `ROOT/diagnostic.json`
+   com a etapa pendente e uma mensagem segura.
 
-### Retomada e correção de erros
+A release estável mais recente tem preferência; na ausência dela, o administrador
+confirma a RC mais recente, identificada como versão de testes. O manifesto é baixado
+do asset oficial, conferido com o SHA-256 do GitHub e com o commit da tag. As três
+imagens precisam ser dos repositórios oficiais e suportar a arquitetura Docker.
+Downloads têm limites e timeout. Falha de rede/autenticação não executa migrations.
 
-`ROOT/wizard.json` guarda entradas e etapas concluídas; ele contém credenciais e
-recebe permissão 600, dentro de uma raiz 700. A senha é digitada sem eco. Configurações,
-credenciais temporárias e relatórios também usam 600. A CLI não retransmite stderr
-de ferramentas, que poderia revelar senhas. Mantenha todos esses arquivos privados.
+### Banco vazio e histórico Flyway
 
-Em erro recuperável, corrija o problema e escolha tentar novamente, ou saia e execute
-`sudo dspacepcirn` para retomar na etapa pendente. Em automação, repita o mesmo comando,
-com a mesma configuração, manifesto e pacote. Antes do provisionamento do banco,
-é possível corrigir as credenciais em `--config`; após essa etapa, mudanças de
-configuração são recusadas para proteger o destino. Uma importação já verificada não é
-executada de novo; manifesto ou pacote alterados bloqueiam a retomada.
+As migrations institucionais históricas não foram alteradas. Elas dependem de
+comunidades e metadados existentes. O perfil explícito `DB_PROFILE: "fresh"`
+(`db.pcirn.profile=fresh` no backend) carrega as migrations DSpace básicas e a
+inicialização dos grupos Anonymous, Administrator, Usuarios_Logados, NUGECID e
+PCIRN_Depositantes, sem importar acervo, comunidades,
+coleções ou usuários institucionais. O histórico próprio está em
+`scripts/flyway-fresh-history.json`; o manifesto deve declarar
+`database.fresh_bootstrap=pcirn-fresh-v1` e `database.fresh_migrations`.
 
-Se houver `operation.json` (restauração/deploy interrompido) ou `postgres.json` com
-estado `creating`, a retomada fica bloqueada para revisão manual. Não remova o diário
-para forçar nova importação, não limpe a base e não execute `down -v`. Examine o diário,
-o staging e os backups, preserve os recursos e determine quais operações concluíram.
-Para falha durante a primeira restauração, use uma nova raiz e um novo banco vazio
-após preservar o destino interrompido; o wizard não reinicializa esse destino.
-Recuperação de instalação já existente continua pelos comandos explícitos de
-restore/rollback documentados abaixo, com autorização própria.
+O wizard verifica essa declaração e `database fresh-capability` na imagem antes de
+iniciar. Imagens RC4 são recusadas para instalação nova. O perfil deve ser preservado
+em backups, restaurações e atualizações. Uma base institucional não pode trocar para
+`fresh`; o histórico padrão permanece integral. Não se fabricam registros Flyway
+para representar SQL que não foi executado.
 
-As portas HTTP internas não validam a publicação HTTPS. Configure o proxy reverso
-conforme [exemplo existente](../nginx/pcirn.conf.example), certificados e SMTP antes
-de liberar acesso aos usuários. O relatório confirma os serviços internos.
+### PostgreSQL gerenciado e retomada
 
-### Automação das sete etapas
+O banco publica apenas em `127.0.0.1`; o backend usa `postgres:5432` na rede privada.
+TCP exige TLS e SCRAM. O usuário da aplicação não recebe superuser, createdb ou
+createrole. TLS fica em `ROOT/postgres-tls`; chave privada e senha usam 600, com
+ownership adequado à imagem. Certificado local verificado por CA, válido por dez
+anos, precisa de manutenção antes de expirar.
+
+O volume externo persistente nunca é apagado. Nome, token e raiz são registrados
+em `postgres.json` e nos rótulos do volume. Antes de reutilizar um container, o
+instalador confere projeto Compose, imagem e mounts do volume, TLS e senha.
+Um diário `creating` só pode terminar o provisionamento se os recursos pertencem
+à instalação e os arquivos privados estão completos. Se a criação da função já
+concluiu, a conexão/ownership são conferidos sem redefinir senha. Se não concluiu,
+só um banco sem objetos pode terminar essa operação, em transação. Recursos
+estranhos, desaparecidos ou incompletos exigem revisão; nada é recriado para
+contornar a dúvida. Isso inclui instalações RC4 parcialmente provisionadas.
+
+`wizard.json` e configurações usam 600 numa raiz 700. A retomada conserva manifesto,
+configuração e pacote. Não remova diários para forçar importação; nunca execute
+`down -v`. Uma inicialização nova interrompida confere o histórico antes de continuar:
+se migrations já terminaram, apenas retoma serviços; migrations pendentes requerem
+nova autorização. Restauração interrompida exige revisão de staging e backups.
+
+Os serviços internos não configuram o DNS/proxy público. Prepare HTTPS usando o
+[proxy existente](../nginx/pcirn.conf.example) e configure SMTP antes de abrir acesso.
+O relatório de sucesso valida os serviços internos; não comprova publicação HTTPS.
+
+### Automação
 
 ```bash
+# Migração, contrato existente:
 sudo dspacepcirn install --wizard --root /srv/dspacepcirn \
   --config /etc/dspacepcirn/config.json --manifest /backup/release.json \
   --data-package /backup/pacote
-# Equivalente:
-sudo ./install.sh --root /srv/dspacepcirn \
-  --config /etc/dspacepcirn/config.json --manifest /backup/release.json \
-  --data-package /backup/pacote
+# Instalação vazia, somente com imagem/manifesto compatíveis:
+sudo dspacepcirn install --wizard --installation-mode new \
+  --root /srv/dspacepcirn --config /etc/dspacepcirn/config.json \
+  --manifest /backup/release.json --authorize-migrations
 ```
 
-Para Docker, acrescente `PG_MODE: "docker"` e `PG_IMAGE` à configuração abaixo,
-e use `DB_URL` com host `127.0.0.1`, porta explícita, `sslmode=verify-ca` e
-`sslrootcert=/srv/dspacepcirn/postgres-tls/server.crt` (ajuste à raiz escolhida).
-Esse certificado é criado pelo wizard. Para externo, `PG_MODE: "external"` é opcional.
-`DSPACE_NAME` e `DSPACE_SHORTNAME` são opcionais na automação. Nenhuma senha deve
-ser passada na linha de comando.
+A automação preserva os argumentos técnicos explícitos e não instala dependências
+sem interação. Os clientes major diferentes são selecionados por caminho próprio,
+sem mudar alternativas globais. Para Docker, configure `PG_MODE`, `PG_IMAGE`,
+`PG_MAJOR` e uma URL local com `sslmode=verify-ca` e CA gerenciada. Para banco externo,
+`PG_MODE: "external"` é opcional.
+
+### Atualizar somente o gerenciador
+
+`sudo dspacepcirn update-manager` obtém o pacote oficial e verifica o digest do asset.
+Também é possível usar `--manager-package ARQUIVO --manager-sha256 HEX` após conferir
+um pacote local. A atualização confere os arquivos permitidos, recusa links/caminhos
+externos e mantém a biblioteca anterior. Não executa scripts baixados, não atualiza
+imagens DSpace nem acessa banco, documentos ou volumes. Pacotes são gerados por
+`python3 scripts/package-manager.py`; a pipeline anexa pacote e checksum à release.
+A RC4 não oferece esse asset e a atualização remota é recusada com mensagem clara.
 
 ## Configuração inicial
 
@@ -218,7 +240,7 @@ Todos aceitam `--root` (padrão `/srv/dspacepcirn`). Operações concorrentes s�
 bloqueadas. Erros retornam 1, argumentos inválidos 2 e interrupção 130.
 
 Para migrar o acervo na instalação inicial, use `install.sh --data-package DIRETÓRIO`.
-O [roteiro de migração](MIGRACAO.md) descreve preparação do pacote, configuração TLS,
+O [roteiro de migração](OPERACOES.md#importacao) descreve preparação do pacote, configuração TLS,
 SQL de provisionamento para o DBA, recusa de banco ocupado e
 recuperação de falhas. Nenhuma importação bem-sucedida é marcada como instalação
 concluída antes do deploy e healthcheck.
@@ -275,71 +297,21 @@ de backup avulso antes de qualquer alteração de dados, rollback apenas reinici
 a release anterior, sem exigir autorização de restore. Não apague o journal
 para forçar update.
 
-## Contrato esperado do pipeline GHCR — integração pendente
+## Contrato GHCR
 
-O pipeline paralelo deve publicar um arquivo JSON de release confiável com:
+A pipeline publica backend, Angular e Solr por digest para AMD64/ARM64, além do
+manifesto e do gerenciador verificável. `schema_version=1`, versão SemVer sem `v`,
+imagens GHCR com SHA-256 e histórico Flyway completo medido são obrigatórios.
+Checksums Flyway não são SHA-256 do SQL. O perfil fresh tem histórico próprio;
+repeatables não são aceitas por este contrato. Startup não executa migrations.
 
-```json
-{
-  "schema_version": 1,
-  "version": "1.0.0",
-  "images": {
-    "backend": "ghcr.io/ORGANIZACAO/backend@sha256:DIGEST_REAL_64_HEX",
-    "solr": "ghcr.io/ORGANIZACAO/solr@sha256:DIGEST_REAL_64_HEX",
-    "frontend": "ghcr.io/ORGANIZACAO/frontend@sha256:DIGEST_REAL_64_HEX"
-  },
-  "database": {
-    "migrations": [
-      {"version": "1", "script": "V1__exemplo.sql", "checksum": 123456789}
-    ]
-  }
-}
-```
-
-**Exemplo estrutural, deliberadamente não instalável.** version é SemVer e imagens
-usam apenas nomes GHCR minúsculos + SHA-256 real, nunca tags/latest. O pipeline
-versiona as três imagens e fornece o digest do índice/plataforma publicado.
-`database.migrations` é o histórico completo esperado após migrate de um banco
-vazio de homologação: valores version/script/checksum do Flyway efetivamente usados
-pela imagem, incluindo migrations Java (checksum null quando apropriado) e baseline
-se existente. Não derive checksum Flyway de SHA-256 do SQL. Entradas são únicas;
-version usa pontos, conforme persistida em schema_version. Mudanças em migrations
-já aplicadas são rejeitadas. Este contrato v1 admite migrations versionadas; se o
-pipeline introduzir repeatables, o contrato deve ser revisto antes da integração.
-
-Backend: /dspace/bin/dspace, server-boot.jar, curl e Java 17; startup sem migration.
-Solr: cores DSpace e utilitários init-var-solr/precreate-core/runuser/curl conforme
-Compose atual. Frontend: Node SSR porta 4000, configuração DSPACE_* em runtime.
-Banco usa schema public; assetstore em /dspace/assetstore. Imagens devem suportar
-os envs e healthchecks do Compose existente. A CLI instalada é distribuída junto
-com esta árvore, não atualizada implicitamente pelo manifesto de imagens.
-
-Pendente: emissão do manifesto pelo pipeline DeepSeek, digests/versões reais,
-permissões GHCR, arquitetura do servidor e ensaio end-to-end em homologação com
-PostgreSQL externo (TLS, privilégios, Flyway, backup/restore e healthchecks).
-Workflows do GitHub Actions não foram alterados por este instalador.
-
-## Testes isolados
+## Manutenção e validação
 
 ```bash
-python3 -m unittest discover -s deploy/nti/tests -v
-bash -n install.sh deploy/nti/dspacepcirn
+python3 -B scripts/check-installer.py
+bash -n install.sh deploy/nti/dspacepcirn deploy/nti/install-manager.sh
 ```
 
-Executáveis simulados verificam a CLI por subprocessos, sem daemon Docker ou banco.
-Incluem os dois tipos de PostgreSQL, falhas nas sete etapas, retomada sem reimportação,
-recusa de volumes existentes, TLS/SCRAM, falhas em pull, dump, migration, conexão, health e restore, corrupção de
-backup, autorização, concorrência, proteção de credenciais e travessia de archives.
-`test_production_operations.py` cobre a superfície fora da CLI — entrypoint do
-Compose, `scripts/backup-dspace.sh`, publicação manual e SMTP — e usa o Docker
-apenas para renderizar configurações; sem o CLI do Docker esses casos são pulados.
-Referências técnicas: [imagem oficial PostgreSQL](https://hub.docker.com/_/postgres),
-[TLS PostgreSQL](https://www.postgresql.org/docs/17/ssl-tcp.html), [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
-[interpolação Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
-e [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).
-
-## Homologação numa VM limpa
-
-O [roteiro de homologação](HOMOLOGACAO.md) inclui preflight automático no wizard,
-executor E2E opt-in e critérios de aprovação/recuperação. O contrato GHCR acima
-permanece inalterado. Testes locais são simulados e não iniciam containers.
+O comando padrão é sequencial e não inicia serviços. A suíte completa, PostgreSQL
+real e bootstrap são explícitos; veja [operações](OPERACOES.md#validacao).
+Resultados e bloqueadores da entrega: [VALIDACAO.md](VALIDACAO.md).

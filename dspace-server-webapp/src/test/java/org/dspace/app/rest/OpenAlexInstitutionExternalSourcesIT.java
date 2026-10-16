@@ -51,13 +51,15 @@ public class OpenAlexInstitutionExternalSourcesIT extends AbstractControllerInte
 
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();
         ReflectionTestUtils.setField(openAlexImportMetadataSourceService, "liveImportClient", liveImportClient);
     }
 
     @Test
     public void findOneOpenalexImportInstitutionExternalExternalSourceTest() throws Exception {
-        getClient().perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
+        getClient(getAuthToken(eperson.getEmail(), password))
+            .perform(get("/api/integration/externalsources?size=25")).andExpect(status().isOk())
                    .andExpect(jsonPath("$._embedded.externalsources", Matchers.hasItem(
                        ExternalSourceMatcher.matchExternalSource("openalexInstitution",
                                                                  "openalexInstitution", false))));
@@ -71,7 +73,8 @@ public class OpenAlexInstitutionExternalSourcesIT extends AbstractControllerInte
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexInstitution/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexInstitution/entries")
                                     .param("query", "empty"))
                        .andExpect(status().isOk()).andExpect(jsonPath("$.page.number", is(0)));
             verify(liveImportClient, times(2)).executeHttpGetRequest(anyInt(), anyString(), anyMap());
@@ -86,7 +89,8 @@ public class OpenAlexInstitutionExternalSourcesIT extends AbstractControllerInte
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexInstitution/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexInstitution/entries")
                                     .param("query", "Centre"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries[0].id").value("I1294671590"))
@@ -138,7 +142,8 @@ public class OpenAlexInstitutionExternalSourcesIT extends AbstractControllerInte
             when(liveImportClient.executeHttpGetRequest(anyInt(), anyString(), anyMap()))
                 .thenReturn(jsonResponse);
 
-            getClient().perform(get("/api/integration/externalsources/openalexInstitution/entries")
+            getClient(getAuthToken(eperson.getEmail(), password))
+                .perform(get("/api/integration/externalsources/openalexInstitution/entries")
                                     .param("query", "Centre"))
                        .andExpect(status().isOk())
                        .andExpect(jsonPath("$._embedded.externalSourceEntries", hasSize(2)))
