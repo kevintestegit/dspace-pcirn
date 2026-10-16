@@ -25,17 +25,44 @@ class DockerExportTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.output = Path(self.temp.name) / 'export'
-        self.args = SimpleNamespace(output=self.output, manifest='fixture.json', backend='backend',
-                                    frontend='frontend', solr='solr', postgres='database',
+        self.args = SimpleNamespace(output=self.output, manifest='fixture.json', backend='dspace',
+                                    frontend='dspace-angular', solr='dspacesolr', postgres='dspacedb',
                                     username='dspace', database='dspace')
-        self.rows = [{'Id': name, 'State': {'Running': True}}
-                     for name in ('backend-id', 'frontend-id', 'solr-id', 'database-id')]
+        services = ('dspace', 'dspace-angular', 'dspacesolr', 'dspacedb')
+        self.rows = []
+        for name in services:
+            row = {'Id': name + '-id', 'Name': '/' + name, 'State': {'Running': True},
+                   'Config': {'Image': name + ':local', 'Labels': {
+                       'com.docker.compose.project': 'd9', 'com.docker.compose.service': name},
+                       'Env': []}, 'Mounts': [], 'NetworkSettings': {'Networks': {}}}
+            self.rows.append(row)
+        self.rows[0]['Config']['Env'] = ['db__P__url=jdbc:postgresql://dspacedb:5432/dspace']
+        self.rows[3]['Config']['Env'] = ['POSTGRES_DB=dspace', 'POSTGRES_USER=dspace']
+        self.rows[0]['Mounts'] = [{'Destination': '/dspace/assetstore', 'Type': 'volume', 'Name': 'd9_assetstore'}]
+        self.rows[2]['Mounts'] = [{'Destination': '/var/solr/data', 'Type': 'volume', 'Name': 'd9_solr_data'}]
+        network = {'d9_default': {'Aliases': ['dspacedb']}}
+        self.rows[0]['NetworkSettings']['Networks'] = network
+        self.rows[3]['NetworkSettings']['Networks'] = network
+        for row in self.rows:
+            row['Image'] = 'sha256:' + row['Id']
         self.calls = []
         self.failure = None
+        self.inspect_count = 0
+        self.handlers = {}
         self.endpoint = 'unix:///var/run/docker.sock'
 
     def run_command(self, command, **kwargs):
         self.calls.append(command)
+        if 'stop' in command:
+            for row in self.rows:
+                if row['Id'] == command[-1]:
+                    row['State']['Running'] = False
+            if self.failure == 'signal':
+                self.handlers[exporter.signal.SIGTERM](exporter.signal.SIGTERM, None)
+        if 'start' in command:
+            for row in self.rows:
+                if row['Id'] == command[-1]:
+                    row['State']['Running'] = True
         if 'cp' in command:
             (Path(command[-1]) / 'preserved-document').write_bytes(b'document')
         if 'pg_dump' in command:
@@ -45,12 +72,24 @@ class DockerExportTests(unittest.TestCase):
         return SimpleNamespace(returncode=1 if self.failure == 'restart' and 'start' in command else 0)
 
     def export(self, pending=False):
+        def sql(query):
+            return '150000' if query.startswith('SHOW server_version_num') else '0'
+        def check_output(args, **kwargs):
+            if 'context' in args:
+                return self.endpoint
+            if 'rev-parse' in args:
+                raise subprocess.CalledProcessError(1, args)
+            if 'inspect' in args:
+                self.inspect_count += 1
+                if self.failure == 'external-start' and self.inspect_count == 2:
+                    self.rows[2]['State']['Running'] = True
+                return json.dumps(self.rows)
+            return json.dumps(self.rows)
         with mock.patch.object(exporter, 'manifest', return_value={'version': '1.0.0-rc5'}), \
                 mock.patch.object(exporter.Source, 'pending', return_value=pending), \
-                mock.patch.object(exporter.Source, 'sql', return_value='0'), \
+                mock.patch.object(exporter.Source, 'sql', side_effect=sql), \
                 mock.patch.object(exporter, 'snapshot', return_value={'schema_version': 1}), \
-                mock.patch.object(exporter.subprocess, 'check_output', side_effect=lambda args, **kwargs:
-                                  self.endpoint if 'context' in args else json.dumps(self.rows)), \
+                mock.patch.object(exporter.subprocess, 'check_output', side_effect=check_output), \
                 mock.patch.object(exporter.subprocess, 'run', side_effect=self.run_command):
             exporter.export(self.args)
 
@@ -60,15 +99,35 @@ class DockerExportTests(unittest.TestCase):
             self.export()
         self.assertEqual(self.calls, [])
 
+    def test_source_roles_must_match_the_selected_flags(self):
+        self.args.backend, self.args.frontend = self.args.frontend, self.args.backend
+        with self.assertRaisesRegex(Error, 'expected service roles'):
+            self.export()
+        self.assertEqual(self.calls, [])
+
     def test_export_is_flat_private_and_preserves_source_database(self):
         self.export()
         validate_package(self.output)
         self.assertEqual(self.output.stat().st_mode & 0o777, 0o700)
         self.assertEqual({p.name for p in self.output.iterdir()},
-                         data_migration.PACKAGE_FILES | {'checksums.json'})
-        self.assertFalse(any('database-id' in c and ('stop' in c or 'start' in c) for c in self.calls))
+                         data_migration.PACKAGE_FILES | {'checksums.json', 'source-identity.json'})
+        self.assertFalse(any('dspacedb-id' in c and ('stop' in c or 'start' in c) for c in self.calls))
         self.assertEqual([c[-1] for c in self.calls if 'start' in c],
-                         ['solr-id', 'frontend-id', 'backend-id'])
+                         ['dspacesolr-id', 'dspace-angular-id', 'dspace-id'])
+
+    def test_export_refuses_destination_inside_git_worktree(self):
+        self.output.parent.mkdir(exist_ok=True)
+        self.output = self.output.parent / 'nested' / 'export'
+        self.args.output = self.output
+        def check_output(args, **kwargs):
+            if 'rev-parse' in args:
+                return str(self.output.parent.parent)
+            return self.endpoint
+        with mock.patch.object(exporter.subprocess, 'check_output', side_effect=check_output), \
+                self.assertRaisesRegex(Error, 'inside a Git working tree'):
+            with mock.patch.object(exporter, 'manifest', return_value={'version': '1.0.0-rc5'}):
+                exporter.export(self.args)
+        self.assertEqual(self.calls, [])
 
     def test_failed_dump_restarts_all_services_and_keeps_partial_copy_private(self):
         self.failure = 'dump'
@@ -83,6 +142,29 @@ class DockerExportTests(unittest.TestCase):
         with self.assertRaisesRegex(Error, 'restart requires attention'):
             self.export()
         self.assertEqual(len([c for c in self.calls if 'start' in c]), 3)
+
+    def test_external_restart_during_export_aborts_and_restarts_all_services(self):
+        self.failure = 'external-start'
+        with self.assertRaisesRegex(Error, 'must remain stopped'):
+            self.export()
+        self.assertFalse(self.output.exists())
+        self.assertEqual(len([c for c in self.calls if 'start' in c]), 3)
+
+    def test_sigterm_restarts_source_and_restores_previous_signal_handler(self):
+        self.failure = 'signal'
+        original = object()
+        for sig in (exporter.signal.SIGINT, exporter.signal.SIGTERM, exporter.signal.SIGHUP):
+            self.handlers[sig] = original
+        def install(sig, handler):
+            previous = self.handlers[sig]
+            self.handlers[sig] = handler
+            return previous
+        with mock.patch.object(exporter.signal, 'signal', side_effect=install):
+            with self.assertRaisesRegex(Error, 'Export interrupted'):
+                self.export()
+        self.assertFalse(self.output.exists())
+        self.assertEqual(len([c for c in self.calls if 'start' in c]), 1)
+        self.assertTrue(all(handler is original for handler in self.handlers.values()))
 
     def test_incompatible_history_and_existing_output_never_stop_services(self):
         with self.assertRaisesRegex(Error, 'history'):

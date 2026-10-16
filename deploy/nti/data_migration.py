@@ -86,6 +86,15 @@ def snapshot(dep, assetstore, solr, *, local_socket=False):
                         identifier = str(UUID(value['uuid']))
                         raise Error(f'Bitstream {identifier}: {error}') from error
             report['tables'][name] = {'count': count, 'sha256': digest.hexdigest()}
+    sequences = json.loads(dep.sql("SELECT COALESCE(json_agg(sequencename ORDER BY sequencename), '[]') "
+                                   "FROM pg_sequences WHERE schemaname='public';"))
+    report['sequences'] = {}
+    for name in sequences:
+        quoted = '"' + name.replace('"', '""') + '"'
+        state = json.loads(dep.sql(
+            f'SELECT row_to_json(s) FROM (SELECT last_value, is_called FROM public.{quoted}) s;'))
+        digest = hashlib.sha256((json.dumps(state, sort_keys=True) + '\n').encode()).hexdigest()
+        report['sequences'][name] = {'state': state, 'sha256': digest}
     report['assetstore'] = tree_fingerprint(assetstore)
     report['solr'] = tree_fingerprint(solr)
     return report
@@ -168,14 +177,27 @@ def migrate_data(dep, package):
            any((dep.root / 'data' / name).iterdir()) for name in ('assetstore', 'solr')):
         raise Error('Initial import requires empty assetstore and Solr')
     package = Path(package).resolve()
-    names = PACKAGE_FILES
     hashes = read_json(package / 'checksums.json')
-    if set(hashes) != names or any(checksum(package / name) != hashes[name] for name in names):
+    provided = set(hashes)
+    if (provided not in (PACKAGE_FILES, PACKAGE_FILES | {'source-identity.json'})
+            or any(checksum(package / name) != hashes[name] for name in provided)):
         raise Error('Package incomplete or checksum mismatch')
     manifest(package / 'release.json')
     expected = read_json(package / 'source-report.json')
     if expected.get('schema_version') != 1 or not REQUIRED_TABLES <= set(expected.get('tables', {})):
         raise Error('Invalid source report')
+    if 'source-identity.json' in hashes:
+        identity = read_json(package / 'source-identity.json')
+        containers = identity.get('containers') if isinstance(identity, dict) else None
+        if (not isinstance(containers, dict)
+                or identity.get('schema_version') != 1 or identity.get('project') != 'd9'
+                or identity.get('release_equivalence') is not False
+                or set(containers) != {'dspace', 'dspacedb', 'dspacesolr', 'dspace-angular'}
+                or any(not isinstance(container, dict)
+                       or not all(isinstance(container.get(field), str) and container[field]
+                               for field in ('id', 'image_id', 'configured_image'))
+                       for container in containers.values())):
+            raise Error('Invalid local source identity')
     profile = expected.get('database_profile', 'institutional')
     if profile not in ('institutional', 'fresh') or profile != dep.config.get('DB_PROFILE', 'institutional'):
         raise Error('Database profile differs from package; configure DB_PROFILE before restore')

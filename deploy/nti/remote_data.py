@@ -56,17 +56,36 @@ urlopen = build_opener(PublicRedirect()).open
 
 def validate_package(directory):
     from data_migration import PACKAGE_FILES
-    if (directory.is_symlink() or set(p.name for p in directory.iterdir()) != PACKAGE_FILES | {'checksums.json'}
+    allowed = PACKAGE_FILES | {'checksums.json', 'source-identity.json'}
+    if directory.is_symlink():
+        raise Error('Cached data package contains unexpected files or links')
+    files = {p.name for p in directory.iterdir()}
+    if (files not in (PACKAGE_FILES | {'checksums.json'}, allowed)
             or any(p.is_symlink() or not p.is_file() for p in directory.iterdir())):
         raise Error('Cached data package contains unexpected files or links')
     if any((directory / name).stat().st_size > 2 * CHUNK
-           for name in ('checksums.json', 'release.json', 'source-report.json')):
+           for name in ('checksums.json', 'release.json', 'source-report.json', 'source-identity.json')
+           if (directory / name).exists()):
         raise Error('Data package metadata exceeds its size limit')
     hashes = read_json(directory / 'checksums.json')
-    if (not isinstance(hashes, dict) or set(hashes) != PACKAGE_FILES
+    provided = set(hashes) if isinstance(hashes, dict) else set()
+    if (provided not in (PACKAGE_FILES, PACKAGE_FILES | {'source-identity.json'})
+            or files != provided | {'checksums.json'}
             or any(not isinstance(hashes[name], str) or checksum(directory / name) != hashes[name]
-                   for name in PACKAGE_FILES)):
+                   for name in provided)):
         raise Error('Data package is incomplete or its checksums do not match')
+    if 'source-identity.json' in provided:
+        identity = read_json(directory / 'source-identity.json')
+        containers = identity.get('containers') if isinstance(identity, dict) else None
+        if (not isinstance(containers, dict)
+                or identity.get('schema_version') != 1 or identity.get('project') != 'd9'
+                or identity.get('release_equivalence') is not False
+                or set(containers) != {'dspace', 'dspacedb', 'dspacesolr', 'dspace-angular'}
+                or any(not isinstance(container, dict)
+                       or not all(isinstance(container.get(field), str) and container[field]
+                                  for field in ('id', 'image_id', 'configured_image'))
+                       for container in containers.values())):
+            raise Error('Invalid local source identity')
 
 
 def download_package(root, source):
