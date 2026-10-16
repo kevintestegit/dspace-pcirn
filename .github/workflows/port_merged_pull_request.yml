@@ -19,8 +19,11 @@ permissions:
 jobs:
   port_pr:
     runs-on: ubuntu-latest
-    # Don't run on closed *unmerged* pull requests
-    if: github.event.pull_request.merged
+    # Only run for merged PRs with a backport label; otherwise the action
+    # requires a PAT even though it has nothing to port.
+    if: >-
+      github.event.pull_request.merged &&
+      contains(join(github.event.pull_request.labels.*.name, ','), 'port to ')
     steps:
       # Checkout code
       - uses: actions/checkout@v7
