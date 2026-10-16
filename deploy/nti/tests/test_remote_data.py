@@ -79,6 +79,26 @@ class RemoteDataTests(unittest.TestCase):
         with mock.patch.object(remote_data, 'urlopen', side_effect=AssertionError('repeated download')):
             self.assertEqual(remote_data.download_package(self.root, self.source), package)
 
+    def test_source_identity_must_be_bounded_and_well_formed(self):
+        for identity in (b'[]', json.dumps({'containers': []}).encode(), b'{}'):
+            files = dict(self.files)
+            files['source-identity.json'] = identity
+            files['checksums.json'] = json.dumps({
+                name: hashlib.sha256(data).hexdigest()
+                for name, data in files.items() if name != 'checksums.json'}).encode()
+            payload = self.archive(files)
+            source = self.source | {'sha256': hashlib.sha256(payload).hexdigest(), 'size': len(payload)}
+            with self.assertRaises(pcirn.Error):
+                self.download(payload, source)
+        files['source-identity.json'] = b' ' * (2 * remote_data.CHUNK + 1)
+        files['checksums.json'] = json.dumps({
+            name: hashlib.sha256(data).hexdigest()
+            for name, data in files.items() if name != 'checksums.json'}).encode()
+        payload = self.archive(files)
+        source = self.source | {'sha256': hashlib.sha256(payload).hexdigest(), 'size': len(payload)}
+        with self.assertRaises(pcirn.Error):
+            self.download(payload, source)
+
     def test_corruption_truncation_and_oversize_never_publish_package(self):
         for payload in (b'bad', self.payload[:-1], self.payload + b'bad'):
             with self.assertRaises(pcirn.Error):
