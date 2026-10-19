@@ -52,23 +52,28 @@ Dependências usadas somente em testes foram separadas das de execução.
 
 ### Backend
 
-A árvore resolvida de `dspace-api` contém os seguintes componentes de execução
-com avisos. Atualizações maiores precisam de validação de compatibilidade com
+Foram consultadas 444 combinações de biblioteca/versão com escopo `compile` ou
+`runtime` nas árvores resolvidas de todos os módulos. O inventário de componentes
+com avisos e seus módulos está em
+[revisao-dependencias-2026-10-19.csv](revisao-dependencias-2026-10-19.csv).
+Os componentes de execução afetados incluem os seguintes. Atualizações maiores precisam de validação de compatibilidade com
 Solr, Tika, Handle e Java 17; não foram aplicadas indiscriminadamente.
 
 | Componente | Versão encontrada | Encaminhamento |
 |---|---|---|
-| Jetty servlets / HTTP2 | 9.4.15.v20190215 | Alinhar a família Jetty e tratar avisos de DoS e servlets. |
+| Jetty servlets / HTTP2 | 9.4.15.v20190215; servlets também 9.4.53 | Alinhar a família Jetty e tratar avisos de DoS e servlets. |
 | Jetty server / HTTP | 9.4.58.v20250814 | Verificar exposição pelo Handle; há avisos de parsing HTTP e autoridade. |
-| Jetty security | 9.4.53.v20231009 | Corrigir autenticação Digest se usada; migração da família necessária. |
+| Jetty security | 9.4.53.v20231009 / 9.4.58.v20250814 | Corrigir autenticação Digest se usada; migração da família necessária. |
 | Apache Thrift | 0.19.0 | Avaliar 0.24.0 ou superior compatível. |
 | Commons Lang antigo | 2.6 | Remover dependência legada via atualização do componente que a introduz. |
 | Netty codec/common/handler/epoll | 4.1.99.Final | Atualizar a família em conjunto; avisos de DoS/TLS/filtros. Parte dos avisos é específica de Windows. |
 | ZooKeeper | 3.6.2 | Atualizar componente de origem; avisos de autorização e watchers. |
 | snappy-java | 1.1.10.1 | Avaliar 1.1.10.4 ou superior compatível. |
-| protobuf-java | 3.15.0 | Atualizar para versão corrigida compatível com Solr. |
+| protobuf-java | 3.15.0 / 3.24.3 | Atualizar para versão corrigida compatível com Solr. |
 | jsoup | 1.22.2 | Avaliar 1.23.2 ou superior compatível. |
 | junrar | 7.6.0 | Avaliar 7.6.1 ou superior compatível. |
+| Tomcat embarcado | 10.1.55 | Avaliar 10.1.58 ou superior; avisos em autenticação Digest/Form e restrições de acesso. |
+| Nimbus JOSE JWT | 9.48 | Avaliar 10.0.2 ou superior compatível; DoS por JSON profundamente aninhado. |
 
 Spring Web MVC `6.2.19` também possui
 [GHSA-j9f9-w8pj-32f8](https://github.com/advisories/GHSA-j9f9-w8pj-32f8) e
