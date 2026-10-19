@@ -291,6 +291,10 @@ public class OREIngestionCrosswalk
             return false;
         }
         String resourceHost = resourceUri.getHost();
+        if (resourceHost == null) {
+            return false;
+        }
+        resourceHost = resourceHost.toLowerCase(Locale.ROOT);
 
         Set<String> allowedSchemes = Set.of("http", "https");
         String resourceScheme = resourceUri.getScheme();
@@ -317,7 +321,7 @@ public class OREIngestionCrosswalk
         if (configurationService.getBooleanProperty("oai.harvester.ore.file.validateHost", false)) {
             for (String allowedHost : configurationService
                     .getArrayProperty("oai.harvester.ore.file.allowedHosts")) {
-                if (Objects.equals(resourceUri.getHost().toLowerCase(Locale.ROOT),
+                if (Objects.equals(resourceHost,
                         allowedHost.toLowerCase(Locale.ROOT))) {
                     return true;
                 }

@@ -107,6 +107,11 @@ public class OREIngestionCrosswalkTest extends AbstractIntegrationTestWithDataba
         result = crosswalk.validResourceUri("http://127.0.0.1:8080/resource");
         assertFalse("127.0.0.1 should be forbidden", result);
 
+        assertFalse("Host matching must ignore case",
+                crosswalk.validResourceUri("http://LOCALHOST/resource"));
+        assertFalse("Missing hostname must be rejected",
+                crosswalk.validResourceUri("http:/resource"));
+
         // allowed.example.com = not forbidden
         result = crosswalk.validResourceUri("http://allowed.example.com/resource");
         assertTrue("External host should be allowed", result);
@@ -128,7 +133,7 @@ public class OREIngestionCrosswalkTest extends AbstractIntegrationTestWithDataba
     public void testSuccessfulBitstreamIngest() throws Exception {
         // fully mocked response
         try (MockedStatic<HarvestHttpClient> mockedFactory =
-                     mockHttpClient(200, "Test bitstream content")) {
+                     mockHttpClient("Test bitstream content")) {
 
             Element entry = createValidOREEntry();
             crosswalk.ingest(context, item, entry, false);
@@ -202,7 +207,7 @@ public class OREIngestionCrosswalkTest extends AbstractIntegrationTestWithDataba
         return entry;
     }
 
-    private MockedStatic<HarvestHttpClient> mockHttpClient(int statusCode, String content) throws IOException {
+    private MockedStatic<HarvestHttpClient> mockHttpClient(String content) throws IOException {
         MockedStatic<HarvestHttpClient> transport = Mockito.mockStatic(HarvestHttpClient.class);
         transport.when(() -> HarvestHttpClient.open(URI.create("http://example.com/resource.pdf"),
                 1024L * 1024 * 1024)).thenReturn(new ByteArrayInputStream(content.getBytes()));
