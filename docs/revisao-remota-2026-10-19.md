@@ -83,6 +83,34 @@ no código da aplicação pesquisado. Isso reduz a evidência de exposição des
 caminhos, mas não substitui a avaliação em execução. Spring 7 exige migração de
 plataforma; não é atualização isolada adequada para esta integração.
 
+### Alertas do código no GitHub
+
+O CodeQL registra **19 alertas abertos na `main`**: 6 críticos, 7 altos e
+6 médios, segundo a classificação da ferramenta. Inventário com arquivos,
+linhas e links: [revisao-codeql-2026-10-19.csv](revisao-codeql-2026-10-19.csv).
+Esses números são alertas estáticos, não 19 explorações confirmadas.
+
+- **Prioridade:** `DSpaceControlledVocabulary` interpola IDs recebidos em
+  expressões XPath (`getChoicesByParent`, `getParentChoice`, `getNode`).
+  Substituir a interpolação por variáveis XPath e testar entradas com aspas.
+- **ReDoS:** cinco alertas em expressões de DOI, Handle, Solr e facetas de ano;
+  revisar com entradas longas e limites de tamanho.
+- **XML:** quatro alertas de XXE passam por fábricas protegidas de `XMLUtils`,
+  com DTD desativado. Há indício de falso positivo, mas faltam testes de
+  exploração para encerrar os alertas.
+- **Brevo:** o host de destino é constante (`api.brevo.com`) e os valores de
+  entrada são codificados em query/path. SSRF não foi confirmada na leitura;
+  validar também a política de redirecionamento do cliente HTTP.
+- **Redirecionamentos/cookie:** quatro fluxos de login já comparam hosts com
+  uma lista configurada; o cookie usa `request.isSecure()`. Validar esquema,
+  origem completa e cabeçalhos do proxy HTTPS. O redirecionamento OAI também
+  requer verificação com caminho iniciado por `//`.
+- Dois alertas altos estão em testes (`MockSHERPAService` e script de UI),
+  sem evidência de uso em produção.
+
+Os alertas não foram encerrados administrativamente. A nova análise CodeQL
+na PR deve ser consultada junto com este inventário.
+
 ### Frontend vinculado
 
 O gitlink `dspace-angular/source` aponta para `857aa482e5d9`, na branch
