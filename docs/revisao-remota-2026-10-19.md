@@ -6,6 +6,7 @@ Repositório: https://github.com/kevintestegit/dspace-pcirn.
 Base revisada: `origin/main` em `7797f2a408`. As 19 branches remotas existentes
 (incluindo `main`) foram incorporadas na branch `codex/remote-security-integration`.
 Conflitos foram resolvidos preservando as proteções e funcionalidades da `main`.
+Integração na `main` pela [PR #25](https://github.com/kevintestegit/dspace-pcirn/pull/25).
 O checkout original, com alterações locais, não foi modificado.
 
 As propostas de dependências foram conciliadas: Hibernate permanece em
@@ -108,8 +109,9 @@ Esses números são alertas estáticos, não 19 explorações confirmadas.
 - Dois alertas altos estão em testes (`MockSHERPAService` e script de UI),
   sem evidência de uso em produção.
 
-Os alertas não foram encerrados administrativamente. A nova análise CodeQL
-na PR deve ser consultada junto com este inventário.
+Os alertas não foram encerrados administrativamente. A análise CodeQL da PR
+concluiu com sucesso em 19/10/2026; isso não substitui a triagem dos alertas
+preexistentes na `main`.
 
 ### Frontend vinculado
 
@@ -131,13 +133,21 @@ Angular e resolver esses peers antes de build e testes de SSR/proxy.
 
 ## Validação e publicação
 
-- Validação completa do backend em andamento: Java 17 / Maven 3.9.9,
-  `mvn -B -ntp install -P-assembly -DskipUnitTests=false -DskipIntegrationTests=false`.
-- Resultado final dos testes e merge: pendentes; atualizar esta seção antes da entrega.
+- [CI de testes unitários e Checkstyle](https://github.com/kevintestegit/dspace-pcirn/actions/runs/39259022438): aprovado: 1.711 testes, zero falhas/erros, 11 ignorados; Java 17 e zero violações de Checkstyle nos 15 módulos.
+- [CodeQL da integração](https://github.com/kevintestegit/dspace-pcirn/actions/runs/39259022121): aprovado. As alterações posteriores ao código validado são somente documentação.
+- Integração completa em Docker / Java 17 / Maven 3.9.9:
+  `mvn -B -ntp install -P-assembly -DskipUnitTests=true -DskipIntegrationTests=false`.
+  Aprovado nos 15 módulos: **3.907 testes**, zero falhas/erros e 32 ignorados.
+  A primeira tentativa foi interrompida após falha
+  ambiental do teste S3 por ausência de acesso ao Docker; a retomada usa socket
+  Docker e diretórios temporários em memória. A montagem do ambiente exige
+  o reactor completo, incluindo o módulo `dspace`, sem limitar a `dspace-api`.
 - Varreduras: Gitleaks do histórico remoto; OSV das dependências Maven resolvidas;
   auditoria npm do frontend vinculado.
 - Não houve teste de invasão, varredura das imagens Docker finais ou validação no
   servidor do NTI. Dependabot Alerts não estava acessível/ativado pela API usada.
+- A `main` estava sem proteção de branch. Recomenda-se exigir checks aprovados
+  antes de merges futuros; as regras do repositório não foram alteradas.
 - As imagens e o pacote de instalação anteriores precisam ser reconstruídos e
   revalidados para incluir as correções desta revisão.
 
