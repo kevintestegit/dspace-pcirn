@@ -100,8 +100,9 @@ API:
 GET /server/api/discover/search/objects?query=porte+de+arma&semantic=true
 ```
 
-UI: a caixa **Busca por significado** aparece acima dos resultados. Ela adiciona `semantic=true`
-à URL e preserva os filtros e a paginação.
+UI: a busca por significado já vem habilitada em todas as buscas. O parâmetro `semantic=true` é
+enviado automaticamente e preserva os filtros e a paginação. Para desativar numa consulta
+específica, use `?semantic=false`.
 
 ## Limites
 

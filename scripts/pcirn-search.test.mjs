@@ -145,12 +145,12 @@ test('PCIRN search sidebar hides type, has-files and access-status facets', () =
   assert.match(authorFilter, /<property name="isOpenByDefault" value="false"\/>/);
 });
 
-test('semantic search mode is wired through the search options', () => {
-  assert.match(template, /class="pcirn-semantic-toggle"/);
-  assert.match(template, /toggleSemantic\(\$event\)/);
+test('semantic search is enabled in the default search flow', () => {
+  assert.doesNotMatch(template, /pcirn-semantic-toggle/);
   assert.match(searchOptionsModel, /semantic\?: boolean/);
   assert.match(searchOptionsModel, /semantic=true/);
   assert.match(searchConfigurationService, /getCurrentSemantic/);
+  assert.match(searchConfigurationService, /semantic !== 'false'/);
 });
 
 test('search results show full-text context snippets', () => {
