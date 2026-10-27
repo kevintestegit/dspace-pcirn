@@ -57,25 +57,42 @@ documentos sai da infraestrutura local. Para conteúdo institucional, prefira um
 
 ### Ollama no Docker Compose
 
-O serviço está no perfil opcional `semantic`:
+Em produção, o `docker-compose.yml` sobe o `ollama` junto com a stack e o serviço de bootstrap
+`ollama-init` baixa o modelo no primeiro start:
 
 ```bash
-docker compose --profile semantic up -d ollama
-docker compose exec ollama ollama pull bge-m3
+docker compose -f docker-compose.yml --env-file .env.production up -d
+docker compose -f docker-compose.yml --env-file .env.production logs -f ollama-init
+docker compose -f docker-compose.yml --env-file .env.production exec ollama ollama list
 ```
 
-No `docker-compose.yml` de produção, habilite no `.env.production`:
+O modelo fica no volume `ollama_data`, não no repositório Git: são cerca de 1,2 GB baixados uma
+única vez por volume. O servidor precisa de espaço em disco e de memória suficiente para o
+`bge-m3` (aproximadamente 2 GB de RAM); em CPU, a geração dos vetores durante a reindexação é
+lenta. Se o servidor não tiver saída para a internet, copie o volume `ollama_data` de uma máquina
+que já tenha o modelo.
+
+No ambiente de desenvolvimento o perfil continua opcional:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile semantic up -d ollama
+docker compose -f docker-compose.dev.yml exec ollama ollama pull bge-m3
+```
+
+As variáveis já têm os valores padrão no Compose; o `.env.production.example` as repete para
+deixar explícito o que pode ser ajustado:
 
 ```dotenv
 SEMANTIC_ENABLED=true
 SEMANTIC_EMBEDDING_URL=http://ollama:11434/v1/embeddings
 SEMANTIC_EMBEDDING_MODEL=bge-m3
 SEMANTIC_EMBEDDING_DIMENSION=1024
+SEMANTIC_SOLR_URL=http://dspacesolr:8983/solr/semantic
 ```
 
-Depois recrie o backend para ler as variáveis. A imagem do Solr também precisa ser reconstruída
-a partir de `dspace/src/main/docker/dspace-solr/Dockerfile`: ela inclui o configset `semantic`, e
-o entrypoint do Compose cria o core `semantic` no primeiro start.
+A imagem do Solr também precisa ser reconstruída a partir de
+`dspace/src/main/docker/dspace-solr/Dockerfile`: ela inclui o configset `semantic`, e o entrypoint
+do Compose cria o core `semantic` no primeiro start.
 
 ## Reindexação
 

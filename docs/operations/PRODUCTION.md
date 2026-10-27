@@ -126,6 +126,34 @@ docker compose -f docker-compose.yml --env-file .env.production \
   exec dspace /dspace/bin/dspace index-discovery -b
 ```
 
+### Busca semântica
+
+A stack de produção sobe o Ollama e o serviço `ollama-init`, que baixa o modelo
+`bge-m3` para o volume `ollama_data` no primeiro deploy. Confira:
+
+```bash
+docker compose -f docker-compose.yml --env-file .env.production \
+  logs ollama-init
+docker compose -f docker-compose.yml --env-file .env.production \
+  exec ollama ollama list
+```
+
+O modelo não vai no repositório Git. São cerca de 1,2 GB no primeiro download,
+e o `bge-m3` usa aproximadamente 2 GB de RAM. Se o servidor não tiver acesso à
+internet, copie o volume `ollama_data` de outra instalação.
+
+Depois que o modelo estiver disponível, gere os vetores com uma reindexação
+completa (a mesma que reconstrói o índice de busca):
+
+```bash
+docker compose -f docker-compose.yml --env-file .env.production \
+  exec dspace /dspace/bin/dspace index-discovery -b
+```
+
+Em CPU, essa etapa pode levar horas. Rode-a novamente depois de um
+`filter-media` que extraia novos textos (por exemplo, OCR de PDFs digitalizados).
+Enquanto não houver vetores, a busca continua funcionando no modo lexical.
+
 ## Login OIDC
 
 O login começa em `/server/api/authn/oidc/login`. O callback exige o estado de
