@@ -56,7 +56,7 @@ WORKDIR $dspace__P__dir
 ENV JAVA_OPTS=-Xmx1000m
 # Install unzip for AIPs
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends unzip \
+    && apt-get install -y --no-install-recommends unzip tesseract-ocr tesseract-ocr-por tesseract-ocr-eng \
     && apt-get purge -y --auto-remove \
     && rm -rf /var/lib/apt/lists/*
 

@@ -74,6 +74,7 @@ import org.dspace.discovery.indexobject.IndexableItem;
 import org.dspace.discovery.indexobject.factory.IndexFactory;
 import org.dspace.discovery.indexobject.factory.IndexObjectFactoryFactory;
 import org.dspace.discovery.indexobject.factory.ItemIndexFactory;
+import org.dspace.discovery.semantic.SemanticSearchService;
 import org.dspace.eperson.EPerson;
 import org.dspace.eperson.Group;
 import org.dspace.eperson.factory.EPersonServiceFactory;
@@ -147,6 +148,8 @@ public class SolrServiceImpl implements SearchService, IndexingService {
     protected SolrSearchCore solrSearchCore;
     @Autowired
     protected ConfigurationService configurationService;
+    @Autowired
+    protected SemanticSearchService semanticSearchService;
 
     /**
      * The minimum and maximum value of each facet that exposes them, keyed by the permissions they were resolved
@@ -949,7 +952,26 @@ public class SolrServiceImpl implements SearchService, IndexingService {
             query = discoveryQuery.getQuery();
         }
 
-        solrQuery.setQuery(query);
+        String solrQueryString = query;
+        if (discoveryQuery.isSemantic() && semanticSearchService != null && StringUtils.isNotBlank(query)) {
+            Optional<float[]> vector = semanticSearchService.embed(query);
+            if (vector.isPresent()) {
+                int topK = Math.max(configurationService.getIntProperty("semantic.top-k", 100),
+                    Math.max(0, discoveryQuery.getStart()) + Math.max(1, discoveryQuery.getMaxResults()));
+                List<String> identifiers = semanticSearchService.search(vector.get(), topK);
+                if (!identifiers.isEmpty()) {
+                    solrQueryString = buildIdentifierQuery(identifiers);
+                    // Keep highlighting the original text: it is what the user typed and what the UI displays.
+                    solrQuery.setParam("hl.q", query);
+                } else {
+                    log.warn("Semantic search returned no vectors; using lexical search");
+                }
+            } else {
+                log.warn("Semantic search requested but no query embedding was produced; using lexical search");
+            }
+        }
+
+        solrQuery.setQuery(solrQueryString);
 
         if (discoveryQuery.getMaxResults() != 0) {
             // set search fields in Solr query only if we are interested in the actual search results
@@ -1097,6 +1119,18 @@ public class SolrServiceImpl implements SearchService, IndexingService {
         }
 
         return solrQuery;
+    }
+
+    static String buildIdentifierQuery(List<String> identifiers) {
+        StringBuilder query = new StringBuilder("(");
+        for (int i = 0; i < identifiers.size(); i++) {
+            if (i > 0) {
+                query.append(" OR ");
+            }
+            query.append(SearchUtils.RESOURCE_UNIQUE_ID).append(":\"")
+                .append(identifiers.get(i)).append("\"^").append(identifiers.size() - i);
+        }
+        return query.append(')').toString();
     }
 
     protected DiscoverResult retrieveResult(Context context, DiscoverQuery query)
@@ -1709,6 +1743,13 @@ public class SolrServiceImpl implements SearchService, IndexingService {
             }
         } catch (IOException | SolrServerException e) {
             throw new SearchServiceException(e.getMessage(), e);
+        }
+        if (semanticSearchService != null) {
+            try {
+                semanticSearchService.commit();
+            } catch (Exception e) {
+                log.warn("Could not commit the semantic core", e);
+            }
         }
     }
 

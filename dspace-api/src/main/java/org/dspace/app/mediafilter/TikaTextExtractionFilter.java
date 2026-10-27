@@ -14,15 +14,19 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.poi.util.IOUtils;
-import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
+import org.apache.tika.exception.WriteLimitReachedException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.ocr.TesseractOCRConfig;
+import org.apache.tika.parser.pdf.PDFParserConfig;
 import org.apache.tika.sax.BodyContentHandler;
 import org.apache.tika.sax.ContentHandlerDecorator;
 import org.dspace.content.Item;
@@ -32,7 +36,8 @@ import org.xml.sax.SAXException;
 
 /**
  * Text Extraction media filter which uses Apache Tika to extract text from a large number of file formats (including
- * all Microsoft formats, PDF, HTML, Text, etc).  For a more complete list of file formats supported by Tika see the
+ * all Microsoft formats, PDF, HTML, Text, etc).  Scanned PDF pages are OCRed with Tesseract when
+ * {@code textextractor.ocr.enabled} is true. For a more complete list of file formats supported by Tika see the
  * Tika documentation: https://tika.apache.org/2.3.0/formats.html
  */
 public class TikaTextExtractionFilter
@@ -79,14 +84,24 @@ public class TikaTextExtractionFilter
         // Get maximum size of structure that Tika will try to buffer.
         int maxArray = configurationService.getIntProperty("textextractor.max-array", DEFAULT_MAX_ARRAY);
         IOUtils.setByteArrayMaxOverride(maxArray);
+        BodyContentHandler textHandler = new BodyContentHandler(maxChars);
         try {
-            // Use Tika to extract text from input. Tika will automatically detect the file type.
-            Tika tika = new Tika();
-            tika.setMaxStringLength(maxChars); // Tell Tika the maximum number of characters to extract
-            extractedText = tika.parseToString(source);
+            // Use Tika's AutoDetectParser so OCR settings can be passed through the ParseContext.
+            AutoDetectParser parser = new AutoDetectParser();
+            parser.parse(source, textHandler, new Metadata(), buildParseContext(configurationService));
+            extractedText = textHandler.toString();
+        } catch (SAXException e) {
+            if (!WriteLimitReachedException.isWriteLimitReached(e)) {
+                log.error("Unable to extract text from bitstream in Item {}", currentItem.getID().toString(), e);
+                throw e;
+            }
+            extractedText = textHandler.toString();
         } catch (IOException e) {
             System.err.format("Unable to extract text from bitstream in Item %s%n", currentItem.getID().toString());
             e.printStackTrace(System.err);
+            log.error("Unable to extract text from bitstream in Item {}", currentItem.getID().toString(), e);
+            throw e;
+        } catch (TikaException e) {
             log.error("Unable to extract text from bitstream in Item {}", currentItem.getID().toString(), e);
             throw e;
         } catch (OutOfMemoryError oe) {
@@ -180,14 +195,49 @@ public class TikaTextExtractionFilter
             AutoDetectParser parser = new AutoDetectParser();
             Metadata metadata = new Metadata();
             // parse our source InputStream using the above custom handler
-            parser.parse(source, handler, metadata);
+            parser.parse(source, handler, metadata, buildParseContext(configurationService));
         }
 
         // At this point, all extracted text is written to our temp file. So, return a FileInputStream for that file
         return new FileInputStream(tempExtractedTextFile);
     }
 
+    /**
+     * Build the Tika parse context. OCR is enabled by default and applies to scanned PDF pages;
+     * Tika silently skips OCR when the tesseract binary is not installed.
+     *
+     * @param configurationService DSpace configuration.
+     * @return parse context with OCR settings.
+     */
+    static ParseContext buildParseContext(ConfigurationService configurationService) {
+        ParseContext parseContext = new ParseContext();
+        if (!configurationService.getBooleanProperty("textextractor.ocr.enabled", true)) {
+            return parseContext;
+        }
 
+        PDFParserConfig pdfConfig = new PDFParserConfig();
+        pdfConfig.setOcrStrategy(parseOcrStrategy(
+            configurationService.getProperty("textextractor.ocr.strategy", "AUTO")));
+        pdfConfig.setOcrDPI(configurationService.getIntProperty("textextractor.ocr.dpi", 300));
+        parseContext.set(PDFParserConfig.class, pdfConfig);
 
+        TesseractOCRConfig ocrConfig = new TesseractOCRConfig();
+        ocrConfig.setLanguage(configurationService.getProperty("textextractor.ocr.language", "por+eng"));
+        ocrConfig.setTimeoutSeconds(configurationService.getIntProperty("textextractor.ocr.timeout", 120));
+        parseContext.set(TesseractOCRConfig.class, ocrConfig);
+        return parseContext;
+    }
+
+    private static PDFParserConfig.OCR_STRATEGY parseOcrStrategy(String configuredStrategy) {
+        if (configuredStrategy == null || configuredStrategy.isBlank()) {
+            return PDFParserConfig.OCR_STRATEGY.AUTO;
+        }
+        try {
+            return PDFParserConfig.OCR_STRATEGY.valueOf(configuredStrategy.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid textextractor.ocr.strategy '{}'; using AUTO", configuredStrategy);
+            return PDFParserConfig.OCR_STRATEGY.AUTO;
+        }
+    }
 
 }

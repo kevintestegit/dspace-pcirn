@@ -30,7 +30,7 @@ public abstract class DiscoveryRestHalLinkFactory<T> extends HalLinkFactory<T, D
             UriComponentsBuilder uriBuilder = uriBuilder(getMethodOn()
                     .getSearchObjects(data.getQuery(), data.getDsoTypes(),
                             data.getScope(), data.getConfiguration(),
-                            null, null));
+                            data.isSemantic() ? Boolean.TRUE : null, null, null));
 
             return addFilterParams(uriBuilder, data);
         } catch (Exception ex) {

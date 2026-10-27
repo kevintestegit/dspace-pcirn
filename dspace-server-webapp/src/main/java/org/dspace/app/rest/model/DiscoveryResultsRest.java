@@ -32,6 +32,7 @@ public abstract class DiscoveryResultsRest extends BaseObjectRest<String> {
     @JsonIgnore
     private List<SearchFilter> searchFilters;
     private String configuration;
+    private boolean semantic;
 
     public String getCategory() {
         return CATEGORY;
@@ -112,6 +113,14 @@ public abstract class DiscoveryResultsRest extends BaseObjectRest<String> {
 
     public void setConfiguration(final String configuration) {
         this.configuration = configuration;
+    }
+
+    public boolean isSemantic() {
+        return semantic;
+    }
+
+    public void setSemantic(final boolean semantic) {
+        this.semantic = semantic;
     }
 
     public void setSearchFilters(final List<SearchFilter> searchFilters) {

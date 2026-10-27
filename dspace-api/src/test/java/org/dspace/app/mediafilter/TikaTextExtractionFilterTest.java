@@ -9,6 +9,7 @@ package org.dspace.app.mediafilter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -16,6 +17,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.ocr.TesseractOCRConfig;
+import org.apache.tika.parser.pdf.PDFParserConfig;
 import org.dspace.AbstractUnitTest;
 import org.dspace.services.ConfigurationService;
 import org.dspace.services.factory.DSpaceServicesFactory;
@@ -31,6 +35,24 @@ import org.junit.Test;
 public class TikaTextExtractionFilterTest extends AbstractUnitTest {
 
     private ConfigurationService configurationService = DSpaceServicesFactory.getInstance().getConfigurationService();
+
+    @Test
+    public void testOcrParseContext() {
+        try {
+            configurationService.setProperty("textextractor.ocr.enabled", "true");
+            ParseContext context = TikaTextExtractionFilter.buildParseContext(configurationService);
+            assertEquals(PDFParserConfig.OCR_STRATEGY.AUTO,
+                context.get(PDFParserConfig.class).getOcrStrategy());
+            assertEquals("por+eng", context.get(TesseractOCRConfig.class).getLanguage());
+
+            configurationService.setProperty("textextractor.ocr.enabled", "false");
+            context = TikaTextExtractionFilter.buildParseContext(configurationService);
+            assertNull(context.get(PDFParserConfig.class));
+            assertNull(context.get(TesseractOCRConfig.class));
+        } finally {
+            configurationService.setProperty("textextractor.ocr.enabled", "true");
+        }
+    }
 
     /**
      * Test of getDestinationStream method using temp file for text extraction

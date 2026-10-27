@@ -27,6 +27,7 @@
     <bean id="solrServiceResourceIndexPlugin" class="org.dspace.discovery.SolrServiceResourceRestrictionPlugin" scope="prototype"/>
     <bean id="solrServiceWorkspaceWorkflowPlugin" class="org.dspace.discovery.SolrServiceWorkspaceWorkflowRestrictionPlugin" scope="prototype"/>
     <bean id="solrServiceSpellIndexingPlugin" class="org.dspace.discovery.SolrServiceSpellIndexingPlugin" scope="prototype"/>
+    <bean id="solrServiceSemanticIndexPlugin" class="org.dspace.discovery.SolrServiceSemanticIndexPlugin"/>
     <bean id="solrServiceMetadataBrowseIndexingPlugin" class="org.dspace.discovery.SolrServiceMetadataBrowseIndexingPlugin" scope="prototype"/>
     <bean id="solrServicePrivateItemPlugin" class="org.dspace.discovery.SolrServicePrivateItemPlugin" scope="prototype"/>
     <bean id="SolrServiceParentObjectIndexingPlugin" class="org.dspace.discovery.SolrServiceParentObjectIndexingPlugin" scope="prototype"/>
@@ -314,22 +315,13 @@
                             <property name="field" value="person.familyName"/>
                             <property name="snippets" value="5"/>
                         </bean>
-                        <!-- By default, full text snippets are disabled, as snippets of embargoed/restricted bitstreams
-                             may appear in search results when the Item is public. See DS-3498
+                        <!-- PCIRN: todos os itens arquivados e seus bitstreams são públicos. Se restrições
+                             por bitstream forem introduzidas, revise o DS-3498 antes de manter este snippet. -->
                         <bean class="org.dspace.discovery.configuration.DiscoveryHitHighlightFieldConfiguration">
-                            <property name="field" value="project.identifier.status"/>
-                            <property name="snippets" value="5"/>
-                        </bean>
-                        <bean class="org.dspace.discovery.configuration.DiscoveryHitHighlightFieldConfiguration">
-                            <property name="field" value="orgunit.identifier.name"/>
-                            <property name="snippets" value="5"/>
-                        </bean>
-                        <bean class="org.dspace.discovery.configuration.DiscoveryHitHighlightFieldConfiguration">
-                            <property name="field" value="orgunit.identifier.description"/>
+                            <property name="field" value="fulltext"/>
                             <property name="maxSize" value="250"/>
-                            <property name="snippets" value="5"/>
+                            <property name="snippets" value="2"/>
                         </bean>
-                        -->
                     </list>
                 </property>
             </bean>

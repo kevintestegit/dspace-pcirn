@@ -137,6 +137,8 @@ public class DiscoveryRestController implements InitializingBean {
                                                   @RequestParam(name = "scope", required = false) String dsoScope,
                                                   @RequestParam(name = "configuration", required = false) String
                                                       configuration,
+                                                  @RequestParam(name = "semantic", defaultValue = "false")
+                                                          Boolean semantic,
                                                   List<SearchFilter> searchFilters,
                                                   Pageable page) throws Exception {
 
@@ -154,7 +156,7 @@ public class DiscoveryRestController implements InitializingBean {
         //Get the Search results in JSON format
         try {
             SearchResultsRest searchResultsRest = discoveryRestRepository.getSearchObjects(query, dsoTypes, dsoScope,
-                configuration, searchFilters, page, utils.obtainProjection());
+                configuration, semantic, searchFilters, page, utils.obtainProjection());
 
             //Convert the Search JSON results to paginated HAL resources
             SearchResultsResource searchResultsResource = new SearchResultsResource(searchResultsRest, utils, page);

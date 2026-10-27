@@ -11,6 +11,9 @@
 
     <bean class="org.dspace.discovery.utils.DiscoverQueryBuilder"/>
 
+    <!-- Embedding client used by semantic search and by the semantic indexing plugin. -->
+    <bean id="semanticSearchService" class="org.dspace.discovery.semantic.SemanticSearchServiceImpl"/>
+
     <bean name='org.dspace.util.MultiFormatDateParser'
           class='org.dspace.util.MultiFormatDateParser'>
         <property name='patterns'>

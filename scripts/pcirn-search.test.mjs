@@ -14,10 +14,14 @@ const mydspaceTemplatePath = new URL('src/themes/custom/app/my-dspace-page/my-ds
 const workflowStylePath = new URL('src/themes/custom/styles/_pcirn-workflow.scss', sourceRoot);
 const taskSummaryComponentPath = new URL('src/themes/custom/app/my-dspace-page/workflow-task-summary/pcirn-workflow-task-summary.component.ts', sourceRoot);
 const taskSummaryTemplatePath = new URL('src/themes/custom/app/my-dspace-page/workflow-task-summary/pcirn-workflow-task-summary.component.html', sourceRoot);
+const searchResultTemplatePath = new URL('src/themes/custom/app/shared/object-list/search-result-list-element/item-search-result/item-types/item/item-search-result-list-element.component.html', sourceRoot);
+const searchOptionsModelPath = new URL('src/app/shared/search/models/search-options.model.ts', sourceRoot);
+const searchConfigurationServicePath = new URL('src/app/core/shared/search/search-configuration.service.ts', sourceRoot);
 const discoveryConfigurationPath = new URL('../dspace/config/spring/api/discovery.xml', import.meta.url);
 
 const [component, template, styles, globalStyles, typography, comcolTemplate, mydspaceComponent, mydspaceTemplate,
-  workflowStyles, taskSummaryComponent, taskSummaryTemplate, discoveryConfiguration] = await Promise.all([
+  workflowStyles, taskSummaryComponent, taskSummaryTemplate, searchResultTemplate, searchOptionsModel,
+  searchConfigurationService, discoveryConfiguration] = await Promise.all([
   readFile(componentPath, 'utf8'),
   readFile(templatePath, 'utf8'),
   readFile(stylePath, 'utf8'),
@@ -29,6 +33,9 @@ const [component, template, styles, globalStyles, typography, comcolTemplate, my
   readFile(workflowStylePath, 'utf8'),
   readFile(taskSummaryComponentPath, 'utf8'),
   readFile(taskSummaryTemplatePath, 'utf8'),
+  readFile(searchResultTemplatePath, 'utf8'),
+  readFile(searchOptionsModelPath, 'utf8'),
+  readFile(searchConfigurationServicePath, 'utf8'),
   readFile(discoveryConfigurationPath, 'utf8'),
 ]);
 
@@ -136,6 +143,19 @@ test('PCIRN search sidebar hides type, has-files and access-status facets', () =
   }
   const authorFilter = discoveryConfiguration.match(/<bean id="searchFilterAuthor"[\s\S]*?<\/bean>/)[0];
   assert.match(authorFilter, /<property name="isOpenByDefault" value="false"\/>/);
+});
+
+test('semantic search mode is wired through the search options', () => {
+  assert.match(template, /class="pcirn-semantic-toggle"/);
+  assert.match(template, /toggleSemantic\(\$event\)/);
+  assert.match(searchOptionsModel, /semantic\?: boolean/);
+  assert.match(searchOptionsModel, /semantic=true/);
+  assert.match(searchConfigurationService, /getCurrentSemantic/);
+});
+
+test('search results show full-text context snippets', () => {
+  assert.match(searchResultTemplate, /firstMetadataValue\('fulltext'\)/);
+  assert.match(discoveryConfiguration, /<property name="field" value="fulltext"\/>/);
 });
 
 test('PCIRN search stylesheet exposes the approved visual/icon contract', () => {

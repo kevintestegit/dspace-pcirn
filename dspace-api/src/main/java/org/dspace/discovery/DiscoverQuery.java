@@ -32,6 +32,7 @@ public class DiscoverQuery {
      * Main attributes for the discovery query
      **/
     private String query;
+    private boolean semantic;
     private final List<String> filterQueries;
     private List<String> dspaceObjectFilters = new ArrayList<>();
     private final List<String> fieldPresentQueries;
@@ -101,6 +102,19 @@ public class DiscoverQuery {
 
     public String getQuery() {
         return query;
+    }
+
+    /**
+     * Whether this query should use the semantic (vector) search mode.
+     *
+     * @return true for semantic search.
+     */
+    public boolean isSemantic() {
+        return semantic;
+    }
+
+    public void setSemantic(boolean semantic) {
+        this.semantic = semantic;
     }
 
     public int getStart() {

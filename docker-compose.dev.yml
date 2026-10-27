@@ -22,6 +22,7 @@ volumes:
   assetstore:
   pgdata:
   solr_data:
+  ollama_data:
 
 services:
   dspace:
@@ -46,6 +47,11 @@ services:
       db__P__username: ${db__P__username:-dspace}
       db__P__password: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
       solr__P__server: ${solr__P__server:-http://dspacesolr:8983/solr}
+      semantic__P__enabled: ${SEMANTIC_ENABLED:-false}
+      semantic__P__embedding__P__url: ${SEMANTIC_EMBEDDING_URL:-http://ollama:11434/v1/embeddings}
+      semantic__P__embedding__P__model: ${SEMANTIC_EMBEDDING_MODEL:-bge-m3}
+      semantic__P__embedding__P__dimension: ${SEMANTIC_EMBEDDING_DIMENSION:-1024}
+      semantic__P__solr__P__server: ${SEMANTIC_SOLR_URL:-http://dspacesolr:8983/solr/semantic}
       proxies__P__trusted__P__ipranges: ${proxies__P__trusted__P__ipranges:-10.250.50}
       LOGGING_CONFIG: ${LOGGING_CONFIG:-/dspace/config/log4j2-container.xml}
       # LDAP is unused. Spring Boot still builds an LdapContextSource pointed at
@@ -175,6 +181,10 @@ services:
         cp -r /opt/solr/server/solr/configsets/oai/* oai
         precreate-core search /opt/solr/server/solr/configsets/search
         cp -r /opt/solr/server/solr/configsets/search/* search
+        if [ -d /opt/solr/server/solr/configsets/semantic ]; then
+          precreate-core semantic /opt/solr/server/solr/configsets/semantic
+          cp -r /opt/solr/server/solr/configsets/semantic/* semantic
+        fi
         precreate-core statistics /opt/solr/server/solr/configsets/statistics
         cp -r /opt/solr/server/solr/configsets/statistics/* statistics
         precreate-core qaevent /opt/solr/server/solr/configsets/qaevent
@@ -183,6 +193,19 @@ services:
         cp -r /opt/solr/server/solr/configsets/suggestion/* suggestion
         chown -R solr:solr /var/solr
         runuser -u solr -- solr-foreground
+
+  # Optional: start with --profile semantic and pull the model once:
+  #   docker compose -f docker-compose.dev.yml --profile semantic up -d ollama
+  #   docker compose -f docker-compose.dev.yml exec ollama ollama pull bge-m3
+  ollama:
+    container_name: dspace-ollama
+    image: ollama/ollama:latest
+    profiles: ["semantic"]
+    restart: unless-stopped
+    networks:
+      - dspacenet
+    volumes:
+      - ollama_data:/root/.ollama
 
   dspace-angular:
     container_name: dspace-angular

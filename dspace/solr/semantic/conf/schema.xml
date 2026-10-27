@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Dedicated vector store for semantic search. Keeping it in a separate core means the
+    main search schema stays compatible with the SolrJ 8.x embedded server used by tests.
+-->
+<schema name="semantic" version="1.6">
+    <fieldType name="string" class="solr.StrField" sortMissingLast="true"/>
+    <fieldType name="plong" class="solr.LongPointField" docValues="true"/>
+
+    <!-- This dimension MUST match semantic.embedding.dimension (1024 for bge-m3). -->
+    <fieldType name="knn_vector" class="solr.DenseVectorField"
+               vectorDimension="1024" similarityFunction="cosine"/>
+
+    <field name="_version_" type="plong" indexed="true" stored="true"/>
+    <field name="search.uniqueid" type="string" indexed="true" stored="true" required="true"/>
+    <field name="semantic_vector" type="knn_vector" indexed="true" stored="false"/>
+
+    <uniqueKey>search.uniqueid</uniqueKey>
+</schema>

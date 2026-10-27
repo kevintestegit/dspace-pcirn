@@ -62,6 +62,7 @@ import org.dspace.discovery.configuration.HierarchicalSidebarFacetConfiguration;
 import org.dspace.discovery.indexobject.factory.ItemIndexFactory;
 import org.dspace.discovery.indexobject.factory.WorkflowItemIndexFactory;
 import org.dspace.discovery.indexobject.factory.WorkspaceItemIndexFactory;
+import org.dspace.discovery.semantic.SemanticSearchService;
 import org.dspace.eperson.EPerson;
 import org.dspace.handle.service.HandleService;
 import org.dspace.services.factory.DSpaceServicesFactory;
@@ -106,6 +107,8 @@ public class ItemIndexFactoryImpl extends DSpaceObjectIndexFactoryImpl<Indexable
     protected WorkspaceItemIndexFactory workspaceItemIndexFactory;
     @Autowired
     protected VersionHistoryService versionHistoryService;
+    @Autowired
+    protected SemanticSearchService semanticSearchService;
 
 
     @Override
@@ -627,7 +630,21 @@ public class ItemIndexFactoryImpl extends DSpaceObjectIndexFactoryImpl<Indexable
     @Override
     public void delete(IndexableItem indexableObject) throws IOException, SolrServerException {
         super.delete(indexableObject);
+        deleteSemanticVector(indexableObject.getUniqueIndexID());
         deleteInProgressData(indexableObject.getUniqueIndexID());
+    }
+
+    @Override
+    public void deleteAll() throws IOException, SolrServerException {
+        super.deleteAll();
+        if (semanticSearchService == null) {
+            return;
+        }
+        try {
+            semanticSearchService.deleteAll();
+        } catch (Exception e) {
+            log.warn("Could not clear the semantic core", e);
+        }
     }
 
     private void deleteInProgressData(String indexableObjectIdentifier) throws SolrServerException, IOException {
@@ -640,7 +657,19 @@ public class ItemIndexFactoryImpl extends DSpaceObjectIndexFactoryImpl<Indexable
     @Override
     public void delete(String indexableObjectIdentifier) throws IOException, SolrServerException {
         super.delete(indexableObjectIdentifier);
+        deleteSemanticVector(indexableObjectIdentifier);
         deleteInProgressData(indexableObjectIdentifier);
+    }
+
+    private void deleteSemanticVector(String indexableObjectIdentifier) {
+        if (semanticSearchService == null) {
+            return;
+        }
+        try {
+            semanticSearchService.delete(indexableObjectIdentifier);
+        } catch (Exception e) {
+            log.warn("Could not delete semantic vector for {}", indexableObjectIdentifier, e);
+        }
     }
 
     @Override

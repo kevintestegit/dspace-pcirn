@@ -90,7 +90,7 @@ public class DiscoveryRestRepository extends AbstractDSpaceRestRepository {
     }
 
     public SearchResultsRest getSearchObjects(final String query, final List<String> dsoTypes, final String dsoScope,
-                                              final String configuration,
+                                              final String configuration, final Boolean semantic,
                                               final List<SearchFilter> searchFilters, final Pageable page,
                                               final Projection projection) {
         Context context = obtainContext();
@@ -104,6 +104,7 @@ public class DiscoveryRestRepository extends AbstractDSpaceRestRepository {
         try {
             discoverQuery = queryBuilder
                 .buildQuery(context, scopeObject, discoveryConfiguration, query, searchFilters, dsoTypes, page);
+            discoverQuery.setSemantic(Boolean.TRUE.equals(semantic));
             searchResult = searchService.search(context, scopeObject, discoverQuery);
 
         } catch (SearchServiceException e) {
@@ -111,9 +112,11 @@ public class DiscoveryRestRepository extends AbstractDSpaceRestRepository {
             throw new IllegalArgumentException("Error while searching with Discovery: " + e.getMessage());
         }
 
-        return discoverResultConverter
+        SearchResultsRest results = discoverResultConverter
             .convert(context, query, dsoTypes, configuration, dsoScope, searchFilters, page, searchResult,
                      discoveryConfiguration, projection);
+        results.setSemantic(Boolean.TRUE.equals(semantic));
+        return results;
     }
 
     public FacetConfigurationRest getFacetsConfiguration(final String dsoScope, final String configuration) {
