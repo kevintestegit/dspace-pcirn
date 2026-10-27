@@ -65,6 +65,8 @@
         Duplicate tokens at the same position (which may result from Stemmed Synonyms or
         WordDelim parts) are removed.
         -->
+    <!-- PCIRN: o campo texto padrão analisa português (ICUFolding + stemmer português).
+         Não volte este campo para o Snowball em inglês. -->
    	<fieldType name="text" class="solr.TextField" positionIncrementGap="100">
       <analyzer type="index">
         <tokenizer class="solr.WhitespaceTokenizerFactory"/>
