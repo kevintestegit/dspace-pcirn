@@ -17,8 +17,15 @@ public class SolrServiceImplSemanticTest {
 
     @Test
     public void identifiersAreBoostedInSemanticOrder() {
-        assertEquals("(search.uniqueid:\"Item-a\"^3 OR search.uniqueid:\"Item-b\"^2"
-                + " OR search.uniqueid:\"Item-c\"^1)",
+        assertEquals("(search.uniqueid:\"Item-a\"^0.0100 OR search.uniqueid:\"Item-b\"^0.0050"
+                + " OR search.uniqueid:\"Item-c\"^0.0033)",
             SolrServiceImpl.buildIdentifierQuery(List.of("Item-a", "Item-b", "Item-c")));
+    }
+
+    @Test
+    public void semanticQueryKeepsTheLexicalMatches() {
+        assertEquals("((crime contra a fauna) OR dc.title:(crime contra a fauna)^2)"
+                + " OR (search.uniqueid:\"Item-a\"^0.0100)",
+            SolrServiceImpl.buildSemanticQuery("crime contra a fauna", List.of("Item-a")));
     }
 }

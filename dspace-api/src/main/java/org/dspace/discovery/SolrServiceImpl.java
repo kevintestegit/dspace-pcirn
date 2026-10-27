@@ -953,14 +953,20 @@ public class SolrServiceImpl implements SearchService, IndexingService {
         }
 
         String solrQueryString = query;
-        if (discoveryQuery.isSemantic() && semanticSearchService != null && StringUtils.isNotBlank(query)) {
+        if (discoveryQuery.isSemantic() && semanticSearchService != null && StringUtils.isNotBlank(query)
+            && query.trim().split("\\s+").length > 1) {
             Optional<float[]> vector = semanticSearchService.embed(query);
             if (vector.isPresent()) {
-                int topK = Math.max(configurationService.getIntProperty("semantic.top-k", 100),
+                int topK = Math.max(configurationService.getIntProperty("semantic.top-k", 500),
                     Math.max(0, discoveryQuery.getStart()) + Math.max(1, discoveryQuery.getMaxResults()));
                 List<String> identifiers = semanticSearchService.search(vector.get(), topK);
                 if (!identifiers.isEmpty()) {
-                    solrQueryString = buildIdentifierQuery(identifiers);
+                    int maxSemanticResults = Math.max(1, configurationService.getIntProperty(
+                        "semantic.max-results", 50));
+                    if (identifiers.size() > maxSemanticResults) {
+                        identifiers = identifiers.subList(0, maxSemanticResults);
+                    }
+                    solrQueryString = buildSemanticQuery(query, identifiers);
                     // Keep highlighting the original text: it is what the user typed and what the UI displays.
                     solrQuery.setParam("hl.q", query);
                 } else {
@@ -1121,14 +1127,22 @@ public class SolrServiceImpl implements SearchService, IndexingService {
         return solrQuery;
     }
 
+    static String buildSemanticQuery(String query, List<String> identifiers) {
+        // Hybrid: lexical matches (with a title boost) first, nearest vectors below them.
+        // The title boost keeps an exact title match above a document that merely mentions it.
+        return "((" + query + ") OR dc.title:(" + query + ")^2) OR " + buildIdentifierQuery(identifiers);
+    }
+
     static String buildIdentifierQuery(List<String> identifiers) {
         StringBuilder query = new StringBuilder("(");
         for (int i = 0; i < identifiers.size(); i++) {
             if (i > 0) {
                 query.append(" OR ");
             }
+            double boost = Math.max(0.0001, 0.01 / (i + 1));
             query.append(SearchUtils.RESOURCE_UNIQUE_ID).append(":\"")
-                .append(identifiers.get(i)).append("\"^").append(identifiers.size() - i);
+                .append(identifiers.get(i)).append("\"^")
+                .append(String.format(Locale.ROOT, "%.4f", boost));
         }
         return query.append(')').toString();
     }

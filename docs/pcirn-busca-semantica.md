@@ -11,14 +11,17 @@
    O core principal de busca não muda, então o schema continua compatível com o Solr 8.x
    embarcado usado nos testes.
 3. Quando a busca é feita com `semantic=true`, o backend gera o vetor da consulta, busca os
-   identificadores mais próximos no core `semantic` e monta a consulta principal com esses IDs
-   ordenados por similaridade. Os filtros de permissão, coleção e `latestVersion` continuam
-   valendo no core principal.
+   identificadores mais próximos no core `semantic` e **combina esses IDs com a consulta
+   lexical**. A busca por palavras continua valendo para códigos, números de portaria, nomes e
+   variações de plural; os vetores entram como um reforço de relevância. Os filtros de permissão,
+   coleção e `latestVersion` continuam valendo no core principal.
 4. Os resultados voltam normalmente pela API/UI. Se o serviço de embeddings falhar, a busca cai
    automaticamente para a busca lexical (por palavras).
 
 A busca semântica continua mostrando o trecho do documento (`hitHighlights.fulltext`) quando o
-termo digitado aparece no texto. Ela não substitui a busca lexical: é um modo adicional.
+termo digitado aparece no texto. Ela é híbrida: não substitui a busca lexical. Consultas de uma
+única palavra continuam usando apenas a busca lexical, para preservar a precisão de termos,
+nomes e variações de plural.
 
 ## Modelo e dimensão
 
@@ -47,7 +50,8 @@ semantic.solr.server = ${solr.server}/${solr.multicorePrefix}semantic
 # semantic.embedding.api-key =
 # semantic.embedding.max-chars = 4000
 # semantic.embedding.timeout-ms = 15000
-# semantic.top-k = 100
+# semantic.top-k = 500
+# semantic.max-results = 50
 ```
 
 O endpoint precisa ser compatível com a API de embeddings da OpenAI. O Ollama expõe
@@ -123,13 +127,13 @@ específica, use `?semantic=false`.
 
 ## Limites
 
-- É busca vetorial pura (KNN). Códigos exatos, números de portaria e nomes pouco frequentes podem
-  funcionar melhor na busca lexical; o modo semântico é para consultas por assunto/sentido.
-- O `top-k` é limitado por `semantic.top-k` (padrão 100) ou pelo necessário para a página atual.
-  Os filtros de permissão/coleção são aplicados depois, no core principal; por isso, uma busca
-  muito filtrada pode devolver menos itens que o `top-k`.
-- A paginação e os filtros continuam funcionando; a contagem de facetas reflete os itens do
-  `top-k` que sobreviveram aos filtros.
+- A busca é híbrida: a consulta lexical é mantida e os vizinhos vetoriais entram com boost menor.
+  Códigos exatos, números de portaria e nomes continuam funcionando pela busca por palavras.
+- O `top-k` é limitado por `semantic.top-k` (padrão 500) para recall; no máximo `semantic.max-results`
+  (padrão 50) vizinhos entram na consulta. Os filtros de permissão/coleção são aplicados no core
+  principal; por isso, uma busca muito filtrada pode devolver menos itens que o `top-k`.
+- A paginação e os filtros continuam funcionando; a contagem de facetas reflete a consulta
+  híbrida.
 - Itens em workspace/workflow não recebem vetor; a busca semântica é para itens arquivados.
 - O destaque de trechos usa o termo digitado (`hl.q`). Documentos encontrados apenas por
   similaridade, sem o termo literal, aparecem sem trecho destacado.
