@@ -20,6 +20,10 @@
         <!-- Default submission process -->
         <name-map collection-handle="default" submission-name="pcirn"/>
 
+        <!-- Documents and tutorials published as links in the NUGECID collection.
+             The handle is created by V9.4_2026.08.24; update it if the collection is recreated. -->
+        <name-map collection-handle="123456789/34" submission-name="pcirnlink"/>
+
         <!-- Sample Entities Collection configuration based on the demo Entities dataset available at:
              https://github.com/DSpace-Labs/AIP-Files/releases/tag/demo-entities-data
              This sets up the following Entity-based Collections in that dataset:
@@ -128,6 +132,11 @@
             <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
             <type>submission-form</type>
         </step-definition>
+        <step-definition id="pcirnlinkdestino" mandatory="true">
+            <heading>submit.progressbar.describe.steptwo</heading>
+            <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
+            <type>submission-form</type>
+        </step-definition>
         <step-definition id="publicationStep" mandatory="true">
             <heading>submit.progressbar.describe.stepone</heading>
             <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
@@ -165,6 +174,11 @@
         </step-definition>
 
         <step-definition id="upload">
+            <heading>submit.progressbar.upload</heading>
+            <processing-class>org.dspace.app.rest.submit.step.UploadStep</processing-class>
+            <type>upload</type>
+        </step-definition>
+        <step-definition id="uploadoptional" mandatory="false">
             <heading>submit.progressbar.upload</heading>
             <processing-class>org.dspace.app.rest.submit.step.UploadStep</processing-class>
             <type>upload</type>
@@ -290,6 +304,17 @@
             <step id="pcirnpageone"/>
             <step id="pcirnpagetwo"/>
             <step id="upload"/>
+            <step id="license"/>
+        </submission-process>
+
+        <!-- Link-only entries for the Documents and Tutorials tabs. The upload
+             step is optional, so a submission can contain just metadata and a URL. -->
+        <submission-process name="pcirnlink">
+            <step id="collection"/>
+            <step id="pcirnpageone"/>
+            <step id="pcirnlinkdestino"/>
+            <step id="pcirnpagetwo"/>
+            <step id="uploadoptional"/>
             <step id="license"/>
         </submission-process>
 

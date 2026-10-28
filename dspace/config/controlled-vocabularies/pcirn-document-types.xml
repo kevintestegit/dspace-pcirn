@@ -2,6 +2,8 @@
 <node id="PCIRN_DOCUMENT_TYPES" label="Tipos de documento PCIRN">
     <isComposedBy>
         <node id="PORTARIA" label="Portaria e Ato Normativo Interno" />
+        <node id="DOCUMENTO_INSTITUCIONAL" label="Documento institucional" />
+        <node id="TUTORIAL" label="Tutorial" />
         <node id="POP" label="Procedimento Operacional Padrão (POP)" />
         <node id="PAP" label="Procedimento Administrativo Padrão (PAP)" />
         <node id="MANUAL_GUIA" label="Manual Técnico e Guia" />
