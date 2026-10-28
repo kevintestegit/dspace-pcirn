@@ -33,7 +33,7 @@ test('home-page template does not have hardcoded Portuguese text', () => {
     'Normas e Portarias',
     'POPs e Procedimentos',
     'Produção Científica',
-    'Relatórios Técnicos',
+    'Relatórios de Produtividade',
     'Acesso rápido',
     'Coleções em destaque',
     'Últimas publicações',
