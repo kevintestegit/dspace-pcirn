@@ -1,3 +1,11 @@
+--
+-- The contents of this file are subject to the license and copyright
+-- detailed in the LICENSE and NOTICE files at the root of the source
+-- tree and available online at
+--
+-- http://www.dspace.org/license/
+--
+
 -- PCIRN: point stored item/collection URIs at the public repository host.
 --
 -- The PCIRN migrations that created the initial collections wrote
