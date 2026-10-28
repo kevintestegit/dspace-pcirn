@@ -400,10 +400,10 @@
       "highlights": []
     },
     "home-search": {
-      "width": 1090,
-      "height": 157,
+      "width": 1200,
+      "height": 680,
       "caption": "Interface PCIRN · ambiente de demonstração · 06/10/2026",
-      "highlights": []
+      "highlights": [[50, 388, 660, 75]]
     }
   }
 }

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <defs>
+    <filter id="haircell" x="0" y="0" width="240" height="240" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9 0.7" numOctaves="4" seed="7" stitchTiles="stitch" result="noise"/>
+      <feDiffuseLighting in="noise" surfaceScale="2.4" diffuseConstant="1.05" lighting-color="#ffffff" result="lit">
+        <feDistantLight azimuth="235" elevation="42"/>
+      </feDiffuseLighting>
+      <feComponentTransfer in="lit">
+        <feFuncR type="linear" slope="0.0025" intercept="0.0015"/>
+        <feFuncG type="linear" slope="0.0481" intercept="0.0175"/>
+        <feFuncB type="linear" slope="0.1368" intercept="0.0482"/>
+        <feFuncA type="linear" slope="0" intercept="1"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="240" height="240" filter="url(#haircell)"/>
+</svg>
