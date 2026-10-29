@@ -433,5 +433,15 @@
     "version": "9.4.2026.09.23",
     "script": "V9.4_2026.09.23__pcirn_memoria_institucional_collection.sql",
     "checksum": 20958078
+  },
+  {
+    "version": "9.4.2026.10.28",
+    "script": "V9.4_2026.10.28__pcirn_public_identifier_uri.sql",
+    "checksum": -1436855571
+  },
+  {
+    "version": "9.4.2026.10.29",
+    "script": "V9.4_2026.10.29__pcirn_pap_cleanup.sql",
+    "checksum": -1496269519
   }
 ]

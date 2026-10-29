@@ -90,7 +90,7 @@
                     <repeatable>true</repeatable>
                     <label>Identificador ou código oficial</label>
                     <input-type>onebox</input-type>
-                    <hint>Informe o número da portaria, POP, nota ou instrução.</hint>
+                    <hint>Informe o número da legislação/portaria, POP, PAP, nota ou instrução.</hint>
                     <required></required>
                 </field>
             </row>
@@ -114,7 +114,7 @@
                     <repeatable>false</repeatable>
                     <label>Versão ou edição</label>
                     <input-type>onebox</input-type>
-                    <hint>Obrigatório para POPs e manuais quando existir.</hint>
+                    <hint>Obrigatório para POP e PAP quando existir.</hint>
                     <required></required>
                 </field>
             </row>
@@ -180,22 +180,6 @@
                     <input-type>onebox</input-type>
                     <hint>Use para relatórios, por exemplo: 2025-01-01 / 2025-12-31.</hint>
                     <required></required>
-                </field>
-            </row>
-        </form>
-
-        <!-- Destination of link-only entries: Documents or Tutorials tab -->
-        <form name="pcirnlinkdestino">
-            <row>
-                <field>
-                    <dc-schema>dc</dc-schema>
-                    <dc-element>type</dc-element>
-                    <dc-qualifier></dc-qualifier>
-                    <repeatable>true</repeatable>
-                    <label>Destino no site</label>
-                    <input-type value-pairs-name="pcirn_destinos">dropdown</input-type>
-                    <hint>Escolha a aba onde este documento deve aparecer.</hint>
-                    <required>O destino é obrigatório.</required>
                 </field>
             </row>
         </form>
@@ -1636,18 +1620,6 @@
             <pair>
                 <displayed-value>Other</displayed-value>
                 <stored-value>Other</stored-value>
-            </pair>
-        </value-pairs>
-
-        <!-- PCIRN: tabs that read link entries from the NUGECID collection -->
-        <value-pairs value-pairs-name="pcirn_destinos" dc-term="type">
-            <pair>
-                <displayed-value>Documento institucional</displayed-value>
-                <stored-value>Documento institucional</stored-value>
-            </pair>
-            <pair>
-                <displayed-value>Tutorial</displayed-value>
-                <stored-value>Tutorial</stored-value>
             </pair>
         </value-pairs>
 

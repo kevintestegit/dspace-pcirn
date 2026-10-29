@@ -91,6 +91,10 @@ public class DatabaseUtils {
      * @param argv the command line arguments given
      */
     public static void main(String[] argv) {
+        if (argv.length == 1 && "fresh-capability".equals(argv[0])) {
+            System.out.println("pcirn-fresh-v1");
+            return;
+        }
         // Usage checks
         if (argv.length < 1) {
             System.out.println("\nDatabase action argument is missing.");
@@ -452,6 +456,17 @@ public class DatabaseUtils {
 
             // Migration scripts are based on DBMS Keyword (see full path below)
             String dbType = getDbType(connection);
+            String profile = config.getProperty("db.pcirn.profile", "institutional");
+            if (!"institutional".equals(profile) && !"fresh".equals(profile)) {
+                throw new IllegalArgumentException("Unknown db.pcirn.profile: " + profile);
+            }
+            boolean fresh = "fresh".equals(profile);
+            if (fresh) {
+                if (!DBMS_POSTGRES.equals(dbType)) {
+                    throw new IllegalArgumentException("The PCIRN fresh profile requires PostgreSQL");
+                }
+                PcirnFreshProfile.validate(connection);
+            }
             connection.close();
 
             // Determine location(s) where Flyway will load all DB migrations
@@ -467,7 +482,9 @@ public class DatabaseUtils {
             }
 
             // Also add the Java package where Flyway will load SQL migrations from (based on DB Type)
-            scriptLocations.add("classpath:org/dspace/storage/rdbms/sqlmigration/" + dbType);
+            String migrationLocation = fresh ? "classpath:org/dspace/storage/rdbms/fresh/"
+                : "classpath:org/dspace/storage/rdbms/sqlmigration/";
+            scriptLocations.add(migrationLocation + dbType);
 
             // Also add the Java package where Flyway will load Java migrations from
             // NOTE: this also loads migrations from any sub-package
@@ -500,7 +517,7 @@ public class DatabaseUtils {
             // We are using the older name ("schema_version") for backwards compatibility.
             flywayConfiguration.table(FLYWAY_TABLE);
         } catch (SQLException e) {
-            log.error("Unable to setup Flyway against DSpace database", e);
+            throw new IllegalStateException("Unable to setup Flyway against DSpace database", e);
         }
 
         return flywayConfiguration;

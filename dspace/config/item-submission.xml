@@ -132,11 +132,6 @@
             <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
             <type>submission-form</type>
         </step-definition>
-        <step-definition id="pcirnlinkdestino" mandatory="true">
-            <heading>submit.progressbar.describe.steptwo</heading>
-            <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
-            <type>submission-form</type>
-        </step-definition>
         <step-definition id="publicationStep" mandatory="true">
             <heading>submit.progressbar.describe.stepone</heading>
             <processing-class>org.dspace.app.rest.submit.step.DescribeStep</processing-class>
@@ -308,11 +303,11 @@
         </submission-process>
 
         <!-- Link-only entries for the Documents and Tutorials tabs. The upload
-             step is optional, so a submission can contain just metadata and a URL. -->
+             step is optional, so a submission can contain just metadata and a URL.
+             The destination is the dc.type chosen in pcirnpagetwo. -->
         <submission-process name="pcirnlink">
             <step id="collection"/>
             <step id="pcirnpageone"/>
-            <step id="pcirnlinkdestino"/>
             <step id="pcirnpagetwo"/>
             <step id="uploadoptional"/>
             <step id="license"/>
