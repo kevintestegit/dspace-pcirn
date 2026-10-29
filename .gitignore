@@ -86,3 +86,7 @@ output/
 # Snapshot local de estabilizacao: contem os configs nao versionados
 # (.env, smtp.env, local.cfg). NUNCA versionar.
 .estabilizacao-backup/
+
+# Python bytecode caches
+__pycache__/
+*.py[cod]

@@ -31,18 +31,26 @@ def validate(args):
         raise pcirn.Error('Homologação exige duas releases com versões e digests distintos')
     if not Path(args.fixture_dump).is_file():
         raise pcirn.Error('Forneça dump DSpace fictício confiável compatível com release A')
-    return base, configs, a, b
+    empty_release = pcirn.manifest(args.empty_manifest) if args.empty_manifest else a
+    if configs[0].get('DB_PROFILE', 'institutional') != configs[1].get('DB_PROFILE', 'institutional') and not args.empty_manifest:
+        raise pcirn.Error('Perfis diferentes exigem --empty-manifest explícito')
+    for config, releases in ((configs[0], (a, b)), (configs[1], (empty_release,))):
+        key = 'fresh_migrations' if config.get('DB_PROFILE') == 'fresh' else 'migrations'
+        if any(key not in release['database'] for release in releases):
+            raise pcirn.Error('Manifesto incompatível com DB_PROFILE; não altere checksums Flyway')
+    return base, configs, a, b, empty_release
 
 
 def run(args):
     os.umask(0o077)
-    base, configs, a, b = validate(args)
+    base, configs, a, b, empty_release = validate(args)
+    empty_manifest = args.empty_manifest or args.manifest_a
     restored = pcirn.Deployment(base / 'restored', config=configs[0])
     empty = pcirn.Deployment(base / 'empty', config=configs[1])
     # No writes until both hosts/databases/images pass readiness and isolation checks.
-    for dep in (empty, restored):
-        preflight.check(dep, a)
-        preflight.check(dep, b)
+    for dep, releases in ((empty, (empty_release,)), (restored, (a, b))):
+        for release in releases:
+            preflight.check(dep, release)
         if dep.user_objects() != 0:
             raise pcirn.Error('Ambos os bancos de homologação devem estar vazios antes do ensaio')
     header = restored.run(['pg_restore', '--list', str(Path(args.fixture_dump).absolute())], timeout=30)
@@ -53,7 +61,8 @@ def run(args):
     base.mkdir(mode=0o700, parents=True)
     report = {'fixture_sha256': pcirn.checksum(Path(args.fixture_dump)), 'steps': [],
               'release_a': a['version'], 'release_b': b['version'],
-              'scope': 'restored-lifecycle-and-empty-denial', 'passed': False}
+              'empty_release': empty_release['version'],
+              'scope': 'restored-lifecycle-and-empty-install', 'passed': False}
     report_path = base / 'homolog-report.json'
 
     def cli(dep, command, *options, expected=0):
@@ -84,11 +93,11 @@ def run(args):
 
     try:
         before = empty.user_objects()
-        denied = cli(empty, 'install', '--config', args.empty_config, '--manifest', args.manifest_a, expected=1)
+        denied = cli(empty, 'install', '--config', args.empty_config, '--manifest', empty_manifest, expected=1)
         ensure('--authorize-migrations' in denied.stderr, 'banco vazio recusado por falta de autorização')
         ensure(empty.user_objects() == before,
                'tentativa sem autorização preserva banco vazio')
-        ensure(not empty.compose(a, 'ps', '-q').strip(), 'tentativa negada não cria containers')
+        ensure(not empty.compose(empty_release, 'ps', '-q').strip(), 'tentativa negada não cria containers')
         ensure(not list((empty.root / 'backups').glob('backup-*')), 'tentativa negada não cria backups')
         ensure(not (empty.root / 'installed.json').exists(), 'banco vazio não registrado como instalado')
         ensure(not (empty.root / 'operation.json').exists(), 'sem operação mutável na tentativa negada')
@@ -156,18 +165,20 @@ def run(args):
         if args.authorize_empty_migrations:
             # Only this runner's stack is removed; external DB and all data remain.
             restored.compose(a, 'down')
-            preflight.check(empty, a)
-            cli(empty, 'install', '--config', args.empty_config, '--manifest', args.manifest_a,
+            preflight.check(empty, empty_release)
+            cli(empty, 'install', '--config', args.empty_config, '--manifest', empty_manifest,
                 '--authorize-migrations')
-            ensure(not empty.pending(a), 'banco vazio autorizado recebe histórico completo')
-            cli(empty, 'health'); verify_images(empty, a)
+            ensure(not empty.pending(empty_release), 'banco vazio autorizado recebe histórico completo')
+            cli(empty, 'health'); verify_images(empty, empty_release)
             report['authorized_empty'] = 'passed'
         else:
             report['authorized_empty'] = 'not_run'
-        report['passed'] = True
+        for dep in (restored, empty):
+            ensure(not (dep.root / 'operation.json').exists(), 'journal encerrado: ' + dep.root.name)
+        report['passed'] = report['authorized_empty'] == 'passed'
         pcirn.write_json(report_path, report)
-        print(f'E2E: aprovado; evidências em {report_path}')
-        return 0
+        print(f"E2E: {'aprovado' if report['passed'] else 'parcial'}; evidências em {report_path}")
+        return 0 if report['passed'] else 2
     except (pcirn.Error, OSError, ValueError, KeyboardInterrupt):
         report['passed'] = False
         pcirn.write_json(report_path, report)
@@ -183,6 +194,7 @@ def main(argv=None):
     parser.add_argument('--empty-config', required=True)
     parser.add_argument('--manifest-a', required=True)
     parser.add_argument('--manifest-b', required=True)
+    parser.add_argument('--empty-manifest', help='Manifesto próprio para o perfil do banco vazio; padrão A')
     parser.add_argument('--fixture-dump', required=True)
     parser.add_argument('--authorize-migrations', action='store_true')
     parser.add_argument('--authorize-empty-migrations', action='store_true')

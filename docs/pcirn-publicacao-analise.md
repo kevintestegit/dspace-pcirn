@@ -2,21 +2,23 @@
 
 Análise do fluxo de depósito, revisão e leitura de portarias, POPs e demais documentos do Repositório Institucional PCIRN.
 
-Atualizado em 2026-09-15, após aplicação das migrações `V9.4_2026.08.24` e `V9.4_2026.09.15`.
+Atualizado em 2026-10-13, após a consolidação das coleções POP de IC, IML e II em uma única coleção `POP` por comunidade (as migrações `V9.4_2026.08.24` e `V9.4_2026.09.15` seguem aplicadas).
 
 ## 1. Estrutura
 
 Fonte: `dspace/config/pcirn/structure.xml` (import manual com `dspace structure-builder`, ver `docs/pcirn-repository.md`).
 
-23 coleções em 5 comunidades (as 22 do `structure.xml` mais a coleção `Documentos do NUGECID`), handles `123456789/2..27` e `/34`:
+20 coleções em 5 comunidades (as 18 do `structure.xml` mais as coleções `Documentos do NUGECID` `/34` e `Memória Institucional` `/2272`), handles `123456789/2..27` (com lacunas em `/8`, `/9`, `/15` e `/16`), `/34` e `/2272`:
 
-| Comunidade | Portarias | POPs | Outras |
+| Comunidade | Portarias | POP | Outras |
 |---|---|---|---|
 | Gestão Estratégica e Administrativa (DG) | `/2` | — | Manuais `/3`, Relatórios `/4`, Notas `/5` |
-| Instituto de Criminalística (IC) | `/25` | Internas `/7`, Externas `/8`, Lab `/9` | Manuais `/10`, Relatórios `/11`, Notas `/12` |
-| Instituto de Identificação (II) | `/26` | Biometria/Papiloscopia `/20` | Diretrizes `/21`, Manuais ABIS/CIN `/22`, Notas `/23` |
-| Instituto de Medicina Legal (IML) | `/27` | Tanatologia `/14`, Sexologia `/15`, Antropologia `/16` | Manuais `/17`, Notas `/18` |
-| NUGECID | — | — | Documentos do NUGECID `/34` |
+| Instituto de Criminalística (IC) | `/25` | `/7` | Manuais `/10`, Relatórios `/11`, Notas `/12` |
+| Instituto de Identificação (II) | `/26` | `/20` | Diretrizes `/21`, Manuais ABIS/CIN `/22`, Notas `/23` |
+| Instituto de Medicina Legal (IML) | `/27` | `/14` | Manuais `/17`, Notas `/18` |
+| NUGECID | — | — | Documentos do NUGECID `/34`, Memória Institucional `/2272` |
+
+A consolidação de 2026-10-13 reuniu as coleções por área em uma única `POP` por comunidade: os itens de `/15` e `/16` (IML) passaram a pertencer a `/14`, e as coleções `/8`, `/9`, `/15` e `/16` (vazias) foram excluídas. Os itens POP do II permaneceram em `/20`, que perdeu o sufixo "e Guias". Nenhum Handle de item foi alterado.
 
 A comunidade NUGECID e a coleção `Documentos do NUGECID` são criadas por migração (`V9.4_2026.08.15` e `V9.4_2026.08.24`), não pelo `structure.xml`.
 
@@ -42,7 +44,7 @@ O mesmo formulário vale para portaria, POP e documento comum; o tipo é apenas 
 
 - Passo único `editstep`, role `editor` = grupo `NUGECID` (`dspace/config/spring/api/workflow.xml:27-51`).
 - Ação `editaction` (`AcceptEditRejectAction`), com quatro opções: **validar** (`submit_approve`), **editar** (`submit_edit_metadata`, abre a página de submissão do item), **retornar ao setor** (`submit_reject`, exige motivo e devolve ao workspace do depositante) e **excluir** (`submit_delete`, apaga definitivamente workflow item, item e arquivos). `return_to_pool` foi removido.
-- `cwf_collectionrole editor=NUGECID` existe para as 23 coleções (residual: o papel é `REPOSITORY`, resolvido pelo nome do grupo).
+- `cwf_collectionrole editor=NUGECID` existe para as 20 coleções (residual: o papel é `REPOSITORY`, resolvido pelo nome do grupo).
 - Curadoria: `dspace/config/spring/api/workflow-curation.xml:12` mapeia tudo para `none`; nenhuma task roda. Virus scan desligado (`dspace/config/modules/submission-curation.cfg:10`). PDF/A é exigência manual, não validada pelo sistema.
 
 ## 4. Permissões (estado atual, pós-09.15)
@@ -50,11 +52,11 @@ O mesmo formulário vale para portaria, POP e documento comum; o tipo é apenas 
 | Grupo | Depositar (ADD) | Revisar | Ler |
 |---|---|---|---|
 | `PCIRN_Setor_DG` | 4 coleções do DG | não | via pública |
-| `PCIRN_Setor_IC` | 7 coleções do IC | não | via pública |
+| `PCIRN_Setor_IC` | 5 coleções do IC | não | via pública |
 | `PCIRN_Setor_II` | 5 coleções do II | não | via pública |
-| `PCIRN_Setor_IML` | 6 coleções do IML | não | via pública |
-| `PCIRN_Setor_NUGECID` | coleção `/34` | não | via pública |
-| `NUGECID` | não | todas as 23 coleções | via pública |
+| `PCIRN_Setor_IML` | 4 coleções do IML | não | via pública |
+| `PCIRN_Setor_NUGECID` | 2 coleções do NUGECID | não | via pública |
+| `NUGECID` | não | todas as 20 coleções | via pública |
 | `Usuarios_Logados` | não | não | via pública (grupo sem policies próprias) |
 | `Anonymous` | não | não | tudo: comunidades, coleções, itens arquivados, bundles e bitstreams |
 | `PCIRN_Depositantes` | nenhuma (legado) | não | via pública |

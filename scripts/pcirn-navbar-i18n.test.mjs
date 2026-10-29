@@ -22,6 +22,13 @@ test('PCIRN header navigation labels use translated keys', () => {
   }
 });
 
+test('PCIRN header exposes the Sobre dropdown with repository and documents', () => {
+  assert.match(template, /ngbDropdown/);
+  assert.match(template, /'menu\.section\.about'\s*\|\s*translate/);
+  assert.match(template, /routerLink="\/info\/about"/);
+  assert.match(template, /routerLink="\/info\/documentos"/);
+});
+
 test('PCIRN footer navigation labels use plural collections key', () => {
   const footerTemplate = readFileSync(
     new URL('../dspace-angular/source/src/app/footer/footer.component.html', import.meta.url),

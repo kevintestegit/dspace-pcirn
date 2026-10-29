@@ -11,6 +11,16 @@ necessários para Flyway e restore. Não há serviço PostgreSQL nesta stack.
 
 ## Configuração inicial
 
+O pacote de transferência e os manifestos A/B estão descritos em
+[homolog/README.md](homolog/README.md), incluindo procedência e a pendência do dump
+sintético. Gere o pacote com `python3 scripts/package-installer.py --output ARQUIVO.tar.gz`.
+O checksum é gerado ao lado; confira-o com `sha256sum -c ARQUIVO.tar.gz.sha256`.
+
+Além dos seis campos abaixo, `DB_PROFILE` aceita `institutional` (padrão) ou
+`fresh`. Este último exige manifesto com `fresh_bootstrap=pcirn-fresh-v1` e
+`fresh_migrations`, configura o backend para bootstrap novo e usa esse histórico
+em todas as comparações. Não use fresh para converter um banco institucional.
+
 Crie `/etc/dspacepcirn/nti.json`, com permissão 600 (diretório 700):
 
 ```json
@@ -26,13 +36,33 @@ Crie `/etc/dspacepcirn/nti.json`, com permissão 600 (diretório 700):
 
 Os seis campos são obrigatórios. Não há interpolação nem execução de shell.
 `sslmode` explícito aceita require, verify-ca ou verify-full; os parâmetros JDBC
-adicionais aceitos são sslrootcert, sslcert e sslkey. Certificados precisam existir
-no host **e no backend** com os mesmos caminhos: o pipeline deve empacotar a CA
-institucional ou o NTI deve configurar mounts no Compose antes do primeiro start.
+adicionais aceitos são sslrootcert, sslcert e sslkey. Cada caminho deve ser absoluto
+e apontar para um arquivo legível no host. verify-ca/verify-full exigem sslrootcert
+explícito, sem depender de certificados implícitos do usuário do host.
+A CLI monta esses arquivos somente
+leitura no backend, nos mesmos caminhos, inclusive no container de migration.
+O Compose recebe um override temporário em cada chamada; nenhum arquivo existente
+é sobrescrito e Docker não cria diretórios quando um certificado está ausente.
 Nunca empacote chaves privadas nas imagens. Use require apenas quando autorizado
 pelo NTI; verify-full verifica também a identidade do servidor.
 
-Faça login no GHCR previamente com Docker, quando as imagens forem privadas.
+Faça login no GHCR como o usuário que executará a instalação. Para execução como
+root com configuração padrão, use `sudo docker login ghcr.io --username USUARIO`.
+Imagens privadas exigem PAT classic com `read:packages` e acesso aos três pacotes;
+autorize SSO quando exigido. O token não pertence ao JSON de configuração.
+Se o login já está em outro diretório Docker, informe-o explicitamente:
+
+```bash
+export DOCKER_CONFIG=/caminho/absoluto/docker-autenticado
+docker --context default login ghcr.io --username USUARIO
+sudo DOCKER_CONFIG="$DOCKER_CONFIG" ./install.sh \
+  --root /srv/dspacepcirn --config /etc/dspacepcirn/nti.json \
+  --manifest /tmp/release.json --authorize-migrations
+```
+
+A CLI preserva `DOCKER_CONFIG`; continua ignorando `DOCKER_HOST`/`DOCKER_CONTEXT`
+e usando o contexto local default. Use o mesmo diretório nas chamadas posteriores
+de update/restore. Login do usuário comum em `~/.docker` não autentica root.
 Obtenha e revise o manifesto publicado pelo pipeline; não execute curl | bash.
 
 ```bash
@@ -58,11 +88,13 @@ partir de `smtp.env.example` — com o envio desabilitado — e nunca o sobrescr
 preencha o SMTP institucional e remova `mail__P__server__P__disabled` para
 habilitar as notificações. O arquivo precisa existir para o Compose subir.
 
-Arquivos existentes nunca são sobrescritos por install. Configuração fornecida
-que divergir da existente causa erro. A segunda instalação da mesma release apenas
-verifica os pré-requisitos e a saúde, sem backup, migration ou restart. Para outra
-release, use update. O diretório deve ser dedicado e não conter links nos caminhos
-administrativos. Não aponte a CLI para o checkout, mounts ou banco da stack atual.
+Configuração, `compose.yml`, `smtp.env` e `local.cfg` existentes nunca são
+sobrescritos; configurar diferente da existente causa erro. Os scripts em
+`ROOT/bin` são atualizados pelo próprio pacote em `install`/`update`. A segunda
+instalação da mesma release apenas verifica os pré-requisitos e a saúde, sem
+backup, migration ou restart. Para outra release, use update. O diretório deve ser
+dedicado e não conter links nos caminhos administrativos. Não aponte a CLI para o
+checkout, mounts ou banco da stack atual.
 
 ## Comandos
 
@@ -141,9 +173,9 @@ de backup avulso antes de qualquer alteração de dados, rollback apenas reinici
 a release anterior, sem exigir autorização de restore. Não apague o journal
 para forçar update.
 
-## Contrato esperado do pipeline GHCR — integração pendente
+## Contrato do pipeline GHCR
 
-O pipeline paralelo deve publicar um arquivo JSON de release confiável com:
+O pipeline publica um arquivo JSON de release confiável com:
 
 ```json
 {
@@ -177,13 +209,14 @@ Backend: /dspace/bin/dspace, server-boot.jar, curl e Java 17; startup sem migrat
 Solr: cores DSpace e utilitários init-var-solr/precreate-core/runuser/curl conforme
 Compose atual. Frontend: Node SSR porta 4000, configuração DSPACE_* em runtime.
 Banco usa schema public; assetstore em /dspace/assetstore. Imagens devem suportar
-os envs e healthchecks do Compose existente. A CLI instalada é distribuída junto
-com esta árvore, não atualizada implicitamente pelo manifesto de imagens.
+os envs e healthchecks do Compose existente. A CLI instalada é atualizada a partir
+do pacote/árvore que executa `install` ou `update`; o manifesto de imagens continua
+sem alterar os scripts administrativos.
 
-Pendente: emissão do manifesto pelo pipeline DeepSeek, digests/versões reais,
-permissões GHCR, arquitetura do servidor e ensaio end-to-end em homologação com
-PostgreSQL externo (TLS, privilégios, Flyway, backup/restore e healthchecks).
-Workflows do GitHub Actions não foram alterados por este instalador.
+O workflow publica manifesto, archive do instalador e checksum; a ativação no
+GitHub depende de integrar estas alterações ao repositório de origem e publicar
+uma nova tag. O ensaio end-to-end em homologação com PostgreSQL externo (TLS,
+privilégios, Flyway, backup/restore e healthchecks) permanece obrigatório.
 
 ## Testes isolados
 
@@ -198,6 +231,8 @@ backup, autorização, concorrência, proteção de credenciais e travessia de a
 `test_production_operations.py` cobre a superfície fora da CLI — entrypoint do
 Compose, `scripts/backup-dspace.sh`, publicação manual e SMTP — e usa o Docker
 apenas para renderizar configurações; sem o CLI do Docker esses casos são pulados.
+`scripts/backup-dspace.sh` atende somente stacks Compose de desenvolvimento/
+produção manual; a instalação NTI usa `dspacepcirn backup`.
 Referências técnicas: [Compose up --wait](https://docs.docker.com/reference/cli/docker/compose/up/),
 [interpolação Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
 e [pg_restore](https://www.postgresql.org/docs/current/app-pgrestore.html).

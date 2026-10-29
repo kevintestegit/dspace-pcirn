@@ -1,0 +1,112 @@
+[
+  {
+    "manifest": "release-a.json",
+    "source_release": "https://github.com/kevintestegit/dspace-pcirn/releases/tag/v1.0.0-rc4",
+    "build": {
+      "url": "https://github.com/kevintestegit/dspace-pcirn/actions/runs/37949362468",
+      "conclusion": "success",
+      "headSha": "4fa3a52942cd622218738b1b5ca2d79043d0e7e0"
+    },
+    "jobs": [
+      {
+        "name": "Validate release",
+        "conclusion": "success"
+      },
+      {
+        "name": "solr (arm64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "angular (amd64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "backend (amd64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "solr (amd64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "backend (arm64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "angular (arm64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish angular",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish solr",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish backend",
+        "conclusion": "success"
+      },
+      {
+        "name": "Release manifest",
+        "conclusion": "success"
+      }
+    ]
+  },
+  {
+    "manifest": "release-b.json",
+    "source_release": "https://github.com/kevintestegit/dspace-pcirn/releases/tag/v1.0.0-rc6",
+    "build": {
+      "url": "https://github.com/kevintestegit/dspace-pcirn/actions/runs/38421955489",
+      "conclusion": "success",
+      "headSha": "45bdcc9f8493569bd3d2f18f1821411aeadb06f9"
+    },
+    "jobs": [
+      {
+        "name": "Validate release",
+        "conclusion": "success"
+      },
+      {
+        "name": "backend (arm64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "backend (amd64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "solr (arm64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "angular (amd64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "angular (arm64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "solr (amd64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish solr",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish backend",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish angular",
+        "conclusion": "success"
+      },
+      {
+        "name": "Release manifest",
+        "conclusion": "success"
+      }
+    ]
+  }
+]

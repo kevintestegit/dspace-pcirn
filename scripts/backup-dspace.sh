@@ -2,6 +2,9 @@
 # Backup of the state that cannot be regenerated: the PostgreSQL database, the
 # assetstore and the Solr statistics core.
 #
+# For a CLI-managed NTI installation use `dspacepcirn backup`; this script is
+# only for the Compose-managed development/manual-production stacks.
+#
 # Two deployment shapes are supported and detected automatically:
 #
 #   development  docker-compose.dev.yml, PostgreSQL in the dspacedb container
@@ -17,7 +20,7 @@ set -Eeuo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-backup_root="${1:-${ROOT}/backups}"
+backup_root="$(realpath -m -- "${1:-${ROOT}/backups}")"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_dir="${backup_root%/}/dspace-${timestamp}"
 tmp_dir="${backup_dir}/.incomplete"

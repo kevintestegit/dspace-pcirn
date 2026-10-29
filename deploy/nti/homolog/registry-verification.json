@@ -1,0 +1,146 @@
+[
+  {
+    "manifest": "a",
+    "service": "backend",
+    "image": "ghcr.io/kevintestegit/dspace-pcirn-backend@sha256:61a9fed43f1634912178df9f58a0c487d2491b3038e61c919cfe4c76fad6a63b",
+    "verified": true,
+    "platforms": [
+      {
+        "architecture": "arm64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    ]
+  },
+  {
+    "manifest": "a",
+    "service": "solr",
+    "image": "ghcr.io/kevintestegit/dspace-pcirn-solr@sha256:345286a3282e17326d9d48b12889ddabffb221e4d2954710492dd7f89ea2a64d",
+    "verified": true,
+    "platforms": [
+      {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      {
+        "architecture": "arm64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    ]
+  },
+  {
+    "manifest": "a",
+    "service": "frontend",
+    "image": "ghcr.io/kevintestegit/dspace-pcirn-angular@sha256:53c19f826c25ecbb5dca06c6323fcc54550d63e417e99cedc5c57a6b453be80c",
+    "verified": true,
+    "platforms": [
+      {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      {
+        "architecture": "arm64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    ]
+  },
+  {
+    "manifest": "b",
+    "service": "backend",
+    "image": "ghcr.io/kevintestegit/dspace-pcirn-backend@sha256:5ad862d8501944a747d22d537b01d35f44aea3d3aa8facdb3e5bcd74fbf5813f",
+    "verified": true,
+    "platforms": [
+      {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      {
+        "architecture": "arm64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    ]
+  },
+  {
+    "manifest": "b",
+    "service": "solr",
+    "image": "ghcr.io/kevintestegit/dspace-pcirn-solr@sha256:4ebda1f4c49bbf80541fda6560e32ff1184ab53126146447885fa25402d7ef18",
+    "verified": true,
+    "platforms": [
+      {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      {
+        "architecture": "arm64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    ]
+  },
+  {
+    "manifest": "b",
+    "service": "frontend",
+    "image": "ghcr.io/kevintestegit/dspace-pcirn-angular@sha256:43b54dd560d691ecbc21ffec2a6281238e68fcc71133e1258fb1b2e4e732bdc1",
+    "verified": true,
+    "platforms": [
+      {
+        "architecture": "arm64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    ]
+  }
+]

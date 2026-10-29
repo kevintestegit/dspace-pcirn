@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+Priorize economia de tokens e execução eficiente. Investigue somente arquivos relevantes. Evite ler diretórios inteiros, repetir comandos, executar testes sem relação com as alterações ou produzir logs extensos. Utilize subagentes apenas para tarefas independentes que justifiquem a delegação. Apresente resultados resumidos, indicando alterações, testes executados e problemas encontrados. Não sacrifique a validação necessária para economizar tokens.
+
 ## Project Structure & Module Organization
 
 This repository contains the DSpace backend, a Maven multi-module Java 17 application. Core domain and API code lives in `dspace-api/`; application services are in `dspace-services/`; the REST server is in `dspace-server-webapp/`. Protocol and integration modules include `dspace-oai/`, `dspace-sword/`, `dspace-swordv2/`, `dspace-rdf/`, `dspace-saml2/`, and `dspace-iiif/`. Each module keeps production code under `src/main` and tests under `src/test`. Root-level `pom.xml`, Dockerfiles, and Compose files provide build and local deployment configuration.
@@ -42,6 +44,8 @@ Do not commit credentials, local `.env` files, database dumps, or generated arti
   complexity or improve reliability. Do not reimplement common functionality without a clear reason.
 - Lean on the dependencies already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
 - Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.    
+
+- Keep every source file at or below 500 LOC. Tests, docs and CSS are exempt. Markdown is documentation, not source. Split a source file before completion if your change takes it over the limit.
 
 # JEV
 

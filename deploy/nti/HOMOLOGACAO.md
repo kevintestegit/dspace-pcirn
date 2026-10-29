@@ -1,15 +1,17 @@
 # Homologação do dspacepcirn numa VM Ubuntu limpa
 
-Este roteiro prepara a execução; nenhuma imagem ou banco real foi usado nos testes
-locais. O executor real tem opt-in e só aceita dois bancos com nomes definidos.
+Este roteiro prepara a execução; o ciclo real com imagens DSpace ainda não foi
+executado. Houve teste isolado com PostgreSQL 15 e dados sintéticos. O executor
+real tem opt-in e só aceita dois bancos com nomes definidos.
 Não execute no host de produção nem aponte configurações para bancos existentes.
-O contrato do manifesto em README.md permanece inalterado.
+Os manifestos reais, sua procedência e o bloqueio do dump estão descritos em
+[homolog/README.md](homolog/README.md). A preparação não equivale à aprovação E2E.
 
 ## Responsabilidades e entradas
 
 NTI: VM Ubuntu limpa, Docker local, PostgreSQL externo de homologação com TLS,
 usuário proprietário dos bancos e do schema public, certificado e acesso ao GHCR.
-DeepSeek: duas releases A/B com versões e pelo menos um digest diferentes, os
+Mantenedor: duas releases A/B com versões e pelo menos um digest diferentes, os
 manifestos v1 já contratados, imagens para a arquitetura da VM e configuração dos
 certificados no backend. A compatibilidade Flyway deve ser real, inclusive checksum.
 
@@ -50,13 +52,19 @@ recusa sem autorização e, se autorizada separadamente, a inicialização Flywa
    sobreponha 10.250.50.0/24. Não crie redes/containers locais de PostgreSQL.
    GHCR precisa estar acessível com autenticação, se privado; o PostgreSQL externo
    precisa resolver DNS, conectar e negociar TLS. O proxy público HTTPS fica sob NTI.
-5. Faça checkout **feat/nti-installer**, registre o commit e faça login Docker no
-   GHCR, quando necessário. Copie os artefatos confiáveis para /opt/pcirn-homolog/:
+5. Faça checkout da tag da release sob homologação, registre o commit e faça login
+   Docker no GHCR como o usuário executor, quando necessário. Se executar como
+   root usando o login de outro usuário, passe `sudo DOCKER_CONFIG=/caminho/docker`
+   explicitamente em todas as chamadas; a CLI preserva esse diretório de credenciais.
+   Copie os artefatos confiáveis para /opt/pcirn-homolog/:
    release-a.json, release-b.json e fictional-a.dump. Não execute docker build.
 6. Prepare /etc/dspacepcirn/homolog-restored.json e homolog-empty.json com o mesmo
-   formato de configuração do README (seis campos, chmod 600, diretório 700).
+   formato de configuração do README (chmod 600, diretório 700).
+   Para os manifestos fornecidos, restored usa os seis campos e perfil institucional;
+   empty acrescenta `"DB_PROFILE": "fresh"` e usa o manifesto B.
    DB_URL identifica os bancos acima e exige sslmode. Certificados indicados pelo
-   JDBC precisam existir também no container backend com o mesmo caminho.
+   JDBC devem ser arquivos absolutos legíveis no host; a CLI monta-os somente
+   leitura no backend com o mesmo caminho, inclusive durante migrations.
 7. Tire snapshot da VM e registre que os dois bancos estão vazios. Snapshot de VM
    não inclui PostgreSQL externo: a recuperação do estado inicial desses bancos
    precisa ser combinada separadamente com NTI. Execute como usuário com acesso
@@ -71,8 +79,8 @@ python3 deploy/nti/preflight.py \
   --manifest /opt/pcirn-homolog/release-a.json
 ```
 
-Saída esperada: `preflight: OK`, código 0. Repita para B e para a configuração de
-empty. Nenhum pull, migration, container ou diretório de instalação é criado pelo
+Saída esperada: `preflight: OK`, código 0. Repita com B no banco restored e com B na configuração de
+empty (perfil fresh). Nenhum pull, migration, container ou diretório de instalação é criado pelo
 preflight. As chamadas externas têm prazo de 30 segundos; falha bloqueia instalação.
 `install.sh` executa esse preflight antes de provisionar. A chamada direta da CLI
 `install` permanece disponível para operação administrada: execute o preflight
@@ -101,6 +109,7 @@ python3 deploy/nti/tests/e2e_homolog.py \
   --empty-config /etc/dspacepcirn/homolog-empty.json \
   --manifest-a /opt/pcirn-homolog/release-a.json \
   --manifest-b /opt/pcirn-homolog/release-b.json \
+  --empty-manifest /opt/pcirn-homolog/release-b.json \
   --fixture-dump /opt/pcirn-homolog/fictional-a.dump \
   --authorize-migrations \
   --authorize-empty-migrations
@@ -141,7 +150,7 @@ reinicializados pelo NTI, não removendo apenas o diretório para contornar os g
 | Restore autorizado | Registro/bytes originais voltam; objeto criado depois do backup deixa de existir |
 | Update | Backup anterior contém A; version informa B; três containers usam exatamente os digests B |
 | Rollback | Negado sem flag; autorizado volta para A e seus dados; configuração conserva hash |
-| Empty autorizado | Histórico Flyway completo de A, versão A e três containers healthy usando seus digests |
+| Empty autorizado | Histórico completo do perfil do empty-manifest, sua versão e três containers healthy usando seus digests |
 | Saúde | Cada start termina em até 600s e health retorna 0; backend, Solr e frontend running/healthy |
 | Evidências | report.passed=true, authorized_empty=passed, nenhum assert false; NTI registra VM/commit/data e aprova |
 
@@ -188,6 +197,10 @@ A recuperação só está aprovada quando dados/hash/versão e health voltam aos
 esperados e o journal deixa de existir. Para terminar o ensaio, NTI arquiva as
 evidências e descarta a VM/bancos dedicados sob seu procedimento; o executor não faz isso.
 
+Sem `--authorize-empty-migrations`, o relatório é parcial, retorna código 2 e
+`passed=false`. O manifesto usado no banco vazio pode diferir de A, mas precisa
+declarar o histórico compatível com o perfil de sua configuração.
+
 ## Testes leves disponíveis agora
 
 ```bash
@@ -195,7 +208,8 @@ python3 -m unittest discover -s deploy/nti/tests -v
 bash -n install.sh deploy/nti/dspacepcirn
 ```
 
-Todos usam mocks ou executáveis fictícios em diretórios temporários. O ciclo E2E
+A suíte padrão usa mocks ou executáveis fictícios em diretórios temporários;
+a integração opcional PostgreSQL usa um container local descartável. O ciclo E2E
 simulado roda o mesmo executor da VM e verifica os dados fictícios após restore e
 rollback; não apenas códigos de saída. A simulação não comprova execução real de
 Flyway, pg_restore, arquitetura das imagens, certificados dentro do backend ou

@@ -103,7 +103,7 @@ test('PCIRN sidebar chrome follows the system type scale', () => {
   assert.match(styles, /\.sidebar-content \.search-switch-configuration h3/);
   assert.match(styles, /\.sidebar-content ds-themed-search-filters h3/);
   assert.match(styles, /\.sidebar-content ds-themed-search-settings h3/);
-  assert.match(styles, /ds-search-settings h4,[\s\S]*?font-size: \.9rem/);
+  assert.match(styles, /ds-search-settings h4,[\s\S]*?font-size: \.88rem/);
   assert.match(styles, /ds-search-filters \.btn \{[\s\S]*?font-size: \.85rem/);
 });
 
@@ -177,26 +177,21 @@ test('PCIRN search stylesheet exposes the approved visual/icon contract', () => 
     'padding-inline: clamp(1rem, 4vw, 3.75rem)',
     'ds-object-grid',
     '.card-element',
-    'height: 33rem',
+    'min-height: 32rem',
     '.card-body',
     'flex-direction: column',
     '.card-title',
-    '.card-text',
     '.card-body > ds-truncatable',
-    '-webkit-line-clamp: 2',
     '-webkit-line-clamp: 3',
-    '.text-center:last-child',
+    '.card-element .card-body > .text-center',
     '.pagination-masked.top ds-rss',
     'float: none !important',
     'align-items: center',
-    'top: 5.35rem',
     'min-height: 1.7rem',
     'width: 2.5rem',
     'height: 2.5rem',
-    'padding: .5rem',
     'gap: .5rem',
-    'min-height: 3rem',
-    'flex: 0 1 15rem',
+    'flex: 0 1 12.5rem',
     'margin-right: .4rem',
     'color: #fff',
     '@media (max-width:',

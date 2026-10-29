@@ -32,6 +32,8 @@ test('home-page template does not have hardcoded Portuguese text', () => {
     'Pesquise no acervo',
     'Normas e Portarias',
     'POPs e Procedimentos',
+    'Guias e Manuais',
+    'Legislações e Portarias',
     'Produção Científica',
     'Relatórios de Produtividade',
     'Acesso rápido',
@@ -128,11 +130,60 @@ test('category search result headers are translated in pt-BR and en', () => {
   const pt = JSON5.parse(readFileSync(ptBrUrl, 'utf8'));
   const en = JSON5.parse(readFileSync(enUrl, 'utf8'));
 
-  for (const configuration of ['pcirnNormas', 'pcirnPops', 'pcirnProducao', 'pcirnRelatorios']) {
+  for (const configuration of ['pcirnNormas', 'pcirnPops', 'pcirnPap', 'pcirnNotasTecnicas', 'pcirnRelatorios', 'pcirnMemoriaInstitucional']) {
     const key = `${configuration}.search.results.head`;
     assert.ok(pt[key], `Missing pt-BR key: ${key}`);
     assert.ok(en[key], `Missing en key: ${key}`);
   }
+
+  assert.equal(pt['pcirnNormas.search.results.head'], 'Legislações e Portarias');
+  assert.equal(en['pcirnNormas.search.results.head'], 'Legislation and Ordinances');
+  assert.equal(pt['pcirnPops.search.results.head'], 'POP');
+  assert.equal(en['pcirnPops.search.results.head'], 'POP');
+  assert.equal(pt['pcirnPap.search.results.head'], 'PAP');
+  assert.equal(en['pcirnPap.search.results.head'], 'PAP');
+});
+
+test('retired guide and manual labels stay out of the navigation and templates', () => {
+  const pt = JSON5.parse(readFileSync(ptBrUrl, 'utf8'));
+  const en = JSON5.parse(readFileSync(enUrl, 'utf8'));
+  const removedKeys = [
+    'pcirnGuiasManuais.search.results.head',
+    'pcirn.home.search.chips.aria',
+    'pcirn.home.search.chip.regulations',
+    'pcirn.home.search.chip.pops',
+    'pcirn.home.search.chip.research',
+    'pcirn.home.search.chip.reports',
+    'pcirn.document-type.MANUAL_GUIA',
+    'pcirn.document-type.MANUAL_GESTAO',
+    'pcirn.document-type.MANUAL_TECNICO_E_GUIA',
+    'pcirn.document-type.MANUAL_TÉCNICO_E_GUIA',
+    'pcirn.document-type.MANUAL_DE_GESTAO_E_PLANEJAMENTO',
+    'pcirn.document-type.MANUAL_DE_GESTÃO_E_PLANEJAMENTO',
+  ];
+  for (const key of removedKeys) {
+    assert.ok(!(key in pt), `Retired pt-BR key still present: ${key}`);
+    assert.ok(!(key in en), `Retired en key still present: ${key}`);
+  }
+
+  const collectionListUrl = new URL(
+    '../dspace-angular/source/src/themes/custom/app/collection-list-page/collection-list-page.component.html',
+    import.meta.url,
+  );
+  const templates = [
+    readFileSync(homePageUrl, 'utf8'),
+    readFileSync(collectionListUrl, 'utf8'),
+  ];
+  for (const tpl of templates) {
+    for (const str of ['Guias e Manuais', 'POPs e Procedimentos', 'Normas e Portarias']) {
+      assert.ok(!tpl.includes(str), `Retired label hardcoded in template: ${str}`);
+    }
+  }
+
+  const discoveryUrl = new URL('../dspace/config/spring/api/discovery.xml', import.meta.url);
+  const vocabularyUrl = new URL('../dspace/config/controlled-vocabularies/pcirn-document-types.xml', import.meta.url);
+  assert.ok(!readFileSync(discoveryUrl, 'utf8').includes('pcirnGuiasManuais'));
+  assert.doesNotMatch(readFileSync(vocabularyUrl, 'utf8'), /MANUAL_(GUIA|GESTAO)/);
 });
 
 

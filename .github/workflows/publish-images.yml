@@ -170,6 +170,34 @@ jobs:
             fi
           done < <(jq -r '.[] | [.version, .script] | @tsv' scripts/flyway-history.json)
 
+          # The reverse check: a new migration in the source tree that was
+          # never added to the history would be applied by the image but not
+          # expected by the installer. The next install/update would then
+          # reject the database as divergent.
+          while IFS= read -r migration; do
+            if ! jq -e --arg script "${migration}" 'any(.[]; .script == $script)' \
+                 scripts/flyway-history.json > /dev/null; then
+              echo "::error::migration fonte ausente do histórico: ${migration}"
+              missing=$((missing + 1))
+            fi
+          done < <(find dspace-api/src/main/resources/org/dspace/storage/rdbms/sqlmigration/postgres \
+                        -maxdepth 1 -name 'V*.sql' -printf '%f\n' | sort)
+
+          # The fresh profile is an explicit second history. Its SQL files are
+          # copied from the institutional directory by dspace-api/pom.xml,
+          # except the fresh-only role seed, which lives in its own directory.
+          while IFS= read -r migration; do
+            if [[ "${migration}" == "V9.4_2026.10.13__pcirn_fresh_roles.sql" ]]; then
+              path="dspace-api/src/main/resources/org/dspace/storage/rdbms/fresh/postgres"
+            else
+              path="dspace-api/src/main/resources/org/dspace/storage/rdbms/sqlmigration/postgres"
+            fi
+            if ! find "${path}" -maxdepth 1 -name "${migration}" | grep -q .; then
+              echo "::error::migration fresh ausente do fonte: ${migration}"
+              missing=$((missing + 1))
+            fi
+          done < <(jq -r '.[].script | select(startswith("V"))' scripts/flyway-fresh-history.json | sort -u)
+
           if [ "${missing}" -gt 0 ]; then
             echo "Regenere scripts/flyway-history.json com scripts/flyway-history.sh"
             echo "contra um banco migrado antes de publicar."
@@ -183,6 +211,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Check installer syntax and automated tests
+        run: |
+          python3 -m pip install PyYAML
+          python3 -m compileall -q deploy/nti scripts/package-installer.py
+          bash -n install.sh deploy/nti/dspacepcirn scripts/release-manifest.sh
+          python3 -m unittest discover -s deploy/nti/tests
 
       - name: Build and run the unit tests
         # The same gate the branch build uses. A tag that does not compile or
@@ -458,15 +493,30 @@ jobs:
             --angular-digest "$(awk '{print $2}' /tmp/published/angular.txt)" \
             --solr-digest "$(awk '{print $2}' /tmp/published/solr.txt)" \
             --migrations scripts/flyway-history.json \
+            --fresh-migrations scripts/flyway-fresh-history.json \
             --repository-owner "${{ github.repository_owner }}" \
             --output release-manifest.json
           cat release-manifest.json
+
+      - name: Verify immutable registry inputs and package the installer
+        run: |
+          set -euo pipefail
+          while IFS= read -r image; do
+            docker buildx imagetools inspect "$image" --raw > /tmp/image-index.json
+            printf '%s  /tmp/image-index.json\n' "${image##*@sha256:}" | sha256sum -c -
+            jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] | contains(["amd64", "arm64"])' /tmp/image-index.json
+          done < <(jq -r '.images[]' release-manifest.json)
+          python3 scripts/package-installer.py --output dspacepcirn-installer.tar.gz
+          sha256sum -c dspacepcirn-installer.tar.gz.sha256
 
       - name: Upload the manifest
         uses: actions/upload-artifact@v7
         with:
           name: release-manifest
-          path: release-manifest.json
+          path: |
+            release-manifest.json
+            dspacepcirn-installer.tar.gz
+            dspacepcirn-installer.tar.gz.sha256
           if-no-files-found: error
           retention-days: 90
 
@@ -474,15 +524,25 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.validate.outputs.version }}
-          files: release-manifest.json
+          overwrite_files: false
+          files: |
+            release-manifest.json
+            dspacepcirn-installer.tar.gz
+            dspacepcirn-installer.tar.gz.sha256
           generate_release_notes: true
           body: |
             Images published to GitHub Container Registry:
 
             - `ghcr.io/${{ env.BACKEND_IMAGE }}:${{ needs.validate.outputs.version }}`
             - `ghcr.io/${{ env.ANGULAR_IMAGE }}:${{ needs.validate.outputs.version }}`
+            - `ghcr.io/${{ env.SOLR_IMAGE }}:${{ needs.validate.outputs.version }}`
 
-            Both are multi-architecture manifest lists covering `linux/amd64`
+            All three are multi-architecture manifest lists covering `linux/amd64`
             and `linux/arm64`. `release-manifest.json` records the source commit
             and the digest of each image, so a deployment can pin the exact
             bytes it runs.
+
+            The installer archive includes the E2E runner, fixtures and the
+            homologation guide. A trusted synthetic dump, external PostgreSQL
+            with TLS, private configuration and a disposable Ubuntu VM must be
+            supplied separately. Read deploy/nti/homolog/README.md before testing.

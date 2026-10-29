@@ -6,15 +6,24 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import socket
 import sys
 
-from pcirn import Deployment, Error, configuration, manifest
+from pcirn import (
+    Deployment,
+    Error,
+    configuration,
+    manifest,
+    require_compose,
+    require_pg_clients,
+    require_tools,
+)
 
 GIB = 1024 ** 3
-SUBNET = ipaddress.ip_network('10.250.50.0/24')
+REST_PORT = int(os.environ.get('REST_BIND_PORT', '8501'))
+UI_PORT = int(os.environ.get('UI_BIND_PORT', '4000'))
+SUBNET = ipaddress.ip_network(os.environ.get('DSPACE_NETWORK_SUBNET', '10.250.50.0/24'))
 
 
 def ubuntu():
@@ -29,7 +38,7 @@ def available_memory():
 def ports_available():
     sockets = []
     try:
-        for port in (8501, 4000):
+        for port in (REST_PORT, UI_PORT):
             handle = socket.socket()
             sockets.append(handle)
             handle.bind(('127.0.0.1', port))
@@ -44,12 +53,8 @@ def ports_available():
 def check(dep, release):
     if not ubuntu():
         raise Error('preflight: VM Ubuntu obrigatória para esta homologação')
-    for tool in ('docker', 'psql', 'pg_dump', 'pg_restore'):
-        if not shutil.which(tool):
-            raise Error(f'preflight: pré-requisito ausente: {tool}')
-    version = dep.run(['docker', 'compose', 'version', '--short'], timeout=30).strip().lstrip('v')
-    if tuple(int(x) for x in version.split('.')[:2]) < (2, 20):
-        raise Error('preflight: Compose >= 2.20 obrigatório')
+    require_tools('preflight: ')
+    require_compose(dep, 'preflight: ')
     endpoint = json.loads(dep.run(['docker', 'context', 'inspect', 'default',
                                    '--format', '{{json .Endpoints.docker.Host}}'], timeout=30))
     if not isinstance(endpoint, str) or not endpoint.startswith('unix://'):
@@ -103,10 +108,7 @@ def check(dep, release):
         raise Error('preflight: conexão PostgreSQL sem TLS')
     if not all(pg[k] for k in ('connect', 'create', 'schema', 'owner', 'objects')):
         raise Error('preflight: permissões PostgreSQL insuficientes para migration/backup/restore')
-    for tool in ('psql', 'pg_dump', 'pg_restore'):
-        client = re.search(r'(\d+)\.', dep.run([tool, '--version'], timeout=30))
-        if not client or int(client[1]) != pg['server'] // 10000:
-            raise Error('preflight: clientes PostgreSQL devem ter major igual ao servidor')
+    require_pg_clients(dep, pg['server'] // 10000, 'preflight: ', include_psql=True)
     data_size = sum(p.stat().st_size for p in (root / 'data').rglob('*') if p.is_file())
     required = 30 * GIB + 3 * (pg['size'] + data_size)
     for path in (ancestor, Path(info['DockerRootDir'])):

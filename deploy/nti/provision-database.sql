@@ -1,5 +1,8 @@
 -- Executar como DBA conectado ao banco postgres, fora de uma transação.
 -- Nomes fictícios: ajustar antes de executar. Senha definida interativamente no psql.
+-- Uso: psql -X -h HOST_DO_BANCO -U USUARIO_DBA -d postgres -f deploy/nti/provision-database.sql
+-- Apenas para banco novo; não importa os dados do acervo.
+\set ON_ERROR_STOP on
 CREATE ROLE pcirn LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
 SET password_encryption = 'scram-sha-256';
 \password pcirn

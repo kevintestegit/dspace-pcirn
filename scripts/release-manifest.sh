@@ -29,8 +29,11 @@
 #     --angular-digest sha256:<64 hex> \
 #     --solr-digest sha256:<64 hex> \
 #     --migrations scripts/flyway-history.json \
+#     [--fresh-migrations scripts/flyway-fresh-history.json] \
 #     [--repository-owner ORG] \
 #     [--output release-manifest.json]
+#
+# Informe --migrations, --fresh-migrations ou ambos.
 set -Eeuo pipefail
 
 version=
@@ -40,6 +43,7 @@ backend_digest=
 angular_digest=
 solr_digest=
 migrations=
+fresh_migrations=
 registry=ghcr.io
 owner=
 output=release-manifest.json
@@ -55,10 +59,11 @@ while [[ $# -gt 0 ]]; do
     --angular-digest) angular_digest="$2"; shift 2 ;;
     --solr-digest)    solr_digest="$2";    shift 2 ;;
     --migrations)     migrations="$2";     shift 2 ;;
+    --fresh-migrations) fresh_migrations="$2"; shift 2 ;;
     --registry)       registry="$2";       shift 2 ;;
     --repository-owner) owner="$2";        shift 2 ;;
     --output)         output="$2";         shift 2 ;;
-    -h|--help)        sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help)        sed -n '2,42p' "$0"; exit 0 ;;
     *) die "argumento desconhecido: $1" ;;
   esac
 done
@@ -68,7 +73,8 @@ done
 [[ -n "${backend_digest}" ]] || die "--backend-digest e obrigatorio"
 [[ -n "${angular_digest}" ]] || die "--angular-digest e obrigatorio"
 [[ -n "${solr_digest}" ]]    || die "--solr-digest e obrigatorio"
-[[ -n "${migrations}" ]]     || die "--migrations e obrigatorio"
+[[ -n "${migrations}" || -n "${fresh_migrations}" ]] \
+  || die "--migrations ou --fresh-migrations e obrigatorio"
 
 # The manifest carries SemVer; the git tag may be v-prefixed.
 version="${version#v}"
@@ -91,21 +97,38 @@ if [[ -z "${owner}" ]]; then
 fi
 owner="$(printf '%s' "${owner}" | tr '[:upper:]' '[:lower:]')"
 
-[[ -f "${migrations}" ]] || die "arquivo de migrations nao encontrado: ${migrations}"
-history="$(jq '.' "${migrations}")"
-count="$(printf '%s' "${history}" | jq 'length')"
-[[ "${count}" -gt 0 ]] || die "database.migrations esta vazio"
+history=null
+count=0
+if [[ -n "${migrations}" ]]; then
+  [[ -f "${migrations}" ]] || die "arquivo de migrations nao encontrado: ${migrations}"
+  history="$(jq '.' "${migrations}")"
+  count="$(printf '%s' "${history}" | jq 'length')"
+  [[ "${count}" -gt 0 ]] || die "database.migrations esta vazio"
 
-# Reject anything the installer would refuse, so a broken manifest never ships.
-printf '%s' "${history}" | jq -e '
-  all(.[];
-    (keys | sort) == ["checksum","script","version"]
-    and (.version | test("^[0-9]+(\\.[0-9]+)*$"))
-    and (.script | type == "string")
-    and (.checksum == null or (.checksum | type == "number"))
-  )' >/dev/null || die "database.migrations invalido"
-[[ "$(printf '%s' "${history}" | jq '[.[].version] | unique | length')" == "${count}" ]] \
-  || die "database.migrations tem version repetida"
+  # Reject anything the installer would refuse, so a broken manifest never ships.
+  printf '%s' "${history}" | jq -e '
+    all(.[];
+      (keys | sort) == ["checksum","script","version"]
+      and (.version | test("^[0-9]+(\\.[0-9]+)*$"))
+      and (.script | type == "string")
+      and (.checksum == null or (.checksum | type == "number"))
+    )' >/dev/null || die "database.migrations invalido"
+  [[ "$(printf '%s' "${history}" | jq '[.[].version] | unique | length')" == "${count}" ]] \
+    || die "database.migrations tem version repetida"
+fi
+
+fresh_history=null
+if [[ -n "${fresh_migrations}" ]]; then
+  [[ -f "${fresh_migrations}" ]] || die "historico de bootstrap nao encontrado"
+  fresh_history="$(jq -e 'select(type == "array" and length > 0)
+    | select(all(.[]; (keys | sort) == ["checksum","script","version"]
+      and (.version | test("^[0-9]+(\\.[0-9]+)*$"))
+      and (.script | type == "string")
+      and (.checksum == null or (.checksum | type == "number"))))
+    | select(([.[].version] | unique | length) == length)
+    | select(any(.[]; .script == "V9.4_2026.10.13__pcirn_fresh_roles.sql"))' \
+    "${fresh_migrations}")" || die "historico de bootstrap invalido ou sem evidencia de pcirn-fresh-v1"
+fi
 
 jq -n \
   --arg version "${version}" \
@@ -116,6 +139,7 @@ jq -n \
   --arg solrRef "${registry}/${owner}/dspace-pcirn-solr@${solr_digest}" \
   --arg frontendRef "${registry}/${owner}/dspace-pcirn-angular@${angular_digest}" \
   --argjson migrations "${history}" \
+  --argjson freshMigrations "${fresh_history}" \
   '{
      schema_version: 1,
      version: $version,
@@ -124,7 +148,9 @@ jq -n \
        solr: $solrRef,
        frontend: $frontendRef
      },
-     database: { migrations: $migrations },
+     database: ((if $migrations == null then {} else {migrations: $migrations} end) +
+       (if $freshMigrations == null then {} else
+         {fresh_bootstrap: "pcirn-fresh-v1", fresh_migrations: $freshMigrations} end)),
      source: {
        commit: $commit,
        angularCommit: (if $angularCommit == "" then null else $angularCommit end)
@@ -132,4 +158,5 @@ jq -n \
      createdAt: $createdAt
    }' > "${output}"
 
-printf 'Manifesto %s escrito em %s (%s migrations)\n' "${version}" "${output}" "${count}"
+printf 'Manifesto %s escrito em %s (%s migrations, %s fresh)\n' \
+  "${version}" "${output}" "${count}" "$(printf '%s' "${fresh_history}" | jq 'if . == null then 0 else length end')"

@@ -33,7 +33,7 @@ class HomologationTests(unittest.TestCase):
         self.args = Namespace(execute_on_disposable_vm=True, root=str(self.base / 'dspacepcirn-homolog'),
                               restored_config=configs[0], empty_config=configs[1],
                               manifest_a=str(self.fixture.target), manifest_b=str(b), fixture_dump=str(dump),
-                              authorize_migrations=True, authorize_empty_migrations=True)
+                              authorize_migrations=True, authorize_empty_migrations=True, empty_manifest=None)
 
     def tearDown(self):
         self.fixture.tearDown()
@@ -54,6 +54,41 @@ class HomologationTests(unittest.TestCase):
         with mock.patch.dict(os.environ, self.fixture.env), mock.patch.object(e2e_homolog.preflight, 'check'):
             with self.assertRaisesRegex(e2e_homolog.pcirn.Error, 'vazios'):
                 e2e_homolog.run(self.args)
+        self.assertFalse(Path(self.args.root).exists())
+
+    def test_partial_run_is_not_approved(self):
+        self.args.authorize_empty_migrations = False
+        with mock.patch.dict(os.environ, self.fixture.env), mock.patch.object(e2e_homolog.preflight, 'check'):
+            self.assertEqual(e2e_homolog.run(self.args), 2)
+        report = json.loads((Path(self.args.root) / 'homolog-report.json').read_text())
+        self.assertFalse(report['passed'])
+        self.assertEqual(report['authorized_empty'], 'not_run')
+
+    def test_separate_fresh_empty_manifest_completes_the_cycle(self):
+        config = Path(self.args.empty_config)
+        data = json.loads(config.read_text())
+        data['DB_PROFILE'] = 'fresh'
+        config.write_text(json.dumps(data))
+        self.args.empty_manifest = self.args.manifest_b
+        target = Path(self.args.manifest_b)
+        data = json.loads(target.read_text())
+        data['database']['fresh_bootstrap'] = 'pcirn-fresh-v1'
+        data['database']['fresh_migrations'] = data['database']['migrations']
+        target.write_text(json.dumps(data))
+        with mock.patch.dict(os.environ, self.fixture.env), mock.patch.object(e2e_homolog.preflight, 'check'):
+            self.assertEqual(e2e_homolog.run(self.args), 0)
+        report = json.loads((Path(self.args.root) / 'homolog-report.json').read_text())
+        self.assertEqual(report['empty_release'], data['version'])
+        self.assertTrue(report['passed'])
+
+    def test_unsupported_fresh_profile_is_rejected_before_writes(self):
+        path = Path(self.args.empty_config)
+        data = json.loads(path.read_text())
+        data['DB_PROFILE'] = 'fresh'
+        path.write_text(json.dumps(data))
+        self.args.empty_manifest = self.args.manifest_b
+        with self.assertRaisesRegex(e2e_homolog.pcirn.Error, 'incompatível'):
+            e2e_homolog.run(self.args)
         self.assertFalse(Path(self.args.root).exists())
 
     def test_fixture_major_mismatch_rejected_before_writes(self):

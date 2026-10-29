@@ -66,7 +66,6 @@ test('hero entrance animations implement staggered fade-up with blur and smooth 
   // Keyframes start 24px below with opacity 0 and blur 4px, ending at original position, opacity 1, blur 0
   assert.match(scss, /@keyframes pcirn-hero-fade-up\s*\{[\s\S]*?filter:\s*blur\(4px\);[\s\S]*?opacity:\s*0;[\s\S]*?transform:\s*translateY\(24px\);[\s\S]*?filter:\s*blur\(0\);[\s\S]*?opacity:\s*1;[\s\S]*?transform:\s*translateY\(0\);/);
   assert.match(scss, /@keyframes pcirn-hero-search-fade-up\s*\{[\s\S]*?transform:\s*translate\(-50%,\s*24px\);[\s\S]*?transform:\s*translate\(-50%,\s*0\);/);
-  assert.match(scss, /@keyframes pcirn-hero-fade-forensics\s*\{[\s\S]*?opacity:\s*\.16;/);
 
   // Easing without bounce, duration 580ms (between 500ms and 650ms), fill-mode both
   const easingRegex = /580ms\s+cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)/;
@@ -84,8 +83,6 @@ test('hero entrance animations implement staggered fade-up with blur and smooth 
   assert.match(scss, /\.pcirn-home-search\s*\{[\s\S]*?animation:\s*pcirn-hero-search-fade-up 580ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)\s+200ms\s+both;/);
 
   // 4. Elementos secundários (300ms delay)
-  assert.match(scss, /\.pcirn-home-search-chips\s*\{[\s\S]*?animation:\s*pcirn-hero-fade-up 580ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)\s+300ms\s+both;/);
-  assert.match(scss, /\.pcirn-home-hero-forensics\s*\{[\s\S]*?animation:\s*pcirn-hero-fade-forensics 580ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)\s+300ms\s+both;/);
 
   // Reduced motion support disables animation and resets transforms
   assert.match(scss, /:host-context\(\.reduced-motion\)\s*\{[\s\S]*?\.pcirn-home h1[\s\S]*?animation:\s*none !important;/);

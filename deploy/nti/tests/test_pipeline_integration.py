@@ -85,6 +85,23 @@ class ManifestContractTests(unittest.TestCase):
         self.assertEqual(len(data['database']['migrations']),
                          len(json.loads(self.history().read_text())))
 
+    def test_fresh_only_manifest_is_accepted_by_the_installer(self):
+        output = self.base / 'fresh.json'
+        subprocess.run(
+            [str(REPO / 'scripts/release-manifest.sh'),
+             '--version', '1.0.0', '--commit', '0' * 40,
+             '--backend-digest', 'sha256:' + 'a' * 64,
+             '--angular-digest', 'sha256:' + 'b' * 64,
+             '--solr-digest', 'sha256:' + 'c' * 64,
+             '--fresh-migrations', str(REPO / 'scripts/flyway-fresh-history.json'),
+             '--repository-owner', 'kevintestegit',
+             '--output', str(output)],
+            check=True, capture_output=True, text=True)
+        data = pcirn.manifest(output)
+        self.assertNotIn('migrations', data['database'])
+        self.assertEqual(data['database']['fresh_bootstrap'], 'pcirn-fresh-v1')
+        self.assertTrue(data['database']['fresh_migrations'])
+
     def test_published_history_is_a_supported_version_and_unique(self):
         data = pcirn.manifest(pipeline_manifest(self.base, 'v1.0.0', self.history()))
         versions = [m['version'] for m in data['database']['migrations']]
@@ -211,6 +228,8 @@ class RestoredDatabaseTests(unittest.TestCase):
         self.assertIn('divergente', process.stderr)
 
 
+@unittest.skipUnless((REPO / 'dspace-api').is_dir(),
+                     'requires the full DSpace source tree')
 class ReleaseArtifactTests(unittest.TestCase):
     """Nothing that ships may carry credentials or a local configuration."""
 
@@ -282,6 +301,38 @@ class ReleaseArtifactTests(unittest.TestCase):
                 self.assertTrue(matches, f'Java migration missing: {leaf}')
                 continue
             self.assertTrue(path.is_file(), f'applied migration missing: {script}')
+
+    def test_every_source_migration_is_in_the_published_history(self):
+        history = {row['script'] for row in
+                   json.loads((REPO / 'scripts/flyway-history.json').read_text())}
+        migration_dir = (REPO / 'dspace-api/src/main/resources/org/dspace/storage/rdbms'
+                         / 'sqlmigration/postgres')
+        tracked = subprocess.run(
+            ['git', '-C', str(REPO), 'ls-files', '--',
+             str(migration_dir.relative_to(REPO))],
+            capture_output=True, text=True, check=True).stdout.splitlines()
+        source = {Path(path).name for path in tracked
+                  if Path(path).name.startswith('V') and path.endswith('.sql')}
+        self.assertEqual(source - history, set(),
+                         'Regenere scripts/flyway-history.json antes de publicar')
+        fresh = {row['script'] for row in
+                 json.loads((REPO / 'scripts/flyway-fresh-history.json').read_text())}
+        institutional_only = {
+            'V9.4_2026.08.14__pcirn_mvp_access.sql',
+            'V9.4_2026.08.15__pcirn_sector_access.sql',
+            'V9.4_2026.08.16__pcirn_sector_membership_reconcile.sql',
+            'V9.4_2026.08.17__pcirn_portarias_collections.sql',
+            'V9.4_2026.08.18__pcirn_public_portarias.sql',
+            'V9.4_2026.08.24__pcirn_sector_submission_and_shared_read.sql',
+            'V9.4_2026.09.15__pcirn_public_items.sql',
+            'V9.4_2026.09.17__pcirn_access_reconcile.sql',
+            'V9.4_2026.09.23__pcirn_memoria_institucional_collection.sql',
+        }
+        fresh_source = (source - institutional_only) | {
+            'V9.4_2026.10.13__pcirn_fresh_roles.sql',
+        }
+        self.assertEqual(fresh_source - fresh, set(),
+                         'Regenere scripts/flyway-fresh-history.json antes de publicar')
 
 
 class PublishTagTests(unittest.TestCase):

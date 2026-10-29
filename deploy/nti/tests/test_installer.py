@@ -152,6 +152,37 @@ class InstallerTests(unittest.TestCase):
         return self.cli('install', '--config', self.config, '--manifest', self.target,
                         '--authorize-migrations')
 
+    def test_manifest_accepts_fresh_only_history(self):
+        data = release()
+        del data['database']['migrations']
+        data['database']['fresh_bootstrap'] = 'pcirn-fresh-v1'
+        data['database']['fresh_migrations'] = release(migrations=2)['database']['migrations']
+        path = self.base / 'fresh-only.json'
+        path.write_text(json.dumps(data))
+        self.assertEqual(pcirn.manifest(path), data)
+
+    def test_fresh_profile_uses_its_own_history_and_backend_configuration(self):
+        config = json.loads(self.config.read_text())
+        config['DB_PROFILE'] = 'fresh'
+        self.config.write_text(json.dumps(config))
+        data = release()
+        data['database']['fresh_bootstrap'] = 'pcirn-fresh-v1'
+        data['database']['fresh_migrations'] = release(migrations=2)['database']['migrations']
+        self.target.write_text(json.dumps(data))
+        (self.base / 'wanted.json').write_text(json.dumps([
+            dict(row, success=True) for row in data['database']['fresh_migrations']]))
+        self.install()
+        self.assertEqual(len(self.state()['rows']), 2)
+        self.assertIn('db__P__pcirn__P__profile: fresh', (self.root / 'compose.yml').read_text())
+        self.assertIn('db.pcirn.profile = fresh', (self.root / 'dspace/config/local.cfg').read_text())
+        self.cli('install', '--config', self.config, '--manifest', self.target)
+        self.cli('backup')
+        backup = next((self.root / 'backups').glob('backup-*'))
+        self.assertEqual(json.loads((backup / 'metadata.json').read_text())['database_profile'], 'fresh')
+        config['DB_PROFILE'] = 'institutional'
+        with self.assertRaisesRegex(pcirn.Error, 'outra instalação/banco'):
+            pcirn.verified_backup(backup, pcirn.Deployment(self.root, config=config))
+
     def next_release(self, migrations=1):
         data = release('1.1.0', migrations)
         self.target.write_text(json.dumps(data))
@@ -203,6 +234,17 @@ class InstallerTests(unittest.TestCase):
         before = len(self.calls())
         self.cli('update', '--manifest', self.target)
         self.assertFalse(any('migrate' in a for _, a in self.calls()[before:]))
+
+    def test_update_refreshes_installed_management_scripts(self):
+        self.install()
+        installed = self.root / 'bin/data_migration.py'
+        installed.write_text('# stale management script\n')
+        self.next_release()
+        self.cli('update', '--manifest', self.target)
+        self.assertIn('def migrate_data', installed.read_text())
+        for name in ('pcirn_config.py', 'pcirn_cli.py'):
+            self.assertTrue((self.root / 'bin' / name).is_file())
+        self.assertEqual((self.root / 'bin/dspacepcirn').stat().st_mode & 0o777, 0o700)
 
     def test_failed_dump_aborts_update_and_recovers(self):
         self.install(); self.next_release(2); self.fail('dump')
