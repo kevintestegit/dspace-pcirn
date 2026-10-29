@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringWriter;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -445,10 +446,12 @@ public class Email {
             message.setSubject(subject);
         }
 
+        String dspaceDirectory = getConfigurationService().getProperty("dspace.dir");
+        Path emailDirectory = dspaceDirectory == null || dspaceDirectory.isBlank()
+                ? Paths.get("config", "emails")
+                : Paths.get(dspaceDirectory, "config", "emails");
         PcirnEmailTemplateRenderer.RenderedEmail rendered =
-                new PcirnEmailTemplateRenderer(Paths.get(
-                        getConfigurationService().getProperty("dspace.dir"),
-                        "config", "emails")).render(mergedBody, emailTitle,
+                new PcirnEmailTemplateRenderer(emailDirectory).render(mergedBody, emailTitle,
                         emailActionLabel, emailActionUrl, emailPreheader, emailCategory, emailAuxiliary);
         body = appendPlainTextActionFallback(mergedBody, emailActionLabel, emailActionUrl)
                 + (emailAuxiliary.isBlank() ? "" : "\n\n" + emailAuxiliary);

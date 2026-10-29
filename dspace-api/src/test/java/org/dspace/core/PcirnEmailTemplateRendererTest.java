@@ -268,6 +268,25 @@ public final class PcirnEmailTemplateRendererTest {
         return renderer.render("Corpo", "Título", actionLabel, actionUrl, "Prévia", "Categoria", "");
     }
 
+    @Test
+    public void missingLayoutAndAssetsFallBackWithoutFailingEmail()
+            throws IOException {
+        Path emptyDirectory = Files.createTempDirectory("pcirn-email-");
+        PcirnEmailTemplateRenderer renderer = new PcirnEmailTemplateRenderer(
+                emptyDirectory);
+
+        PcirnEmailTemplateRenderer.RenderedEmail rendered = renderer.render(
+                "Corpo do e-mail", "Título", "Abrir", "https://example.org/item",
+                "Prévia", "Categoria", "");
+
+        assertThat(rendered.html(), allOf(
+                containsString("Corpo do e-mail"),
+                containsString("Título"),
+                containsString("https://example.org/item"),
+                not(containsString("$email"))));
+        assertThat(rendered.inlineResources(), hasSize(0));
+    }
+
     private PcirnEmailTemplateRenderer.RenderedEmail renderWithActionUrl(
             String actionUrl)
             throws IOException {

@@ -14,6 +14,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -21,13 +22,39 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringEscapeUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Renders a merged DSpace email body in the shared PCIRN HTML shell.
  */
 public final class PcirnEmailTemplateRenderer {
 
+    private static final Logger LOG = LogManager.getLogger(PcirnEmailTemplateRenderer.class);
+
     private static final String LAYOUT_FILE = "pcirn-layout.html";
+
+    private static final String FALLBACK_LAYOUT = """
+            <!doctype html>
+            <html lang="pt-BR">
+            <head><meta charset="utf-8"><title>$emailTitle</title></head>
+            <body style="margin:0; padding:24px; background:#f4f7fb; color:#092e61;
+                         font-family:Arial,sans-serif;">
+              <div style="max-width:640px; margin:0 auto; padding:24px; background:#ffffff;">
+                <div style="color:#0e4f97; font-size:12px; font-weight:700;
+                            letter-spacing:1.4px;">$emailCategory</div>
+                <h1 style="margin:24px 0; font-size:28px; line-height:36px;">$emailTitle</h1>
+                $emailActionBlock
+                $emailAuxiliaryHtml
+                $emailBodyHtml
+              </div>
+            </body>
+            </html>
+            """;
+
+    private static volatile Path cachedLayoutPath;
+    private static volatile long cachedLayoutModified;
+    private static volatile String cachedLayout;
 
     private static final String ASSETS_DIRECTORY = "assets";
 
@@ -97,8 +124,7 @@ public final class PcirnEmailTemplateRenderer {
             String preheader,
             String category,
             String auxiliaryText) throws IOException {
-        String layout = Files.readString(
-                emailDirectory.resolve(LAYOUT_FILE), StandardCharsets.UTF_8);
+        String layout = readLayout();
         String escapedActionLabel = escape(actionLabel);
         String escapedActionUrl = escapeActionUrl(actionLabel, actionUrl);
         String actionBlock = "";
@@ -114,11 +140,41 @@ public final class PcirnEmailTemplateRenderer {
                 .replace("$emailAuxiliaryHtml", renderBody(auxiliaryText))
                 .replace("$emailBodyHtml", renderBody(bodyText));
 
-        return new RenderedEmail(html, List.of(
-                inlineResource("pcirn-dspace-logo", DSPACE_LOGO, "image/svg+xml"),
-                inlineResource("pcirn-policiacientifica", POLICIA_CIENTIFICA, "image/png"),
-                inlineResource("pcirn-estado-rn", ESTADO_RN, "image/png"),
-                inlineResource("pcirn-footer-building", FOOTER_BUILDING, "image/png")));
+        List<InlineResource> resources = new ArrayList<>();
+        addResource(resources, "pcirn-dspace-logo", DSPACE_LOGO, "image/svg+xml");
+        addResource(resources, "pcirn-policiacientifica", POLICIA_CIENTIFICA, "image/png");
+        addResource(resources, "pcirn-estado-rn", ESTADO_RN, "image/png");
+        addResource(resources, "pcirn-footer-building", FOOTER_BUILDING, "image/png");
+        return new RenderedEmail(html, List.copyOf(resources));
+    }
+
+    private String readLayout() {
+        Path path = emailDirectory.resolve(LAYOUT_FILE);
+        try {
+            long modified = Files.getLastModifiedTime(path).toMillis();
+            String cached = cachedLayout;
+            if (path.equals(cachedLayoutPath) && modified == cachedLayoutModified && cached != null) {
+                return cached;
+            }
+            String layout = Files.readString(path, StandardCharsets.UTF_8);
+            cachedLayoutPath = path;
+            cachedLayoutModified = modified;
+            cachedLayout = layout;
+            return layout;
+        } catch (IOException e) {
+            LOG.warn("PCIRN email layout unavailable at {}; using the plain fallback shell", path, e);
+            return FALLBACK_LAYOUT;
+        }
+    }
+
+    private void addResource(List<InlineResource> resources, String contentId,
+                             String fileName, String mimeType) {
+        try {
+            resources.add(inlineResource(contentId, fileName, mimeType));
+        } catch (IOException e) {
+            LOG.warn("PCIRN email asset unavailable at {}; sending without it",
+                    emailDirectory.resolve(ASSETS_DIRECTORY).resolve(fileName), e);
+        }
     }
 
     private String renderBody(String bodyText) {
